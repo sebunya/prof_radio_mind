@@ -1,0 +1,15 @@
+{
+  "currentTrack": {
+    "id": "iheart-2501-20260524-00601",
+    "title": "Anti-Hero",
+    "artist": "Taylor Swift",
+    "album": "Midnights",
+    "startTime": 1748044860,
+    "duration": 200,
+    "imageUrl": "https://image.iheart.com/thyImageHost/a/b/c.jpg",
+    "explicit": false
+  },
+  "stationId": "2501",
+  "streamUrl": "https://stream.iheart.com/2501",
+  "listenerId": null
+}
