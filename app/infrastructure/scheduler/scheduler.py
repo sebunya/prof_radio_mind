@@ -15,12 +15,50 @@ from app.infrastructure.collectors.nova_radiowave import NovaRadiowaveCollector
 
 logger = logging.getLogger(__name__)
 
-# Deterministic station/source IDs — match what the DB seeder assigns at first run.
-# Derived from seed call-signs so they are stable across restarts.
-_NOVA_STATION_ID = uuid.uuid5(uuid.NAMESPACE_DNS, "station.NOVA969")
-_NOVA_SOURCE_ID = uuid.uuid5(uuid.NAMESPACE_DNS, "source.NOVA969.radiowave")
-_KIIS_STATION_ID = uuid.uuid5(uuid.NAMESPACE_DNS, "station.KIISFM")
-_KIIS_SOURCE_ID = uuid.uuid5(uuid.NAMESPACE_DNS, "source.KIISFM.iheart")
+# Deterministic IDs — must match app.application.seeder._NS derivation exactly.
+_NS = uuid.NAMESPACE_DNS
+_NOVA_STATION_ID = uuid.uuid5(_NS, "station.NOVA969")
+_NOVA_SOURCE_ID = uuid.uuid5(_NS, "source.NOVA969.radiowave")
+_KIIS_STATION_ID = uuid.uuid5(_NS, "station.KIISFM")
+_KIIS_SOURCE_ID = uuid.uuid5(_NS, "source.KIISFM.iheart")
+
+
+async def _persist_result(result: object) -> None:
+    """Persist a CollectorResult (runs, payloads, events) to the DB."""
+    from app.infrastructure.collectors.base import CollectorResult
+    from app.infrastructure.database.repositories.collector_run_repo import (
+        SQLCollectorRunRepository,
+    )
+    from app.infrastructure.database.repositories.no_track_event_repo import (
+        SQLNoTrackEventRepository,
+    )
+    from app.infrastructure.database.repositories.play_event_repo import SQLPlayEventRepository
+    from app.infrastructure.database.repositories.raw_payload_repo import SQLRawPayloadRepository
+    from app.infrastructure.database.session import _get_factory as _factory
+
+    if not isinstance(result, CollectorResult):
+        return
+
+    try:
+        async with _factory()() as session:
+            run_repo = SQLCollectorRunRepository(session)
+            await run_repo.save(result.collector_run)
+
+            if result.raw_payload:
+                payload_repo = SQLRawPayloadRepository(session)
+                await payload_repo.save(result.raw_payload)
+
+            play_repo = SQLPlayEventRepository(session)
+            for play_event in result.play_events:
+                await play_repo.save(play_event)
+
+            no_track_repo = SQLNoTrackEventRepository(session)
+            for no_track_event in result.no_track_events:
+                await no_track_repo.save(no_track_event)
+
+            await session.commit()
+    except Exception as exc:
+        logger.error("persist_result_failed error=%s run_id=%s", exc, result.collector_run.id)
 
 
 async def job_collect_nova_diary() -> None:
@@ -37,6 +75,7 @@ async def job_collect_nova_diary() -> None:
         len(result.play_events),
         len(result.no_track_events),
     )
+    await _persist_result(result)
 
 
 async def job_collect_kiis_now_playing() -> None:
@@ -53,14 +92,11 @@ async def job_collect_kiis_now_playing() -> None:
         len(result.play_events),
         len(result.no_track_events),
     )
+    await _persist_result(result)
 
 
 async def job_nightly_reconciliation() -> None:
-    """Nightly deduplication and normalization reconciliation (runs daily 17:00 UTC).
-
-    Creates a MANUAL_REVIEW item for operator awareness until full normalization
-    persistence is wired in a future pass.
-    """
+    """Nightly deduplication and normalization reconciliation (runs daily 17:00 UTC)."""
     from app.application.review.store import review_store
     from app.domain.entities.review_item import ReviewItem, ReviewItemType
 

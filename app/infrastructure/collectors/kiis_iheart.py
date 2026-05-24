@@ -12,8 +12,6 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 
-import httpx
-
 from app.domain.entities.no_track_event import NoTrackEvent, NoTrackReason
 from app.domain.entities.play_event import PlayEvent
 from app.infrastructure.collectors.base import BaseCollector
@@ -44,8 +42,10 @@ class KIISIHeartCollector(BaseCollector):
         return f"{self.base_url}/{self.iheart_station_id}/currentTrack"
 
     async def fetch_raw(self) -> tuple[bytes, int | None, str | None]:
+        from app.infrastructure.http.client import build_client
+
         url = self._build_url()
-        async with httpx.AsyncClient(timeout=_REQUEST_TIMEOUT) as client:
+        async with await build_client(timeout=_REQUEST_TIMEOUT) as client:
             response = await client.get(url)
         return response.content, response.status_code, response.headers.get("content-type")
 

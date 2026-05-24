@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from apscheduler.triggers.cron import CronTrigger
@@ -66,17 +66,21 @@ async def test_nightly_reconciliation_is_no_op() -> None:
 
 @pytest.mark.anyio
 async def test_nova_diary_job_invokes_collector() -> None:
-    mock_result = MagicMock()
-    mock_result.collector_run.status.value = "completed"
-    mock_result.play_events = []
-    mock_result.no_track_events = []
+    import uuid
+
+    from app.domain.entities.collector_run import CollectorRun
+    from app.infrastructure.collectors.base import CollectorResult
+
+    run = CollectorRun.create(source_id=uuid.uuid4(), station_id=uuid.uuid4())
+    real_result = CollectorResult(collector_run=run, play_events=[], no_track_events=[])
 
     mock_collector = AsyncMock()
-    mock_collector.run = AsyncMock(return_value=mock_result)
+    mock_collector.run = AsyncMock(return_value=real_result)
 
-    with patch(
-        "app.infrastructure.scheduler.scheduler.NovaRadiowaveCollector",
-        return_value=mock_collector,
+    _sched = "app.infrastructure.scheduler.scheduler"
+    with (
+        patch(f"{_sched}.NovaRadiowaveCollector", return_value=mock_collector),
+        patch(f"{_sched}._persist_result", new_callable=AsyncMock),
     ):
         await job_collect_nova_diary()
 
@@ -85,17 +89,21 @@ async def test_nova_diary_job_invokes_collector() -> None:
 
 @pytest.mark.anyio
 async def test_kiis_job_invokes_collector() -> None:
-    mock_result = MagicMock()
-    mock_result.collector_run.status.value = "completed"
-    mock_result.play_events = []
-    mock_result.no_track_events = []
+    import uuid
+
+    from app.domain.entities.collector_run import CollectorRun
+    from app.infrastructure.collectors.base import CollectorResult
+
+    run = CollectorRun.create(source_id=uuid.uuid4(), station_id=uuid.uuid4())
+    real_result = CollectorResult(collector_run=run, play_events=[], no_track_events=[])
 
     mock_collector = AsyncMock()
-    mock_collector.run = AsyncMock(return_value=mock_result)
+    mock_collector.run = AsyncMock(return_value=real_result)
 
-    with patch(
-        "app.infrastructure.scheduler.scheduler.KIISIHeartCollector",
-        return_value=mock_collector,
+    _sched = "app.infrastructure.scheduler.scheduler"
+    with (
+        patch(f"{_sched}.KIISIHeartCollector", return_value=mock_collector),
+        patch(f"{_sched}._persist_result", new_callable=AsyncMock),
     ):
         await job_collect_kiis_now_playing()
 

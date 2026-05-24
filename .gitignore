@@ -13,6 +13,8 @@ ENV/
 
 # Secrets — never commit
 .env
+.env.production
+.env.staging
 
 # Build artifacts
 dist/

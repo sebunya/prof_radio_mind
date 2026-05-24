@@ -13,7 +13,19 @@ class Settings(BaseSettings):
 
     # Security
     max_upload_bytes: int = 10 * 1024 * 1024  # 10 MB
-    rate_limit_rpm: int = 30  # requests per minute per IP on rate-limited endpoints
+    rate_limit_rpm: int = 30
+    api_key: str = ""  # empty = auth disabled (dev); set in production
+
+    # Proxy rotation — comma-separated list of proxy URLs (http:// or socks5://)
+    # Example: http://user:pass@proxy1:8080,socks5://proxy2:1080
+    proxy_urls: str = ""
+
+    # S3 / Hetzner Object Storage (leave blank to use local filesystem)
+    s3_endpoint_url: str = ""       # e.g. https://fsn1.your-objectstorage.com
+    s3_access_key_id: str = ""
+    s3_secret_access_key: str = ""
+    s3_bucket_name: str = "rmias-raw-payloads"
+    s3_region: str = "eu-central-1"
 
 
 settings = Settings()

@@ -9,6 +9,7 @@ from pydantic import BaseModel
 
 from app.application.imports.csv_importer import import_csv
 from app.application.imports.manual_csv import ImportStatus
+from app.core.auth import require_api_key
 from app.core.rate_limiter import require_not_rate_limited
 from app.core.settings import settings
 
@@ -32,7 +33,7 @@ class ImportResponse(BaseModel):
     "/{station_id}",
     response_model=ImportResponse,
     status_code=201,
-    dependencies=[Depends(require_not_rate_limited)],
+    dependencies=[Depends(require_api_key), Depends(require_not_rate_limited)],
 )
 async def create_manual_import(
     station_id: uuid.UUID,
