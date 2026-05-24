@@ -1,0 +1,39 @@
+services:
+  app:
+    build: .
+    ports:
+      - "${APP_PORT:-8000}:8000"
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - raw_payloads:/data/raw_payloads
+    restart: unless-stopped
+    develop:
+      watch:
+        - action: sync
+          path: ./app
+          target: /app/app
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-rmias}
+      POSTGRES_USER: ${POSTGRES_USER:-rmias}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-rmias}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-rmias}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  raw_payloads:
