@@ -1,12 +1,17 @@
-"""Verify all Phase A SQLAlchemy models are importable and have expected tablenames."""
+"""Verify all Phase A and Phase B SQLAlchemy models are importable and have expected tablenames."""
 
 from app.infrastructure.database.models import (
     Alert,
+    Artist,
     AuditLog,
     CollectorRun,
     Error,
+    NoTrackEventDB,
+    PlayEventDB,
     RawPayload,
+    ReviewItem,
     Role,
+    Song,
     Source,
     SourceRoutePriority,
     SourceValidation,
@@ -42,7 +47,19 @@ def test_phase_a_model_tablenames() -> None:
 def test_phase_a_model_count() -> None:
     from app.infrastructure.database.models import __all__ as all_models
 
-    assert len(all_models) == 14
+    assert len(all_models) == 19  # 14 Phase A + 5 Phase B
+
+
+def test_phase_b_model_tablenames() -> None:
+    expected = {
+        Artist: "artists",
+        Song: "songs",
+        PlayEventDB: "play_events",
+        NoTrackEventDB: "no_track_events",
+        ReviewItem: "review_items",
+    }
+    for model, tablename in expected.items():
+        assert model.__tablename__ == tablename, f"{model.__name__}: expected {tablename}"
 
 
 def test_raw_payload_has_sha256_column() -> None:
