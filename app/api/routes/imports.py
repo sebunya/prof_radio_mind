@@ -4,13 +4,17 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, UploadFile
 from pydantic import BaseModel
 
 from app.application.imports.csv_importer import import_csv
 from app.application.imports.manual_csv import ImportStatus
+from app.core.rate_limiter import require_not_rate_limited
+from app.core.settings import settings
 
 router = APIRouter(prefix="/manual-imports", tags=["imports"])
+
+_ALLOWED_CONTENT_TYPES = {"text/csv", "application/csv", "application/vnd.ms-excel"}
 
 
 class ImportResponse(BaseModel):
@@ -24,7 +28,12 @@ class ImportResponse(BaseModel):
     errors: list[str]
 
 
-@router.post("/{station_id}", response_model=ImportResponse, status_code=201)
+@router.post(
+    "/{station_id}",
+    response_model=ImportResponse,
+    status_code=201,
+    dependencies=[Depends(require_not_rate_limited)],
+)
 async def create_manual_import(
     station_id: uuid.UUID,
     file: UploadFile,
@@ -32,11 +41,23 @@ async def create_manual_import(
     if not file.filename or not file.filename.endswith(".csv"):
         raise HTTPException(status_code=400, detail="Only .csv files are accepted")
 
+    if file.content_type and file.content_type not in _ALLOWED_CONTENT_TYPES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid content-type '{file.content_type}' — expected text/csv",
+        )
+
     raw_bytes = await file.read()
     if not raw_bytes:
         raise HTTPException(status_code=400, detail="Uploaded file is empty")
 
-    # Use placeholder source_id and collector_run_id — real IDs wired in Pass 16
+    if len(raw_bytes) > settings.max_upload_bytes:
+        limit_mb = settings.max_upload_bytes // (1024 * 1024)
+        raise HTTPException(
+            status_code=413,
+            detail=f"File exceeds maximum allowed size of {limit_mb} MB",
+        )
+
     source_id = uuid.uuid5(uuid.NAMESPACE_DNS, f"manual_csv_{station_id}")
     collector_run_id = uuid.uuid4()
 

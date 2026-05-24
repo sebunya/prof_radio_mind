@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime
 
 from fastapi import APIRouter, HTTPException, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.application.review.store import review_store
 from app.domain.entities.review_item import ReviewItemStatus
@@ -29,18 +29,18 @@ class ReviewItemResponse(BaseModel):
 
 
 class ResolveRequest(BaseModel):
-    resolved_by: str
-    notes: str | None = None
+    resolved_by: str = Field(min_length=1, max_length=255)
+    notes: str | None = Field(default=None, max_length=2000)
 
 
 class DismissRequest(BaseModel):
-    resolved_by: str
-    notes: str | None = None
+    resolved_by: str = Field(min_length=1, max_length=255)
+    notes: str | None = Field(default=None, max_length=2000)
 
 
 class EscalateRequest(BaseModel):
-    resolved_by: str
-    notes: str | None = None
+    resolved_by: str = Field(min_length=1, max_length=255)
+    notes: str | None = Field(default=None, max_length=2000)
 
 
 def _to_response(item: object) -> ReviewItemResponse:
