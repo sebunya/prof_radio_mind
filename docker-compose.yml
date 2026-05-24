@@ -5,7 +5,12 @@ services:
       - "${APP_PORT:-8000}:8000"
     env_file:
       - .env
-    # Pass 2 will add depends_on: db once DATABASE_URL is wired
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - raw_payloads:/data/raw_payloads
+    restart: unless-stopped
     develop:
       watch:
         - action: sync
@@ -19,7 +24,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-rmias}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-rmias}
     ports:
-      - "5432:5432"
+      - "${DB_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -27,6 +32,8 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
 
 volumes:
   postgres_data:
+  raw_payloads:
