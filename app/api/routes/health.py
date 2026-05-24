@@ -5,9 +5,6 @@ from __future__ import annotations
 from fastapi import APIRouter, Request
 from pydantic import BaseModel
 
-from app.application.review.store import review_store
-from app.domain.entities.review_item import ReviewItemStatus
-
 router = APIRouter()
 
 _SERVICE = "radio-music-intelligence"
@@ -27,10 +24,22 @@ class HealthResponse(BaseModel):
 
 
 @router.get("/health", response_model=HealthResponse)
-def health(request: Request) -> HealthResponse:
+async def health(request: Request) -> HealthResponse:
     scheduler = getattr(request.app.state, "scheduler", None)
     scheduler_status = "running" if (scheduler and scheduler.running) else "stopped"
-    pending_count = len(review_store.list(ReviewItemStatus.PENDING))
+
+    pending_count = 0
+    try:
+        from app.infrastructure.database.repositories.review_item_repo import (
+            SQLReviewItemRepository,
+        )
+        from app.infrastructure.database.session import _get_factory
+
+        async with _get_factory()() as session:
+            repo = SQLReviewItemRepository(session)
+            pending_count = await repo.count_pending()
+    except Exception:
+        pass
 
     return HealthResponse(
         status="ok",

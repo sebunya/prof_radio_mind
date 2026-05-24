@@ -25,6 +25,7 @@ def _to_domain(row: PlayEventDB) -> PlayEvent:
         raw_label=row.raw_label,
         source_event_id=row.source_event_id,
         fingerprint=row.fingerprint,
+        attribution=row.attribution,
     )
 
 
@@ -45,6 +46,7 @@ class SQLPlayEventRepository(PlayEventRepository):
                 played_at=event.played_at,
                 source_event_id=event.source_event_id,
                 fingerprint=event.fingerprint,
+                attribution=event.attribution,
             )
         )
         await self._session.flush()

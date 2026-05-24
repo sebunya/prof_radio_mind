@@ -19,6 +19,8 @@ class PlayEvent:
     raw_label: str | None = None
     # SHA-256 fingerprint used for deduplication when source_event_id is absent
     fingerprint: str | None = None
+    # radiowave | iheart | manual_csv — set by the collector or importer
+    attribution: str | None = None
 
     @classmethod
     def create(
@@ -33,6 +35,7 @@ class PlayEvent:
         source_event_id: str | None = None,
         raw_label: str | None = None,
         fingerprint: str | None = None,
+        attribution: str | None = None,
     ) -> PlayEvent:
         return cls(
             id=uuid.uuid4(),
@@ -45,4 +48,5 @@ class PlayEvent:
             source_event_id=source_event_id,
             raw_label=raw_label,
             fingerprint=fingerprint,
+            attribution=attribution,
         )

@@ -1,0 +1,77 @@
+/**
+ * RMIAS API client — all fetch calls go through here.
+ * Auth is disabled in dev mode (API_KEY env var not set), so no key is sent.
+ */
+
+export async function apiCall(method, path, body = null, isFormData = false) {
+  const headers = {};
+  if (body && !isFormData) headers['Content-Type'] = 'application/json';
+
+  const opts = { method, headers };
+  if (body) opts.body = isFormData ? body : JSON.stringify(body);
+
+  const resp = await fetch(path, opts);
+
+  if (!resp.ok) {
+    let detail = `HTTP ${resp.status}`;
+    try {
+      const j = await resp.json();
+      if (Array.isArray(j.detail)) {
+        detail = j.detail.map(e => e.msg || JSON.stringify(e)).join('; ');
+      } else {
+        detail = j.detail || detail;
+      }
+    } catch { /* ignore */ }
+    const err = new Error(detail);
+    err.status = resp.status;
+    throw err;
+  }
+
+  if (resp.status === 204) return null;
+  const ct = resp.headers.get('content-type') || '';
+  return ct.includes('json') ? resp.json() : resp.blob();
+}
+
+export const API = {
+  // ── Health ──────────────────────────────────────────────────
+  health: () => apiCall('GET', '/health'),
+
+  // ── Stations ────────────────────────────────────────────────
+  stations: () => apiCall('GET', '/stations'),
+
+  // ── Review queue ────────────────────────────────────────────
+  reviewItems: (status) =>
+    apiCall('GET', `/review-items${status ? `?status=${status}` : ''}`),
+  reviewItem: (id) => apiCall('GET', `/review-items/${id}`),
+  resolveItem: (id, body) => apiCall('POST', `/review-items/${id}/resolve`, body),
+  dismissItem: (id, body) => apiCall('POST', `/review-items/${id}/dismiss`, body),
+  escalateItem: (id, body) => apiCall('POST', `/review-items/${id}/escalate`, body),
+
+  // ── Reports ─────────────────────────────────────────────────
+  generateReport: (stationId, body) =>
+    apiCall('POST', `/reports/${stationId}/generate`, body),
+  downloadReport: (stationId, date) =>
+    apiCall('GET', `/reports/${stationId}/download?report_date=${date}`),
+  masterReport: (date) =>
+    apiCall('GET', `/reports/master/download${date ? `?report_date=${date}` : ''}`),
+
+  // ── Playlist ─────────────────────────────────────────────────
+  analyseRotation: (stationId, days = 7) =>
+    apiCall('POST', `/playlist/${stationId}/analyse?lookback_days=${days}`),
+  approveRec: (id, body) =>
+    apiCall('POST', `/playlist/recommendations/${id}/approve`, body),
+
+  // ── ARIA Charts ──────────────────────────────────────────────
+  ingestAria: (date) =>
+    apiCall('POST', `/charts/aria/ingest${date ? `?chart_date=${date}` : ''}`),
+  latestAria: () => apiCall('GET', '/charts/aria/latest'),
+
+  // ── Webhooks ─────────────────────────────────────────────────
+  webhooks: () => apiCall('GET', '/webhooks'),
+  registerWebhook: (body) => apiCall('POST', '/webhooks', body),
+  deleteWebhook: (id) => apiCall('DELETE', `/webhooks/${id}`),
+
+  // ── Backfill ─────────────────────────────────────────────────
+  backfill: (stationId, date, formData) =>
+    apiCall('POST', `/backfill/${stationId}?broadcast_date=${date}`, formData, true),
+};

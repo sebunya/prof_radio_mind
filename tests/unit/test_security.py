@@ -15,9 +15,17 @@ _VALID_CSV = Path(__file__).parent.parent / "fixtures/csv/capital_fm_valid.csv"
 
 @pytest.fixture
 def client() -> TestClient:
+    from unittest.mock import AsyncMock, MagicMock
+
+    from app.infrastructure.database.session import get_db
     from app.main import app
 
-    return TestClient(app)
+    async def fake_db():
+        yield MagicMock()
+
+    app.dependency_overrides[get_db] = fake_db
+    yield TestClient(app)
+    app.dependency_overrides.clear()
 
 
 @pytest.fixture(autouse=True)
@@ -92,28 +100,20 @@ def test_import_invalid_content_type_returns_400(client: TestClient) -> None:
 # --- Review endpoint validation ---
 
 def test_resolve_empty_resolved_by_returns_422(client: TestClient) -> None:
-    from app.api.routes import review as review_module
-    from app.domain.entities.review_item import ReviewItem, ReviewItemType
-
-    item = ReviewItem.create(item_type=ReviewItemType.DRIFT, title="Test")
-    review_module.review_store.add(item)
+    import uuid
 
     r = client.post(
-        f"/review-items/{item.id}/resolve",
+        f"/review-items/{uuid.uuid4()}/resolve",
         json={"resolved_by": ""},
     )
     assert r.status_code == 422
 
 
 def test_resolve_too_long_resolved_by_returns_422(client: TestClient) -> None:
-    from app.api.routes import review as review_module
-    from app.domain.entities.review_item import ReviewItem, ReviewItemType
-
-    item = ReviewItem.create(item_type=ReviewItemType.DRIFT, title="Test")
-    review_module.review_store.add(item)
+    import uuid
 
     r = client.post(
-        f"/review-items/{item.id}/resolve",
+        f"/review-items/{uuid.uuid4()}/resolve",
         json={"resolved_by": "x" * 256},
     )
     assert r.status_code == 422

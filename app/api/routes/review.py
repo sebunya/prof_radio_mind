@@ -5,11 +5,14 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.application.review.store import review_store
-from app.domain.entities.review_item import ReviewItemStatus
+from app.core.auth import require_api_key
+from app.domain.entities.review_item import ReviewItem, ReviewItemStatus
+from app.infrastructure.database.repositories.review_item_repo import SQLReviewItemRepository
+from app.infrastructure.database.session import get_db
 
 router = APIRouter(prefix="/review-items", tags=["review"])
 
@@ -43,10 +46,7 @@ class EscalateRequest(BaseModel):
     notes: str | None = Field(default=None, max_length=2000)
 
 
-def _to_response(item: object) -> ReviewItemResponse:
-    from app.domain.entities.review_item import ReviewItem
-
-    assert isinstance(item, ReviewItem)
+def _to_response(item: ReviewItem) -> ReviewItemResponse:
     return ReviewItemResponse(
         id=str(item.id),
         status=item.status.value,
@@ -63,8 +63,9 @@ def _to_response(item: object) -> ReviewItemResponse:
 
 
 @router.get("", response_model=list[ReviewItemResponse])
-def list_review_items(
+async def list_review_items(
     status: str | None = Query(default=None, description="Filter by status"),
+    session: AsyncSession = Depends(get_db),
 ) -> list[ReviewItemResponse]:
     filter_status: ReviewItemStatus | None = None
     if status is not None:
@@ -76,20 +77,35 @@ def list_review_items(
                 status_code=400,
                 detail=f"Invalid status '{status}'. Valid values: {valid}",
             )
-    return [_to_response(i) for i in review_store.list(filter_status)]
+    repo = SQLReviewItemRepository(session)
+    items = await repo.list(filter_status)
+    return [_to_response(i) for i in items]
 
 
 @router.get("/{item_id}", response_model=ReviewItemResponse)
-def get_review_item(item_id: uuid.UUID) -> ReviewItemResponse:
-    item = review_store.get(item_id)
+async def get_review_item(
+    item_id: uuid.UUID,
+    session: AsyncSession = Depends(get_db),
+) -> ReviewItemResponse:
+    repo = SQLReviewItemRepository(session)
+    item = await repo.get(item_id)
     if item is None:
         raise HTTPException(status_code=404, detail=f"Review item {item_id} not found")
     return _to_response(item)
 
 
-@router.post("/{item_id}/resolve", response_model=ReviewItemResponse)
-def resolve_review_item(item_id: uuid.UUID, body: ResolveRequest) -> ReviewItemResponse:
-    item = review_store.get(item_id)
+@router.post(
+    "/{item_id}/resolve",
+    response_model=ReviewItemResponse,
+    dependencies=[Depends(require_api_key)],
+)
+async def resolve_review_item(
+    item_id: uuid.UUID,
+    body: ResolveRequest,
+    session: AsyncSession = Depends(get_db),
+) -> ReviewItemResponse:
+    repo = SQLReviewItemRepository(session)
+    item = await repo.get(item_id)
     if item is None:
         raise HTTPException(status_code=404, detail=f"Review item {item_id} not found")
     if not item.is_open:
@@ -98,13 +114,22 @@ def resolve_review_item(item_id: uuid.UUID, body: ResolveRequest) -> ReviewItemR
             detail=f"Review item {item_id} is already {item.status.value}",
         )
     item.resolve(resolved_by=body.resolved_by, notes=body.notes)
-    review_store.update(item)
+    await repo.update(item)
     return _to_response(item)
 
 
-@router.post("/{item_id}/dismiss", response_model=ReviewItemResponse)
-def dismiss_review_item(item_id: uuid.UUID, body: DismissRequest) -> ReviewItemResponse:
-    item = review_store.get(item_id)
+@router.post(
+    "/{item_id}/dismiss",
+    response_model=ReviewItemResponse,
+    dependencies=[Depends(require_api_key)],
+)
+async def dismiss_review_item(
+    item_id: uuid.UUID,
+    body: DismissRequest,
+    session: AsyncSession = Depends(get_db),
+) -> ReviewItemResponse:
+    repo = SQLReviewItemRepository(session)
+    item = await repo.get(item_id)
     if item is None:
         raise HTTPException(status_code=404, detail=f"Review item {item_id} not found")
     if not item.is_open:
@@ -113,13 +138,22 @@ def dismiss_review_item(item_id: uuid.UUID, body: DismissRequest) -> ReviewItemR
             detail=f"Review item {item_id} is already {item.status.value}",
         )
     item.dismiss(resolved_by=body.resolved_by, notes=body.notes)
-    review_store.update(item)
+    await repo.update(item)
     return _to_response(item)
 
 
-@router.post("/{item_id}/escalate", response_model=ReviewItemResponse)
-def escalate_review_item(item_id: uuid.UUID, body: EscalateRequest) -> ReviewItemResponse:
-    item = review_store.get(item_id)
+@router.post(
+    "/{item_id}/escalate",
+    response_model=ReviewItemResponse,
+    dependencies=[Depends(require_api_key)],
+)
+async def escalate_review_item(
+    item_id: uuid.UUID,
+    body: EscalateRequest,
+    session: AsyncSession = Depends(get_db),
+) -> ReviewItemResponse:
+    repo = SQLReviewItemRepository(session)
+    item = await repo.get(item_id)
     if item is None:
         raise HTTPException(status_code=404, detail=f"Review item {item_id} not found")
     if not item.is_open:
@@ -128,5 +162,5 @@ def escalate_review_item(item_id: uuid.UUID, body: EscalateRequest) -> ReviewIte
             detail=f"Review item {item_id} is already {item.status.value}",
         )
     item.escalate(resolved_by=body.resolved_by, notes=body.notes)
-    review_store.update(item)
+    await repo.update(item)
     return _to_response(item)

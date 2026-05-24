@@ -1,29 +1,14 @@
-"""Tests for the review queue API endpoints."""
+"""Tests for the review queue API endpoints (DB-backed, mocked session)."""
 
 from __future__ import annotations
 
 import uuid
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
 
-from app.application.review.store import ReviewStore
 from app.domain.entities.review_item import ReviewItem, ReviewItemStatus, ReviewItemType
-
-
-@pytest.fixture(autouse=True)
-def isolated_store(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Replace the module-level review_store with a fresh instance per test."""
-    fresh = ReviewStore()
-    monkeypatch.setattr("app.application.review.store.review_store", fresh)
-    monkeypatch.setattr("app.api.routes.review.review_store", fresh)
-
-
-@pytest.fixture
-def client() -> TestClient:
-    from app.main import app
-
-    return TestClient(app)
 
 
 def _make_item(
@@ -33,23 +18,51 @@ def _make_item(
     return ReviewItem.create(item_type=item_type, title=title)
 
 
+def _make_mock_repo(items: list[ReviewItem] | None = None) -> AsyncMock:
+    items = items or []
+    repo = AsyncMock()
+    repo.list.return_value = items
+    repo.get.side_effect = lambda item_id: next(
+        (i for i in items if i.id == item_id), None
+    )
+    repo.add = AsyncMock()
+    repo.update = AsyncMock()
+    repo.count_pending.return_value = 0
+    return repo
+
+
+@pytest.fixture
+def client():
+    from app.infrastructure.database.session import get_db
+    from app.main import app
+
+    async def fake_db():
+        yield MagicMock()
+
+    app.dependency_overrides[get_db] = fake_db
+    yield TestClient(app)
+    app.dependency_overrides.clear()
+
+
 # --- GET /review-items ---
 
 def test_list_review_items_empty(client: TestClient) -> None:
-    r = client.get("/review-items")
+    with patch(
+        "app.api.routes.review.SQLReviewItemRepository",
+        return_value=_make_mock_repo([]),
+    ):
+        r = client.get("/review-items")
     assert r.status_code == 200
     assert r.json() == []
 
 
-def test_list_review_items_returns_added_item(
-    client: TestClient, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    from app.api.routes import review as review_module
-
+def test_list_review_items_returns_added_item(client: TestClient) -> None:
     item = _make_item(title="Drift detected")
-    review_module.review_store.add(item)
-
-    r = client.get("/review-items")
+    with patch(
+        "app.api.routes.review.SQLReviewItemRepository",
+        return_value=_make_mock_repo([item]),
+    ):
+        r = client.get("/review-items")
     assert r.status_code == 200
     items = r.json()
     assert len(items) == 1
@@ -57,63 +70,66 @@ def test_list_review_items_returns_added_item(
     assert items[0]["status"] == "pending"
 
 
-def test_list_review_items_filter_by_status(
-    client: TestClient, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    from app.api.routes import review as review_module
-
+def test_list_review_items_filter_by_status(client: TestClient) -> None:
     pending = _make_item(title="Pending item")
-    resolved = _make_item(title="Resolved item")
-    resolved.resolve(resolved_by="operator")
-    review_module.review_store.add(pending)
-    review_module.review_store.add(resolved)
+    mock_repo = _make_mock_repo([pending])
 
-    r = client.get("/review-items?status=pending")
+    with patch("app.api.routes.review.SQLReviewItemRepository", return_value=mock_repo):
+        r = client.get("/review-items?status=pending")
     assert r.status_code == 200
     assert len(r.json()) == 1
     assert r.json()[0]["title"] == "Pending item"
 
 
 def test_list_review_items_invalid_status_returns_400(client: TestClient) -> None:
-    r = client.get("/review-items?status=bogus")
+    with patch(
+        "app.api.routes.review.SQLReviewItemRepository",
+        return_value=_make_mock_repo([]),
+    ):
+        r = client.get("/review-items?status=bogus")
     assert r.status_code == 400
 
 
 # --- GET /review-items/{item_id} ---
 
-def test_get_review_item_found(
-    client: TestClient, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    from app.api.routes import review as review_module
-
+def test_get_review_item_found(client: TestClient) -> None:
     item = _make_item(title="Single item")
-    review_module.review_store.add(item)
-
-    r = client.get(f"/review-items/{item.id}")
+    with patch(
+        "app.api.routes.review.SQLReviewItemRepository",
+        return_value=_make_mock_repo([item]),
+    ):
+        r = client.get(f"/review-items/{item.id}")
     assert r.status_code == 200
     assert r.json()["id"] == str(item.id)
     assert r.json()["title"] == "Single item"
 
 
 def test_get_review_item_not_found(client: TestClient) -> None:
-    r = client.get(f"/review-items/{uuid.uuid4()}")
+    with patch(
+        "app.api.routes.review.SQLReviewItemRepository",
+        return_value=_make_mock_repo([]),
+    ):
+        r = client.get(f"/review-items/{uuid.uuid4()}")
     assert r.status_code == 404
 
 
 # --- POST /review-items/{item_id}/resolve ---
 
-def test_resolve_pending_item_returns_200(
-    client: TestClient, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    from app.api.routes import review as review_module
-
+def test_resolve_pending_item_returns_200(client: TestClient) -> None:
     item = _make_item()
-    review_module.review_store.add(item)
+    mock_repo = _make_mock_repo([item])
 
-    r = client.post(
-        f"/review-items/{item.id}/resolve",
-        json={"resolved_by": "operator@example.com", "notes": "Confirmed correct"},
-    )
+    def fake_update(updated_item: ReviewItem) -> None:
+        items = [updated_item if i.id == updated_item.id else i for i in [item]]
+        mock_repo.list.return_value = items
+
+    mock_repo.update = AsyncMock(side_effect=fake_update)
+
+    with patch("app.api.routes.review.SQLReviewItemRepository", return_value=mock_repo):
+        r = client.post(
+            f"/review-items/{item.id}/resolve",
+            json={"resolved_by": "operator@example.com", "notes": "Confirmed correct"},
+        )
     assert r.status_code == 200
     body = r.json()
     assert body["status"] == "reviewed"
@@ -122,75 +138,77 @@ def test_resolve_pending_item_returns_200(
     assert body["resolved_at"] is not None
 
 
-def test_resolve_already_resolved_returns_409(
-    client: TestClient, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    from app.api.routes import review as review_module
-
+def test_resolve_already_resolved_returns_409(client: TestClient) -> None:
     item = _make_item()
     item.resolve(resolved_by="first_operator")
-    review_module.review_store.add(item)
-
-    r = client.post(
-        f"/review-items/{item.id}/resolve",
-        json={"resolved_by": "second_operator"},
-    )
+    with patch(
+        "app.api.routes.review.SQLReviewItemRepository",
+        return_value=_make_mock_repo([item]),
+    ):
+        r = client.post(
+            f"/review-items/{item.id}/resolve",
+            json={"resolved_by": "second_operator"},
+        )
     assert r.status_code == 409
 
 
 def test_resolve_nonexistent_item_returns_404(client: TestClient) -> None:
-    r = client.post(
-        f"/review-items/{uuid.uuid4()}/resolve",
-        json={"resolved_by": "operator"},
-    )
+    with patch(
+        "app.api.routes.review.SQLReviewItemRepository",
+        return_value=_make_mock_repo([]),
+    ):
+        r = client.post(
+            f"/review-items/{uuid.uuid4()}/resolve",
+            json={"resolved_by": "operator"},
+        )
     assert r.status_code == 404
 
 
 # --- POST /review-items/{item_id}/dismiss ---
 
-def test_dismiss_pending_item_returns_200(
-    client: TestClient, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    from app.api.routes import review as review_module
-
+def test_dismiss_pending_item_returns_200(client: TestClient) -> None:
     item = _make_item()
-    review_module.review_store.add(item)
-
-    r = client.post(
-        f"/review-items/{item.id}/dismiss",
-        json={"resolved_by": "operator@example.com"},
-    )
+    with patch(
+        "app.api.routes.review.SQLReviewItemRepository",
+        return_value=_make_mock_repo([item]),
+    ):
+        r = client.post(
+            f"/review-items/{item.id}/dismiss",
+            json={"resolved_by": "operator@example.com"},
+        )
     assert r.status_code == 200
     assert r.json()["status"] == "dismissed"
 
 
 def test_dismiss_nonexistent_item_returns_404(client: TestClient) -> None:
-    r = client.post(
-        f"/review-items/{uuid.uuid4()}/dismiss",
-        json={"resolved_by": "operator"},
-    )
+    with patch(
+        "app.api.routes.review.SQLReviewItemRepository",
+        return_value=_make_mock_repo([]),
+    ):
+        r = client.post(
+            f"/review-items/{uuid.uuid4()}/dismiss",
+            json={"resolved_by": "operator"},
+        )
     assert r.status_code == 404
 
 
 # --- POST /review-items/{item_id}/escalate ---
 
-def test_escalate_pending_item_returns_200(
-    client: TestClient, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    from app.api.routes import review as review_module
-
+def test_escalate_pending_item_returns_200(client: TestClient) -> None:
     item = _make_item()
-    review_module.review_store.add(item)
-
-    r = client.post(
-        f"/review-items/{item.id}/escalate",
-        json={"resolved_by": "senior_operator"},
-    )
+    with patch(
+        "app.api.routes.review.SQLReviewItemRepository",
+        return_value=_make_mock_repo([item]),
+    ):
+        r = client.post(
+            f"/review-items/{item.id}/escalate",
+            json={"resolved_by": "senior_operator"},
+        )
     assert r.status_code == 200
     assert r.json()["status"] == "escalated"
 
 
-# --- Domain entity tests ---
+# --- Domain entity tests (no HTTP, no DB) ---
 
 def test_review_item_create_is_pending() -> None:
     item = ReviewItem.create(item_type=ReviewItemType.DRIFT, title="Test")
@@ -216,12 +234,13 @@ def test_review_item_dismiss_closes_item() -> None:
 
 
 def test_review_store_list_sorted_newest_first() -> None:
+    from app.application.review.store import ReviewStore
+
     store = ReviewStore()
     a = ReviewItem.create(item_type=ReviewItemType.DRIFT, title="A")
     b = ReviewItem.create(item_type=ReviewItemType.DRIFT, title="B")
     store.add(a)
     store.add(b)
     listed = store.list()
-    # Newest first — b was created after a
     assert listed[0].title == "B"
     assert listed[1].title == "A"

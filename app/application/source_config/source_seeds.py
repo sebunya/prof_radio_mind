@@ -67,7 +67,16 @@ SOURCE_SEEDS: tuple[SourceSeed, ...] = (
         validation_note="Always available — manual fallback",
     ),
     # --- Capital FM ---
-    # VAL-CAP-001 / VAL-CAP-002: All Capital routes are UNVALIDATED
+    # VAL-CAP-001: iHeart station ID is UNVALIDATED — placeholder used until confirmed
+    SourceSeed(
+        station_call_sign="CAPITALFM",
+        source_type=SourceType.IHEART,
+        name="Capital FM iHeart Now Playing",
+        base_url="https://api.iheart.com/api/v3/live-meta/stream",
+        config={"station_id": "capitalfm"},
+        priority=1,
+        validation_note="UNVALIDATED — VAL-CAP-001 must confirm iHeart station_id before enable",
+    ),
     SourceSeed(
         station_call_sign="CAPITALFM",
         source_type=SourceType.MANUAL_CSV,
@@ -75,6 +84,6 @@ SOURCE_SEEDS: tuple[SourceSeed, ...] = (
         base_url=None,
         config=None,
         priority=99,
-        validation_note="Always available — only confirmed Capital route until Pass 8 validation",
+        validation_note="Always available — manual fallback",
     ),
 )

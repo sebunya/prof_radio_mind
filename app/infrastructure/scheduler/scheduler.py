@@ -10,6 +10,7 @@ from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 
 from app.core.settings import settings
+from app.infrastructure.collectors.capital_iheart import CapitalIHeartCollector
 from app.infrastructure.collectors.kiis_iheart import KIISIHeartCollector
 from app.infrastructure.collectors.nova_radiowave import NovaRadiowaveCollector
 
@@ -21,10 +22,16 @@ _NOVA_STATION_ID = uuid.uuid5(_NS, "station.NOVA969")
 _NOVA_SOURCE_ID = uuid.uuid5(_NS, "source.NOVA969.radiowave")
 _KIIS_STATION_ID = uuid.uuid5(_NS, "station.KIISFM")
 _KIIS_SOURCE_ID = uuid.uuid5(_NS, "source.KIISFM.iheart")
+_CAPITAL_STATION_ID = uuid.uuid5(_NS, "station.CAPITALFM")
+_CAPITAL_SOURCE_ID = uuid.uuid5(_NS, "source.CAPITALFM.iheart")
 
 
 async def _persist_result(result: object) -> None:
     """Persist a CollectorResult (runs, payloads, events) to the DB."""
+    from app.application.normalization.normalizer import (
+        compute_fingerprint,
+        strip_label_from_artist,
+    )
     from app.infrastructure.collectors.base import CollectorResult
     from app.infrastructure.database.repositories.collector_run_repo import (
         SQLCollectorRunRepository,
@@ -50,6 +57,12 @@ async def _persist_result(result: object) -> None:
 
             play_repo = SQLPlayEventRepository(session)
             for play_event in result.play_events:
+                # Compute fingerprint from normalised artist + title if absent
+                if not play_event.fingerprint:
+                    clean_artist = strip_label_from_artist(play_event.raw_artist)
+                    play_event.fingerprint = compute_fingerprint(
+                        clean_artist, play_event.raw_title
+                    )
                 await play_repo.save(play_event)
 
             no_track_repo = SQLNoTrackEventRepository(session)
@@ -95,18 +108,93 @@ async def job_collect_kiis_now_playing() -> None:
     await _persist_result(result)
 
 
+async def job_collect_capital_now_playing() -> None:
+    """Poll Capital FM iHeart now-playing endpoint (runs every 5 minutes)."""
+    collector = CapitalIHeartCollector(
+        source_id=_CAPITAL_SOURCE_ID,
+        station_id=_CAPITAL_STATION_ID,
+        storage_root=settings.raw_payload_storage_path,
+    )
+    result = await collector.run()
+    logger.debug(
+        "capital_now_playing status=%s plays=%d no_tracks=%d",
+        result.collector_run.status.value,
+        len(result.play_events),
+        len(result.no_track_events),
+    )
+    await _persist_result(result)
+
+
 async def job_nightly_reconciliation() -> None:
     """Nightly deduplication and normalization reconciliation (runs daily 17:00 UTC)."""
-    from app.application.review.store import review_store
-    from app.domain.entities.review_item import ReviewItem, ReviewItemType
+    from datetime import UTC, datetime, timedelta
 
-    item = ReviewItem.create(
-        item_type=ReviewItemType.MANUAL_REVIEW,
-        title="Nightly reconciliation completed",
-        description="Deduplication and normalization reconciliation — review any flagged events.",
+    from app.application.normalization.normalizer import (
+        compute_fingerprint,
+        strip_label_from_artist,
     )
-    review_store.add(item)
-    logger.info("nightly_reconciliation completed review_item_id=%s", item.id)
+    from app.domain.entities.review_item import ReviewItem, ReviewItemType
+    from app.infrastructure.database.repositories.review_item_repo import SQLReviewItemRepository
+    from app.infrastructure.database.repositories.station_repo import SQLStationRepository
+    from app.infrastructure.database.session import _get_factory as _factory
+
+    now = datetime.now(UTC)
+    window_start = now - timedelta(hours=25)
+    total_dupes = 0
+
+    try:
+        async with _factory()() as session:
+            station_repo = SQLStationRepository(session)
+            review_repo = SQLReviewItemRepository(session)
+            stations = await station_repo.list_active()
+
+            for station in stations:
+                from app.infrastructure.database.repositories.play_event_repo import (
+                    SQLPlayEventRepository,
+                )
+
+                play_repo = SQLPlayEventRepository(session)
+                events = await play_repo.list_for_station(station.id, window_start, now)
+
+                seen: set[str] = set()
+                dupes = 0
+                for event in events:
+                    artist = strip_label_from_artist(event.raw_artist)
+                    fp = event.fingerprint or compute_fingerprint(artist, event.raw_title)
+                    if fp in seen:
+                        dupes += 1
+                    else:
+                        seen.add(fp)
+
+                if dupes > 0:
+                    total_dupes += dupes
+                    item = ReviewItem.create(
+                        item_type=ReviewItemType.MANUAL_REVIEW,
+                        title=f"Duplicate plays detected: {station.name}",
+                        description=(
+                            f"{dupes} potential duplicate play(s) in the last 25h "
+                            f"for {station.call_sign}."
+                        ),
+                        station_id=station.id,
+                    )
+                    await review_repo.add(item)
+
+            summary = ReviewItem.create(
+                item_type=ReviewItemType.MANUAL_REVIEW,
+                title="Nightly reconciliation completed",
+                description=(
+                    f"Reconciliation window: {window_start.date()} – {now.date()}. "
+                    f"Stations checked: {len(stations)}. "
+                    f"Potential duplicates flagged: {total_dupes}."
+                ),
+            )
+            await review_repo.add(summary)
+            await session.commit()
+
+    except Exception as exc:
+        logger.error("nightly_reconciliation_failed error=%s", exc)
+
+    logger.info("nightly_reconciliation completed total_dupes=%d", total_dupes)
 
 
 def build_scheduler() -> AsyncIOScheduler:
@@ -129,6 +217,16 @@ def build_scheduler() -> AsyncIOScheduler:
         IntervalTrigger(minutes=5),
         id="kiis_now_playing",
         name="KIIS-FM iHeart now-playing poll",
+        replace_existing=True,
+        misfire_grace_time=60,
+    )
+
+    # Capital FM iHeart now-playing — every 5 minutes
+    sched.add_job(
+        job_collect_capital_now_playing,
+        IntervalTrigger(minutes=5),
+        id="capital_now_playing",
+        name="Capital FM iHeart now-playing poll",
         replace_existing=True,
         misfire_grace_time=60,
     )
