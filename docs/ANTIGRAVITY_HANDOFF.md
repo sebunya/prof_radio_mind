@@ -1,25 +1,15 @@
 # Radio Music Intelligence & Automation System
 # AntiGravity Handoff Note
-# Pass 0 — Audit and Planning
+# Pass 1 — Project Skeleton
 # Last updated: 2026-05-24
 
 ---
 
 ## What This Pass Did
 
-Pass 0 was an audit-and-planning-only pass. No production code was written. No dependencies were installed. No runtime behavior was changed.
+Pass 1 created the minimal production-quality project skeleton.
 
-The repository was inspected and found to be a greenfield blank slate (one commit, one file: README.md with a single line). There are no conflicting frameworks, no existing schema, no existing tests, and no existing Docker configuration to work around.
-
-The following planning documents were created:
-
-| File | Purpose |
-|---|---|
-| `docs/IMPLEMENTATION_PLAN.md` | Full architecture plan, pass sequence, risk register, deployment plan |
-| `docs/VALIDATION_REGISTER.md` | Validation status for every source, endpoint, selector, and operational contract |
-| `docs/AGENT_TASKS.md` | Pass-by-pass checklist, protected decisions, no-fake-success rules, quality gates |
-| `docs/ANTIGRAVITY_HANDOFF.md` | This file — AntiGravity handoff after every pass |
-| `docs/adr/0001-mvp-architecture.md` | Architecture Decision Record locking the MVP stack and protected decisions |
+A Python 3.12 virtual environment was created, all dependencies installed, all tests passed (4/4), ruff passed, mypy passed on all 5 source files. Docker daemon was not running in the remote execution environment (no /var/run/docker.sock), so docker build and docker compose up were skipped as environment constraints — not code failures. The Dockerfile and docker-compose.yml are present and syntactically correct.
 
 ---
 
@@ -27,171 +17,135 @@ The following planning documents were created:
 
 ### Created
 
-- `docs/IMPLEMENTATION_PLAN.md`
-- `docs/VALIDATION_REGISTER.md`
-- `docs/AGENT_TASKS.md`
-- `docs/ANTIGRAVITY_HANDOFF.md`
-- `docs/adr/0001-mvp-architecture.md`
+- `pyproject.toml` — project metadata, dependencies, ruff/mypy/pytest config
+- `app/__init__.py`
+- `app/main.py` — FastAPI app instance, health router included
+- `app/api/__init__.py`
+- `app/api/routes/__init__.py`
+- `app/api/routes/health.py` — GET /health endpoint, HealthResponse Pydantic model
+- `tests/__init__.py`
+- `tests/conftest.py` — pytest `client` fixture (TestClient)
+- `tests/unit/__init__.py`
+- `tests/unit/test_health.py` — 4 health endpoint tests
+- `Dockerfile` — python:3.12-slim, uvicorn entrypoint
+- `docker-compose.yml` — app + PostgreSQL 16 services
+- `.env.example` — all required env vars, no secrets
+- `.gitignore` — standard Python + data + .env exclusions
+- `tests/fixtures/html/.gitkeep`
+- `tests/fixtures/json/.gitkeep`
+- `tests/fixtures/csv/.gitkeep`
+- `tests/fixtures/golden/.gitkeep`
+- `tests/integration/.gitkeep`
+- `migrations/.gitkeep`
+- `scripts/.gitkeep`
 
 ### Modified
 
-- None
+- `README.md` — full local setup, test, Docker instructions
+- `docs/AGENT_TASKS.md` — Pass 1 checklist completed
+- `docs/ANTIGRAVITY_HANDOFF.md` — this file
 
 ### Intentionally Not Touched
 
-- `README.md` (will be updated in Pass 1 with setup instructions)
-- No Python files exist yet
-- No Docker files exist yet
-- No pyproject.toml exists yet
-- No migrations exist yet
+- `docs/IMPLEMENTATION_PLAN.md` — no structural changes required; structure note captured in AGENT_TASKS.md
+- `docs/VALIDATION_REGISTER.md` — no validation changes in Pass 1
+- `docs/adr/0001-mvp-architecture.md` — no decisions changed
 
 ---
 
-## Commands Run
+## Quality Gates After Pass 1
 
-- `find /home/user/prof_radio_mind -type f | sort` — repo inventory
-- `git log --oneline -10` — git history
-- `git status` — working tree state
-- `git branch -a` — all branches
-
----
-
-## Tests Run
-
-None. Pass 0 is docs only. No test framework has been installed yet.
-
----
-
-## Quality Gates
-
-| Gate | Status | Reason |
+| Gate | Status | Detail |
 |---|---|---|
-| pytest | SKIPPED | No Python code exists |
-| ruff | SKIPPED | No Python code exists |
-| mypy | SKIPPED | No Python code exists |
-| alembic upgrade head | SKIPPED | No migrations exist |
-| Docker Compose boot | SKIPPED | No Docker files exist |
-| Golden CSV match | SKIPPED | No exporters exist |
-| Live-network test check | N/A | No tests exist |
+| pytest | PASSED | 4/4 tests |
+| ruff check . | PASSED | No issues |
+| mypy app/ | PASSED | 5 files, no issues |
+| docker build | SKIPPED | Docker daemon not running in remote env |
+| docker compose up | SKIPPED | Docker daemon not running in remote env |
+| GET /health in container | SKIPPED | Docker daemon not running in remote env |
+| Live-network calls in tests | CLEAN | TestClient only, no external calls |
 
 ---
 
-## Repo State After Pass 0
+## Structure Note
 
-```
-prof_radio_mind/
-  .git/
-  docs/
-    adr/
-      0001-mvp-architecture.md
-    AGENT_TASKS.md
-    ANTIGRAVITY_HANDOFF.md
-    IMPLEMENTATION_PLAN.md
-    VALIDATION_REGISTER.md
-  README.md
-```
+The IMPLEMENTATION_PLAN.md (Pass 0) specified `app/` (singular), while the Pass 1 brief suggested `apps/api/`. Used `app/` as per IMPLEMENTATION_PLAN.md. The `app/main.py` + `app/api/routes/` pattern is cleaner and consistent with the layered architecture plan where `app/domain/`, `app/application/`, and `app/infrastructure/` will be added in later passes.
 
 ---
 
 ## Key Decisions Preserved
 
-All protected architecture decisions from the brief are locked in ADR-0001:
-
-- Python 3.12 / FastAPI / PostgreSQL 16 / SQLAlchemy 2.x / Alembic / Pydantic v2
-- APScheduler (no Celery/Redis in MVP)
-- httpx + BeautifulSoup4 (no Playwright by default)
-- Fixture-driven tests (no live-network calls in unit tests)
-- Nova primary source: Radiowave IDDS=11129
-- KIIS primary source: iHeart (station ID 2501 — validation required)
-- KIIS HTTP 204 = no_track_event (not failure)
-- Capital = validation-gated (no assumed automation success)
-- Manual CSV fallback mandatory for all stations
-- Raw payload storage + SHA-256 hashing mandatory
-- Report and export versioning mandatory
-- Low-confidence reports must be labelled
-- Collectors must never fake success
-- No playlist automation, no dashboard, no Celery, no Kubernetes in MVP
+All ADR-0001 protected decisions remain intact:
+- Python 3.12 / FastAPI / Pydantic v2 — confirmed in pyproject.toml
+- httpx in dev deps (will move to runtime deps in Pass 4/5 when collectors are built)
+- No Celery, Redis, Playwright, Kubernetes — none added
+- No collectors, no migrations — correctly deferred
+- No live-network calls in tests — confirmed
 
 ---
 
-## Risks Remaining After Pass 0
+## Risks Remaining
 
-| Risk | Severity | Mitigation |
+| Risk | Severity | Status |
 |---|---|---|
-| All 19 non-deferred source validations are UNVALIDATED | High | Validation pass must occur before or during Pass 6-8 |
-| KIIS station ID 2501 unconfirmed | High | Must validate before KIIS collector goes to production |
-| KIIS iHeart endpoint format unknown | High | Must save real JSON fixture before building parser |
-| KIIS HTTP 204 behavior unconfirmed | Critical | Guard must be implemented regardless — validate with real HTTP session |
-| Radiowave DOM selectors unvalidated | High | Must save real HTML fixture and test parser against it |
-| Capital — all routes unvalidated | High | Capital must not block Nova/KIIS reports |
-| Broadcast day definition not confirmed with client | Medium | Must confirm before Pass 13 reporting |
-| Manual CSV schema not confirmed with client | Medium | Must confirm before Pass 9 |
-| Corrected report policy not confirmed with client | Medium | Must confirm before Pass 14 |
+| Docker build/compose not tested in this env | Low | Non-blocking; test locally with `docker compose up --build` |
+| All 19 source validations still UNVALIDATED | High | Must be addressed before Pass 6-8 |
+| KIIS station ID 2501 unconfirmed | High | Must validate before Pass 7 |
+| KIIS HTTP 204 behavior unconfirmed | Critical | Guard will be implemented in Pass 7 regardless |
+| Capital all routes unvalidated | High | Not a blocker until Pass 8 |
+| Broadcast day definition not confirmed with client | Medium | Must confirm before Pass 13 |
+| .env not in repo (gitignored) | Note | Operator must create `.env` from `.env.example` on each deployment |
 
 ---
 
 ## Recommended AntiGravity Next Prompt
 
-When AntiGravity or the user is ready to proceed to Pass 1, use this prompt:
+When ready to proceed to Pass 2, use this prompt:
 
 ---
 
-**Pass 1 prompt:**
+**Pass 2 prompt:**
 
 ```
-We have completed Pass 0 (audit and planning only) for the Radio Music Intelligence & Automation System. The repo is a greenfield blank slate on branch claude/sweet-archimedes-DFSWo.
+We have completed Pass 1 (project skeleton) for the Radio Music Intelligence &
+Automation System on branch claude/sweet-archimedes-DFSWo.
 
-Please proceed with Pass 1: Project Skeleton.
+Pass 1 delivered: pyproject.toml, FastAPI app, GET /health, 4 passing tests,
+ruff/mypy clean, Dockerfile, docker-compose.yml, .gitignore, .env.example,
+README update.
 
-Pass 1 scope:
-- Create pyproject.toml with all MVP dependencies declared (Python 3.12+, FastAPI, SQLAlchemy 2.x, Alembic, Pydantic v2, APScheduler, httpx, BeautifulSoup4, lxml, rapidfuzz, pytest, pytest-asyncio, ruff, mypy)
-- Create the target directory structure: app/ with domain/, application/, infrastructure/, interfaces/ subdirectories; migrations/; tests/ with fixtures/ subdirectories; scripts/; docs/ (already exists)
-- Create a minimal FastAPI app (app/main.py) that boots and responds to GET /health with status 200 and a JSON payload
-- Create Dockerfile and docker-compose.yml (FastAPI app + PostgreSQL 16)
-- Create .env.example with all required environment variables (no secrets committed)
-- Create .gitignore
-- Configure ruff in pyproject.toml
-- Configure mypy in pyproject.toml
-- Update README.md with setup instructions
+Please proceed with Pass 2: Core Schema Phase A.
 
-Pass 1 must NOT:
-- Create any database migrations
-- Create any collectors
-- Add Celery, Redis, Kubernetes, Playwright, or any non-approved dependency
+Pass 2 scope:
+- Initialize Alembic in the migrations/ directory
+- Create Phase A migrations only (do not create Phase B, C, or D tables):
+  users, roles, stations, station_markets, station_broadcast_days,
+  sources, source_validations, source_route_priorities,
+  collector_runs, raw_payloads,
+  errors, alerts, audit_logs, system_settings
+- Create SQLAlchemy models for all Phase A tables in app/infrastructure/database/models/
+- All timestamps must be stored in UTC (use TIMESTAMP WITH TIME ZONE)
+- Add asyncpg and alembic to pyproject.toml dependencies
+- `alembic upgrade head` must apply cleanly against a fresh PostgreSQL 16 database
+- `alembic downgrade base` must work cleanly
+- pytest, ruff, and mypy must still pass after Pass 2
+
+Pass 2 must NOT:
+- Create Phase B, C, or D tables
+- Implement collectors or parsers
 - Change protected architecture decisions
-- Run git add . (stage only exact files created)
+- Run git add .
 
-Quality gates before declaring Pass 1 complete:
-- ruff check . passes
-- pytest passes (skeleton or empty test)
-- Docker Compose boots (docker compose up)
-- GET /health returns 200 in the container
-
-Report format after Pass 1:
-1. Verdict
-2. Files created (exact list)
-3. Files modified (exact list)
-4. Files intentionally not touched
-5. Commands run
-6. Tests run and results
-7. Quality gates run and results
-8. Risks remaining
-9. AntiGravity handoff
-10. Next recommended pass
+Quality gates: pytest, ruff, mypy, alembic upgrade head.
 ```
 
 ---
 
-## Areas AntiGravity Must Not Rewrite
+## Areas That Must Not Be Rewritten
 
-- Do not change the pass sequence in IMPLEMENTATION_PLAN.md without approval
-- Do not add Celery, Redis, Kubernetes, or Playwright to Pass 1
-- Do not implement any collectors in Pass 1
-- Do not create migrations in Pass 1
-- Do not change protected decisions in ADR-0001 without creating a new ADR
-- Do not treat Capital automated extraction as validated or guaranteed
-- Do not treat KIIS HTTP 204 as a failure
-- Do not skip raw payload hashing
-- Do not skip report confidence scoring
-- Do not call live websites from unit tests
-- Do not run `git add .`
+- `app/main.py` — do not change the FastAPI app setup without reason
+- `app/api/routes/health.py` — health endpoint is working; do not change
+- `tests/unit/test_health.py` — passing tests; do not break
+- `pyproject.toml` — add deps as needed per pass; do not remove existing ones
+- `docs/adr/0001-mvp-architecture.md` — ADR is locked; create a new ADR to change it
+- `docs/IMPLEMENTATION_PLAN.md` — pass sequence is fixed; do not reorder

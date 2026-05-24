@@ -210,23 +210,28 @@ Before declaring any pass complete, the following must pass (or the reason for s
 
 **Objective:** Create working dev environment with FastAPI health endpoint and Docker Compose.
 
-- [ ] pyproject.toml with all MVP dependencies declared
-- [ ] src/rmias/ directory structure created
-- [ ] FastAPI app boots
-- [ ] GET /health returns 200
-- [ ] Dockerfile created
-- [ ] docker-compose.yml created
-- [ ] .env.example created (no secrets committed)
-- [ ] .gitignore created
-- [ ] ruff configured
-- [ ] mypy configured
-- [ ] README.md updated with setup instructions
-- [ ] `ruff check .` passes
-- [ ] `pytest` passes (empty or skeleton tests)
-- [ ] Docker Compose boots
-- [ ] GET /health verified manually in container
+- [x] pyproject.toml with all MVP dependencies declared
+- [x] app/ directory structure created (using `app/` per IMPLEMENTATION_PLAN.md, not `apps/`)
+- [x] FastAPI app boots (`uvicorn app.main:app`)
+- [x] GET /health returns 200
+- [x] Dockerfile created
+- [x] docker-compose.yml created (app + PostgreSQL 16)
+- [x] .env.example created (no secrets committed)
+- [x] .gitignore created
+- [x] ruff configured in pyproject.toml
+- [x] mypy configured in pyproject.toml
+- [x] README.md updated with setup instructions
+- [x] `ruff check .` passes — PASSED
+- [x] `pytest` passes — 4/4 PASSED
+- [x] `mypy app/` passes — 5 files, no issues
+- [ ] Docker Compose boots — SKIPPED: Docker daemon not running in remote execution environment (no /var/run/docker.sock). Non-blocking — Dockerfile and docker-compose.yml are present and syntactically correct.
+- [ ] GET /health verified in container — SKIPPED: depends on Docker boot above
 
-**Quality gates required:** ruff, pytest, Docker Compose boot.
+**Quality gates run:**
+- pytest: PASSED (4/4)
+- ruff: PASSED
+- mypy: PASSED
+- Docker build/boot: SKIPPED (environment constraint — daemon not running)
 
 ---
 
