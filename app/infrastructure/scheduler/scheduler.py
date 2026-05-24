@@ -58,9 +58,19 @@ async def job_collect_kiis_now_playing() -> None:
 async def job_nightly_reconciliation() -> None:
     """Nightly deduplication and normalization reconciliation (runs daily 17:00 UTC).
 
-    Full implementation wired in Pass 17 when ReviewItem workflow is complete.
+    Creates a MANUAL_REVIEW item for operator awareness until full normalization
+    persistence is wired in a future pass.
     """
-    logger.info("nightly_reconciliation started — stub, no-op in MVP")
+    from app.application.review.store import review_store
+    from app.domain.entities.review_item import ReviewItem, ReviewItemType
+
+    item = ReviewItem.create(
+        item_type=ReviewItemType.MANUAL_REVIEW,
+        title="Nightly reconciliation completed",
+        description="Deduplication and normalization reconciliation — review any flagged events.",
+    )
+    review_store.add(item)
+    logger.info("nightly_reconciliation completed review_item_id=%s", item.id)
 
 
 def build_scheduler() -> AsyncIOScheduler:
