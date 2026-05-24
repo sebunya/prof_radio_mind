@@ -9,13 +9,16 @@ from app.api.routes.health import router as health_router
 from app.api.routes.imports import router as imports_router
 from app.api.routes.review import router as review_router
 from app.api.routes.stations import router as stations_router
+from app.core.logging_config import configure_logging
 from app.infrastructure.scheduler.scheduler import build_scheduler
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    configure_logging()
     scheduler = build_scheduler()
     scheduler.start()
+    app.state.scheduler = scheduler
     try:
         yield
     finally:
