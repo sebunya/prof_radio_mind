@@ -5,6 +5,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 
 from app.api.routes.backfill import router as backfill_router
 from app.api.routes.charts import router as charts_router
@@ -66,3 +67,5 @@ app.include_router(proof_of_play_router)
 app.include_router(charts_router)
 app.include_router(webhooks_router)
 app.include_router(backfill_router)
+
+app.mount("/admin", StaticFiles(directory="app/static", html=True), name="admin")
