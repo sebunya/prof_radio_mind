@@ -6,6 +6,8 @@ from app.infrastructure.database.models import (
     AuditLog,
     CollectorRun,
     DailyReport,
+    EmailRecipientDB,
+    EmailSendLogDB,
     Error,
     Export,
     NoTrackEventDB,
@@ -51,7 +53,7 @@ def test_phase_a_model_tablenames() -> None:
 def test_phase_a_model_count() -> None:
     from app.infrastructure.database.models import __all__ as all_models
 
-    assert len(all_models) == 23  # 14 Phase A + 5 Phase B + 3 Phase C + 1 Phase E
+    assert len(all_models) == 25  # 14 Phase A + 5 Phase B + 3 Phase C + 1 Phase E + 2 Phase F
 
 
 def test_phase_b_model_tablenames() -> None:
@@ -79,6 +81,15 @@ def test_phase_c_model_tablenames() -> None:
 def test_phase_e_model_tablenames() -> None:
     expected = {
         WebhookSubscriptionDB: "webhook_subscriptions",
+    }
+    for model, tablename in expected.items():
+        assert model.__tablename__ == tablename, f"{model.__name__}: expected {tablename}"
+
+
+def test_phase_f_model_tablenames() -> None:
+    expected = {
+        EmailRecipientDB: "email_recipients",
+        EmailSendLogDB: "email_send_log",
     }
     for model, tablename in expected.items():
         assert model.__tablename__ == tablename, f"{model.__name__}: expected {tablename}"

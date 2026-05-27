@@ -8,25 +8,27 @@ import { toast, closeModal, esc } from './ui.js';
 
 // ── Page registry ────────────────────────────────────────────────
 const PAGES = {
-  dashboard: () => import('./pages/dashboard.js'),
-  stations:  () => import('./pages/stations.js'),
-  review:    () => import('./pages/review.js'),
-  reports:   () => import('./pages/reports.js'),
-  playlist:  () => import('./pages/playlist.js'),
-  charts:    () => import('./pages/aria-charts.js'),
-  webhooks:  () => import('./pages/webhooks.js'),
-  backfill:  () => import('./pages/backfill.js'),
+  dashboard:     () => import('./pages/dashboard.js'),
+  stations:      () => import('./pages/stations.js'),
+  review:        () => import('./pages/review.js'),
+  reports:       () => import('./pages/reports.js'),
+  playlist:      () => import('./pages/playlist.js'),
+  charts:        () => import('./pages/aria-charts.js'),
+  webhooks:      () => import('./pages/webhooks.js'),
+  backfill:      () => import('./pages/backfill.js'),
+  'email-reports': () => import('./pages/email-reports.js'),
 };
 
 const TITLES = {
-  dashboard: 'Dashboard',
-  stations:  'Radio Stations',
-  review:    'Review Queue',
-  reports:   'Reports',
-  playlist:  'Playlist Automation',
-  charts:    'ARIA Charts',
-  webhooks:  'Webhooks',
-  backfill:  'Historical Backfill',
+  dashboard:     'Dashboard',
+  stations:      'Radio Stations',
+  review:        'Review Queue',
+  reports:       'Reports',
+  playlist:      'Playlist Automation',
+  charts:        'ARIA Charts',
+  webhooks:      'Webhooks',
+  backfill:      'Historical Backfill',
+  'email-reports': 'Email Reports',
 };
 
 // ── Router ───────────────────────────────────────────────────────

@@ -85,4 +85,14 @@ export const API = {
   // ── Backfill ─────────────────────────────────────────────────
   backfill: (stationId, date, formData) =>
     apiCall('POST', `/backfill/${stationId}?broadcast_date=${date}`, formData, true),
+
+  // ── Email reports ─────────────────────────────────────────────
+  emailRecipients: () => apiCall('GET', '/email-reports/recipients'),
+  addEmailRecipient: (body) => apiCall('POST', '/email-reports/recipients', body),
+  updateEmailRecipient: (id, body) =>
+    apiCall('PATCH', `/email-reports/recipients/${id}`, body),
+  removeEmailRecipient: (id) => apiCall('DELETE', `/email-reports/recipients/${id}`),
+  emailLogs: (limit = 50) => apiCall('GET', `/email-reports/logs?limit=${limit}`),
+  sendEmailNow: (frequency) => apiCall('POST', '/email-reports/send-now', { frequency }),
+  previewEmail: (frequency) => apiCall('GET', `/email-reports/preview/${frequency}`),
 };

@@ -6,6 +6,7 @@ from app.infrastructure.database.models.events import (
     ReviewItem,
     Song,
 )
+from app.infrastructure.database.models.notifications import EmailRecipientDB, EmailSendLogDB
 from app.infrastructure.database.models.operations import (
     Alert,
     AuditLog,
@@ -42,4 +43,6 @@ __all__ = [
     "ReportVersion",
     "Export",
     "WebhookSubscriptionDB",
+    "EmailRecipientDB",
+    "EmailSendLogDB",
 ]

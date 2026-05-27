@@ -23,6 +23,15 @@ class Settings(BaseSettings):
     # Example: http://user:pass@proxy1:8080,socks5://proxy2:1080
     proxy_urls: str = ""
 
+    # Email / SMTP — leave smtp_host blank to disable email sending (dry-run logs to stdout)
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_use_tls: bool = True
+    smtp_username: str = ""
+    smtp_password: str = ""
+    smtp_from_email: str = "reports@rmias.example.com"
+    smtp_from_name: str = "RMIAS Radio Reports"
+
     # S3 / Hetzner Object Storage (leave blank to use local filesystem)
     s3_endpoint_url: str = ""       # e.g. https://fsn1.your-objectstorage.com
     s3_access_key_id: str = ""

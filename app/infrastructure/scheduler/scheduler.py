@@ -146,6 +146,39 @@ async def job_collect_capital_now_playing() -> None:
         logger.error("job_collect_capital_now_playing_failed error=%s", exc, exc_info=True)
 
 
+async def job_send_daily_email() -> None:
+    """Send daily email report to subscribed recipients (runs 22:00 UTC = 08:00 AEST)."""
+    try:
+        from app.application.reports.email_report_builder import send_frequency_report
+
+        result = await send_frequency_report("daily")
+        logger.info("daily_email_report_done result=%s", result)
+    except Exception as exc:
+        logger.error("job_send_daily_email_failed error=%s", exc, exc_info=True)
+
+
+async def job_send_weekly_email() -> None:
+    """Send weekly email report every Monday 22:00 UTC (= Tue 08:00 AEST)."""
+    try:
+        from app.application.reports.email_report_builder import send_frequency_report
+
+        result = await send_frequency_report("weekly")
+        logger.info("weekly_email_report_done result=%s", result)
+    except Exception as exc:
+        logger.error("job_send_weekly_email_failed error=%s", exc, exc_info=True)
+
+
+async def job_send_monthly_email() -> None:
+    """Send monthly email report on 1st of month 22:00 UTC (= 2nd 08:00 AEST)."""
+    try:
+        from app.application.reports.email_report_builder import send_frequency_report
+
+        result = await send_frequency_report("monthly")
+        logger.info("monthly_email_report_done result=%s", result)
+    except Exception as exc:
+        logger.error("job_send_monthly_email_failed error=%s", exc, exc_info=True)
+
+
 async def job_nightly_reconciliation() -> None:
     """Nightly deduplication and normalization reconciliation (runs daily 17:00 UTC)."""
     from datetime import UTC, datetime, timedelta
@@ -264,6 +297,44 @@ def build_scheduler() -> AsyncIOScheduler:
         CronTrigger(hour=17, minute=0, timezone="UTC"),
         id="nightly_reconciliation",
         name="Nightly deduplication & normalization reconciliation",
+        replace_existing=True,
+        misfire_grace_time=3600,
+        max_instances=1,
+        coalesce=True,
+    )
+
+    # ── Email reports ─────────────────────────────────────────────────────────
+
+    # Daily email — 22:00 UTC (08:00 AEST next day), covers yesterday's plays
+    sched.add_job(
+        job_send_daily_email,
+        CronTrigger(hour=22, minute=0, timezone="UTC"),
+        id="email_daily_report",
+        name="Daily email report",
+        replace_existing=True,
+        misfire_grace_time=3600,
+        max_instances=1,
+        coalesce=True,
+    )
+
+    # Weekly email — Monday 22:00 UTC (Tue 08:00 AEST), covers last Mon–Sun
+    sched.add_job(
+        job_send_weekly_email,
+        CronTrigger(day_of_week="mon", hour=22, minute=0, timezone="UTC"),
+        id="email_weekly_report",
+        name="Weekly email report",
+        replace_existing=True,
+        misfire_grace_time=3600,
+        max_instances=1,
+        coalesce=True,
+    )
+
+    # Monthly email — 1st of month 22:00 UTC (2nd 08:00 AEST), covers last month
+    sched.add_job(
+        job_send_monthly_email,
+        CronTrigger(day=1, hour=22, minute=0, timezone="UTC"),
+        id="email_monthly_report",
+        name="Monthly email report",
         replace_existing=True,
         misfire_grace_time=3600,
         max_instances=1,

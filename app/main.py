@@ -11,6 +11,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.api.routes.backfill import router as backfill_router
 from app.api.routes.charts import router as charts_router
+from app.api.routes.email_reports import router as email_reports_router
 from app.api.routes.health import router as health_router
 from app.api.routes.imports import router as imports_router
 from app.api.routes.playlist import router as playlist_router
@@ -121,6 +122,7 @@ app.include_router(proof_of_play_router)
 app.include_router(charts_router)
 app.include_router(webhooks_router)
 app.include_router(backfill_router)
+app.include_router(email_reports_router)
 
 app.mount(
     "/admin",

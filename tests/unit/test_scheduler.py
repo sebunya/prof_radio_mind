@@ -20,7 +20,7 @@ from app.infrastructure.scheduler.scheduler import (
 
 def test_scheduler_has_four_jobs() -> None:
     sched = build_scheduler()
-    assert len(sched.get_jobs()) == 4
+    assert len(sched.get_jobs()) == 7
 
 
 def test_scheduler_job_ids() -> None:
@@ -31,6 +31,9 @@ def test_scheduler_job_ids() -> None:
         "kiis_now_playing",
         "capital_now_playing",
         "nightly_reconciliation",
+        "email_daily_report",
+        "email_weekly_report",
+        "email_monthly_report",
     }
 
 
