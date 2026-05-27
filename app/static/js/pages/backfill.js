@@ -136,6 +136,9 @@ function setFile(file) {
     label.textContent = `${file.name} (${kb} KB)`;
     label.style.color = 'var(--accent)';
   }
+  if (file.size > 10 * 1024 * 1024) {
+    toast('warning', 'File may be too large', `${(file.size/1024/1024).toFixed(1)} MB exceeds the 10 MB limit`);
+  }
 }
 
 async function submit() {
@@ -145,6 +148,10 @@ async function submit() {
   if (!stationId)     { toast('warning', 'Select a station'); return; }
   if (!date)          { toast('warning', 'Select a broadcast date'); return; }
   if (!_selectedFile) { toast('warning', 'Choose a CSV file'); return; }
+  if (_selectedFile.size > 10 * 1024 * 1024) {
+    toast('error', 'File too large', 'Maximum size is 10 MB');
+    return;
+  }
 
   const btn = document.getElementById('bf-btn');
   btn.disabled = true;
@@ -189,8 +196,8 @@ function renderResults(r) {
           <div class="result-num" style="color:var(--success)">${r.rows_accepted}</div>
           <div class="result-lbl">Accepted</div>
         </div>
-        <div class="result-card ${r.rows_rejected > 0 ? 'style="background:rgba(239,68,68,.12)"' : ''}">
-          <div class="result-num" ${r.rows_rejected > 0 ? 'style="color:var(--danger)"' : ''}>${r.rows_rejected}</div>
+        <div class="result-card"${r.rows_rejected > 0 ? ' style="background:rgba(239,68,68,.12)"' : ''}>
+          <div class="result-num"${r.rows_rejected > 0 ? ' style="color:var(--danger)"' : ''}>${r.rows_rejected}</div>
           <div class="result-lbl">Rejected</div>
         </div>
       </div>

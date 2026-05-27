@@ -4,7 +4,7 @@
  */
 
 import { API } from './api.js';
-import { toast, closeModal } from './ui.js';
+import { toast, closeModal, esc } from './ui.js';
 
 // ── Page registry ────────────────────────────────────────────────
 const PAGES = {
@@ -30,11 +30,14 @@ const TITLES = {
 };
 
 // ── Router ───────────────────────────────────────────────────────
+let _navToken = 0;
+
 function getRoute() {
   return window.location.hash.replace(/^#\//, '').split('?')[0] || 'dashboard';
 }
 
 async function navigate(route) {
+  const token   = ++_navToken;
   const content = document.getElementById('page-content');
   const titleEl = document.getElementById('page-title');
   const actions = document.getElementById('page-actions');
@@ -60,11 +63,12 @@ async function navigate(route) {
 
   try {
     const mod = await loader();
+    if (token !== _navToken) return; // stale navigation, bail
     await mod.init(content, actions);
   } catch (err) {
     console.error('[router]', err);
     content.innerHTML = `<div class="alert alert-danger">
-      <strong>Failed to load page:</strong> ${err.message}
+      <strong>Failed to load page:</strong> ${esc(err.message)}
     </div>`;
   }
 }
@@ -101,6 +105,44 @@ async function refreshPendingBadge() {
 document.getElementById('modal-close-btn').addEventListener('click', closeModal);
 document.getElementById('modal-overlay').addEventListener('click', (e) => {
   if (e.target === e.currentTarget) closeModal();
+});
+
+// ── Tab visibility: pause polling when hidden ────────────────────
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') {
+    refreshApiStatus();
+    refreshPendingBadge();
+  }
+});
+
+// ── Mobile sidebar toggle ────────────────────────────────────────
+const sidebarToggle = document.getElementById('sidebar-toggle');
+const sidebar       = document.getElementById('sidebar');
+const scrim         = document.getElementById('sidebar-scrim');
+
+if (sidebarToggle) {
+  sidebarToggle.addEventListener('click', () => {
+    const isOpen = sidebar.classList.toggle('open');
+    sidebarToggle.setAttribute('aria-expanded', isOpen);
+    if (scrim) scrim.hidden = !isOpen;
+  });
+}
+if (scrim) {
+  scrim.addEventListener('click', () => {
+    sidebar.classList.remove('open');
+    if (sidebarToggle) sidebarToggle.setAttribute('aria-expanded', 'false');
+    scrim.hidden = true;
+  });
+}
+// Close sidebar on nav (mobile)
+document.querySelectorAll('.nav-item').forEach(el => {
+  el.addEventListener('click', () => {
+    if (window.innerWidth < 640) {
+      sidebar.classList.remove('open');
+      if (sidebarToggle) sidebarToggle.setAttribute('aria-expanded', 'false');
+      if (scrim) scrim.hidden = true;
+    }
+  });
 });
 
 // ── Boot ─────────────────────────────────────────────────────────

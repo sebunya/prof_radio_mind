@@ -57,6 +57,10 @@ function renderPage(chartData) {
           <div class="empty-desc">Click "Fetch ARIA Chart" to ingest this week's ARIA Singles chart.</div>
         </div>`}
     </div>`;
+
+  if (chartData?.entries?.length) {
+    requestAnimationFrame(() => renderPositionsChart(chartData.entries));
+  }
 }
 
 function buildChartHtml(data) {

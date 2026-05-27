@@ -1,9 +1,11 @@
 import { API } from '../api.js';
 import { toast, showModal, closeModal, fmtDateTime, tierBadge, recBadge, esc } from '../ui.js';
 
-let _stations = [];
-let _recs     = [];
-let _chart    = null;
+let _stations     = [];
+let _recs         = [];
+let _chart        = null;
+let _recTypeChart = null;
+let _lastDays     = 7;
 let _container;
 
 export async function init(container, actions) {
@@ -55,6 +57,7 @@ async function analyse() {
 
   try {
     _recs = await API.analyseRotation(stationId, days);
+    _lastDays = days;
     renderResults(stationId, days);
     toast('success', `${_recs.length} recommendations generated`);
   } catch (err) {
@@ -70,11 +73,13 @@ function renderResults(stationId, days) {
   const wrap = document.getElementById('pl-results');
   if (!wrap) return;
 
+  const safeDays = days || _lastDays;
+
   if (!_recs.length) {
     wrap.innerHTML = `<div class="empty-state">
       <div class="empty-icon">🎵</div>
       <div class="empty-title">No recommendations</div>
-      <div class="empty-desc">No play events found in the last ${days} days for this station.</div>
+      <div class="empty-desc">No play events found in the last ${safeDays} days for this station.</div>
     </div>`;
     return;
   }
@@ -179,8 +184,9 @@ function renderTierChart(d) {
 function renderRecTypeChart(d) {
   const ctx = document.getElementById('ch-rec-type');
   if (!ctx || !window.Chart) return;
+  if (_recTypeChart) { _recTypeChart.destroy(); _recTypeChart = null; }
   const colors = { add:'rgba(52,211,153,.6)', increase:'rgba(56,189,248,.6)', maintain:'rgba(100,116,139,.6)', decrease:'rgba(251,191,36,.6)', retire:'rgba(239,68,68,.6)' };
-  new Chart(ctx, {
+  _recTypeChart = new Chart(ctx, {
     type: 'bar',
     data: {
       labels: Object.keys(d),
@@ -283,4 +289,4 @@ async function _submitApproveAll() {
   renderResults(null, null);
 }
 
-window._playlistPage = { analyse, approve, approveAll, approveAll, showDetail, _submitApprove, _submitApproveAll };
+window._playlistPage = { analyse, approve, approveAll, showDetail, _submitApprove, _submitApproveAll };
