@@ -227,6 +227,25 @@ They require the following environment variables (see also [`docs/OBSERVABILITY.
 
 ---
 
+## CI / GitHub Actions secrets
+
+The security pipeline workflows read these repository secrets
+(**Settings → Secrets and variables → Actions**):
+
+| Secret | Required by | How to get it |
+|--------|------------|---------------|
+| `SEMGREP_APP_TOKEN` | `semgrep.yml` | Optional — [Semgrep Cloud Platform](https://semgrep.dev) → Settings → Tokens. Without it Semgrep still runs locally; the token enables cloud dashboard & PR comments. |
+| `SNYK_TOKEN` | `snyk.yml` | [app.snyk.io](https://app.snyk.io) → Account Settings → API Token. Free tier is sufficient. |
+| `SENTRY_AUTH_TOKEN` | `sentry-release.yml` | [sentry.io](https://sentry.io) → Settings → Auth Tokens → Create token with `releases` scope. |
+| `SENTRY_ORG` | `sentry-release.yml` | Your Sentry organisation slug (visible in the Sentry URL: `sentry.io/organizations/<slug>`). |
+| `SENTRY_PROJECT` | `sentry-release.yml` | Your Sentry project slug (visible in Project Settings). |
+
+> All three Sentry secrets must be set for release tracking to work.
+> Semgrep and Snyk steps use `continue-on-error: true` so a missing token never blocks CI —
+> they just produce a warning instead of findings.
+
+---
+
 ## Production checklist
 
 Before going live, verify:
@@ -249,6 +268,9 @@ Before going live, verify:
 - [ ] `GRAFANA_PASSWORD` set to a strong value
 - [ ] Uptime Kuma admin account created and monitors configured
 - [ ] SSH tunnel documented for team access to observability services
+- [ ] GitHub secrets set: `SNYK_TOKEN`, `SEMGREP_APP_TOKEN`, `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT`
+- [ ] Semgrep CI passing with zero HIGH/ERROR findings
+- [ ] Snyk CI passing with zero HIGH/CRITICAL dependency CVEs
 
 See [`docs/HETZNER_DEPLOYMENT.md`](HETZNER_DEPLOYMENT.md) for the full step-by-step cloud deployment guide.
 See [`docs/OBSERVABILITY.md`](OBSERVABILITY.md) for the full observability setup guide.

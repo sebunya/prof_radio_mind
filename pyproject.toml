@@ -31,6 +31,9 @@ dev = [
     "pytest>=8.0.0",
     "ruff>=0.7.0",
     "types-beautifulsoup4>=4.12.0",
+    # Security scanning — run locally with ./scripts/sast.sh
+    "semgrep>=1.70.0",
+    "bandit>=1.7.0",
 ]
 
 [build-system]

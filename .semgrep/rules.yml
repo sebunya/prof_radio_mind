@@ -1,0 +1,190 @@
+rules:
+
+  # ── SQL / ORM safety ───────────────────────────────────────────────────────
+
+  - id: rmias-raw-sql-string-literal
+    message: >
+      Raw SQL string passed directly to session.execute(). Wrap it with
+      sqlalchemy.text() and use bound parameters to prevent SQL injection.
+    severity: ERROR
+    languages: [python]
+    metadata:
+      cwe: "CWE-89: Improper Neutralization of Special Elements used in an SQL Command"
+      category: security
+      confidence: HIGH
+    patterns:
+      - pattern: $SESSION.execute("...")
+      - pattern-not: $SESSION.execute(text("..."))
+      - pattern-not: $SESSION.execute(select(...))
+      - pattern-not: $SESSION.execute(insert(...))
+      - pattern-not: $SESSION.execute(update(...))
+      - pattern-not: $SESSION.execute(delete(...))
+
+  - id: rmias-fstring-in-sql
+    message: >
+      f-string used inside a SQL statement. Never interpolate user data into SQL;
+      use bound parameters (:name) with sqlalchemy.text() instead.
+    severity: ERROR
+    languages: [python]
+    metadata:
+      cwe: "CWE-89"
+      category: security
+      confidence: HIGH
+    patterns:
+      - pattern: text(f"...")
+      - pattern-not: text(f"... :$PARAM ...")
+
+  # ── Authentication & authorisation ────────────────────────────────────────
+
+  - id: rmias-unprotected-write-endpoint
+    message: >
+      POST/PUT/PATCH/DELETE FastAPI endpoint may be missing the
+      `require_api_key` dependency. Add `Depends(require_api_key)` to any
+      endpoint that modifies state.
+    severity: WARNING
+    languages: [python]
+    metadata:
+      cwe: "CWE-306: Missing Authentication for Critical Function"
+      category: security
+      confidence: LOW
+    patterns:
+      - pattern: |
+          @$ROUTER.post(...)
+          async def $FUNC($ARGS):
+              ...
+      - pattern-not: |
+          @$ROUTER.post(...)
+          async def $FUNC(..., _: None = Depends(require_api_key), ...):
+              ...
+      - pattern-not: |
+          @$ROUTER.post(...)
+          async def $FUNC(..., _=Depends(require_api_key), ...):
+              ...
+
+  - id: rmias-token-compare-timing-attack
+    message: >
+      Comparing tokens with == is vulnerable to timing attacks. Use
+      hmac.compare_digest() for all secret/token comparisons.
+    severity: ERROR
+    languages: [python]
+    metadata:
+      cwe: "CWE-208: Observable Timing Discrepancy"
+      category: security
+      confidence: HIGH
+    patterns:
+      - pattern: $TOKEN == $OTHER_TOKEN
+      - pattern-not-inside: |
+          if hmac.compare_digest(...):
+              ...
+
+  # ── Secrets & credentials ─────────────────────────────────────────────────
+
+  - id: rmias-hardcoded-api-key
+    message: >
+      Hardcoded API key or secret in source. Use environment variables
+      (settings.api_key) and never commit secrets.
+    severity: ERROR
+    languages: [python]
+    metadata:
+      cwe: "CWE-798: Use of Hard-coded Credentials"
+      category: security
+      confidence: HIGH
+    patterns:
+      - pattern: api_key = "..."
+      - pattern-not: api_key = ""
+      - pattern-not: api_key = settings.api_key
+
+  - id: rmias-hardcoded-password
+    message: >
+      Hardcoded password in source code. Use environment variables instead.
+    severity: ERROR
+    languages: [python]
+    metadata:
+      cwe: "CWE-798"
+      category: security
+      confidence: MEDIUM
+    patterns:
+      - pattern: password = "..."
+      - pattern-not: password = ""
+      - pattern-not: password = $SETTINGS.$ATTR
+
+  # ── Path traversal ────────────────────────────────────────────────────────
+
+  - id: rmias-path-traversal-open
+    message: >
+      File opened with a path derived from user input. Validate and normalise
+      paths with pathlib.Path(...).resolve() and assert they are inside the
+      expected base directory before opening.
+    severity: ERROR
+    languages: [python]
+    metadata:
+      cwe: "CWE-22: Improper Limitation of a Pathname to a Restricted Directory"
+      category: security
+      confidence: MEDIUM
+    patterns:
+      - pattern: open($REQUEST.$ATTR, ...)
+      - pattern: open(request.$ATTR, ...)
+
+  # ── SSRF ─────────────────────────────────────────────────────────────────
+
+  - id: rmias-ssrf-user-url
+    message: >
+      HTTP request made with a URL derived from user-controlled input. Validate
+      the URL against an allowlist before making the request to prevent SSRF.
+    severity: WARNING
+    languages: [python]
+    metadata:
+      cwe: "CWE-918: Server-Side Request Forgery"
+      category: security
+      confidence: MEDIUM
+    patterns:
+      - pattern: httpx.get($REQUEST.$ATTR, ...)
+      - pattern: httpx.AsyncClient().get($REQUEST.$ATTR, ...)
+      - pattern: httpx.AsyncClient().request(..., $REQUEST.$ATTR, ...)
+
+  # ── Logging safety ────────────────────────────────────────────────────────
+
+  - id: rmias-log-sensitive-field
+    message: >
+      Potentially sensitive field logged directly. Mask or omit passwords,
+      tokens, and API keys from log output.
+    severity: WARNING
+    languages: [python]
+    metadata:
+      cwe: "CWE-532: Insertion of Sensitive Information into Log File"
+      category: security
+      confidence: MEDIUM
+    patterns:
+      - pattern: logger.$METHOD("... password=... %s ...", $VAR)
+      - pattern: logger.$METHOD("... token=... %s ...", $VAR)
+      - pattern: logger.$METHOD(f"... password={...} ...")
+      - pattern: logger.$METHOD(f"... token={...} ...")
+      - pattern: logger.$METHOD(f"... api_key={...} ...")
+
+  # ── Input validation ──────────────────────────────────────────────────────
+
+  - id: rmias-shell-injection
+    message: >
+      subprocess call with shell=True and a variable argument is vulnerable to
+      shell injection. Use shell=False (the default) with a list of arguments.
+    severity: ERROR
+    languages: [python]
+    metadata:
+      cwe: "CWE-78: OS Command Injection"
+      category: security
+      confidence: HIGH
+    patterns:
+      - pattern: subprocess.run($CMD, ..., shell=True, ...)
+      - pattern-not: subprocess.run("...", ..., shell=True, ...)
+
+  - id: rmias-eval-use
+    message: >
+      eval() is dangerous and should never be used with untrusted input.
+      Replace with explicit parsing (json.loads, ast.literal_eval, etc.).
+    severity: ERROR
+    languages: [python]
+    metadata:
+      cwe: "CWE-95: Improper Neutralization of Directives in Dynamically Evaluated Code"
+      category: security
+      confidence: HIGH
+    pattern: eval(...)
