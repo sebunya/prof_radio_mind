@@ -1,0 +1,16 @@
+# Instructs Grafana to load dashboards from the mounted directory.
+# Drop any *.json dashboard file into config/grafana/dashboards/ and it
+# will appear automatically on the next Grafana restart.
+
+apiVersion: 1
+
+providers:
+  - name: rmias
+    orgId: 1
+    folder: RMIAS
+    type: file
+    disableDeletion: true
+    editable: true
+    updateIntervalSeconds: 30
+    options:
+      path: /etc/grafana/dashboards

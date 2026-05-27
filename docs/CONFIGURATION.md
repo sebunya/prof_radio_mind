@@ -204,6 +204,29 @@ Leave `S3_ENDPOINT_URL` blank to use the local filesystem (`RAW_PAYLOAD_STORAGE_
 
 ---
 
+## Observability
+
+RMIAS ships PgHero, Uptime Kuma, and the Grafana/Loki stack as Docker Compose services.
+They require the following environment variables (see also [`docs/OBSERVABILITY.md`](OBSERVABILITY.md)):
+
+### PgHero
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PGHERO_USERNAME` | `admin` | HTTP basic-auth username for the PgHero web UI. |
+| `PGHERO_PASSWORD` | `admin` | HTTP basic-auth password for the PgHero web UI. **Change in production.** |
+| `PGHERO_DATABASE_URL` | *(derived)* | PostgreSQL connection URL for PgHero. Use `postgres://` prefix (not `+asyncpg`). Example: `postgres://rmias:password@db:5432/rmias`. |
+
+### Grafana
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `GRAFANA_PASSWORD` | `admin` | Admin password for the Grafana web UI. **Change in production.** |
+
+> Uptime Kuma has no environment variables — create the admin account through its web UI on first run (`http://localhost:3001`).
+
+---
+
 ## Production checklist
 
 Before going live, verify:
@@ -221,5 +244,11 @@ Before going live, verify:
 - [ ] Webhook registered for `song.trending` / `song.new_entry` if alerts are needed
 - [ ] Persistent Docker volumes configured for `postgres_data` and `raw_payloads`
 - [ ] Backups enabled (Hetzner server backups + `pg_dump` cron or managed DB backups)
+- [ ] `PGHERO_USERNAME` / `PGHERO_PASSWORD` changed from defaults
+- [ ] `PGHERO_DATABASE_URL` matches production DB credentials
+- [ ] `GRAFANA_PASSWORD` set to a strong value
+- [ ] Uptime Kuma admin account created and monitors configured
+- [ ] SSH tunnel documented for team access to observability services
 
 See [`docs/HETZNER_DEPLOYMENT.md`](HETZNER_DEPLOYMENT.md) for the full step-by-step cloud deployment guide.
+See [`docs/OBSERVABILITY.md`](OBSERVABILITY.md) for the full observability setup guide.
