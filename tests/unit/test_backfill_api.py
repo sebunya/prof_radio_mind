@@ -31,7 +31,7 @@ def client():
 
 
 def _db_patches():
-    """Return (mock_play_repo, mock_review_repo, mock_session, factory_patch, play_patch, review_patch).
+    """Return mock repos + session + the three patch contexts the backfill route needs.
 
     The backfill handler calls: _factory()() where _factory = _get_factory.
     So _get_factory() must return a session-factory callable, and calling that must
@@ -51,13 +51,19 @@ def _db_patches():
     # _get_factory() → session_factory; session_factory() → async_ctx_mgr
     session_factory = lambda: fake_ctx()  # noqa: E731
 
+    play_path = (
+        "app.infrastructure.database.repositories.play_event_repo.SQLPlayEventRepository"
+    )
+    review_path = (
+        "app.infrastructure.database.repositories.review_item_repo.SQLReviewItemRepository"
+    )
     return (
         mock_play_repo,
         mock_review_repo,
         mock_session,
         patch("app.infrastructure.database.session._get_factory", return_value=session_factory),
-        patch("app.infrastructure.database.repositories.play_event_repo.SQLPlayEventRepository", return_value=mock_play_repo),
-        patch("app.infrastructure.database.repositories.review_item_repo.SQLReviewItemRepository", return_value=mock_review_repo),
+        patch(play_path, return_value=mock_play_repo),
+        patch(review_path, return_value=mock_review_repo),
     )
 
 

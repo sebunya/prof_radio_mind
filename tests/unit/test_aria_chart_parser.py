@@ -8,7 +8,6 @@ import pytest
 
 from app.infrastructure.collectors.aria_chart import _parse_aria_html
 
-
 _CHART_DATE = date(2026, 5, 24)
 
 
