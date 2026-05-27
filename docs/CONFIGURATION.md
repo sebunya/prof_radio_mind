@@ -75,8 +75,9 @@ docker compose exec app alembic upgrade head
 
 ---
 
-## Email / SMTP
+## Email / SMTP (ZeptoMail)
 
+RMIAS uses ZeptoMail (by Zoho) for email delivery.
 Scheduled reports are sent via SMTP at:
 
 | Cadence | UTC time | AEST time | Covers |
@@ -99,43 +100,31 @@ development.
 | `SMTP_FROM_EMAIL` | `reports@rmias.example.com` | The `From:` address that appears in sent emails. |
 | `SMTP_FROM_NAME` | `RMIAS Radio Reports` | The display name that appears alongside `SMTP_FROM_EMAIL`. |
 
-### Provider examples
+### ZeptoMail configuration
 
-**SendGrid:**
+RMIAS uses **ZeptoMail** (by Zoho) as its email delivery provider.
+
 ```
-SMTP_HOST=smtp.sendgrid.net
+SMTP_HOST=smtp.zeptomail.com
 SMTP_PORT=587
 SMTP_USE_TLS=true
-SMTP_USERNAME=apikey
-SMTP_PASSWORD=SG.xxxxxxxxxxxxxxxxxxxx
+SMTP_USERNAME=emailapikey
+SMTP_PASSWORD=<your ZeptoMail API key>
+SMTP_FROM_EMAIL=reports@yourdomain.com   # must be verified in ZeptoMail
+SMTP_FROM_NAME=RMIAS Radio Reports
 ```
 
-**AWS SES (us-east-1):**
-```
-SMTP_HOST=email-smtp.us-east-1.amazonaws.com
-SMTP_PORT=587
-SMTP_USE_TLS=true
-SMTP_USERNAME=AKIAIOSFODNN7EXAMPLE
-SMTP_PASSWORD=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
-```
+**Where to find your credentials:**
+1. Log in to [app.zeptomail.com](https://app.zeptomail.com)
+2. Go to **Mail Agents** → select or create your mail agent
+3. Copy the **SMTP Token** — this is your `SMTP_PASSWORD`
+4. The username is always the literal string `emailapikey` (not your email address)
+5. Under **Sender Domains / Addresses**, verify the domain or address you want to use as `SMTP_FROM_EMAIL`
 
-**Mailgun:**
-```
-SMTP_HOST=smtp.mailgun.org
-SMTP_PORT=587
-SMTP_USE_TLS=true
-SMTP_USERNAME=postmaster@mg.example.com
-SMTP_PASSWORD=key-xxxxxxxxxxxx
-```
-
-**Gmail (app password required, not recommended for production):**
-```
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USE_TLS=true
-SMTP_USERNAME=your-address@gmail.com
-SMTP_PASSWORD=xxxx xxxx xxxx xxxx   # 16-char app password
-```
+> **Note:** ZeptoMail requires the sender address to be verified before it will
+> accept outbound mail.  If you see an authentication or sender-not-allowed error,
+> check that `SMTP_FROM_EMAIL` matches an address you have verified in the ZeptoMail
+> dashboard.
 
 ---
 
