@@ -109,8 +109,8 @@ SMTP_HOST=smtp.zeptomail.com
 SMTP_PORT=587
 SMTP_USE_TLS=true
 SMTP_USERNAME=emailapikey
-SMTP_PASSWORD=<your ZeptoMail API key>
-SMTP_FROM_EMAIL=reports@yourdomain.com   # must be verified in ZeptoMail
+SMTP_PASSWORD=<your ZeptoMail SMTP token>
+SMTP_FROM_EMAIL=reports@shopgoldplus.com
 SMTP_FROM_NAME=RMIAS Radio Reports
 ```
 
