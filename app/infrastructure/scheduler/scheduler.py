@@ -1,4 +1,22 @@
-"""APScheduler wiring — registers all background collection and reconciliation jobs."""
+"""APScheduler wiring — registers all background collection and reconciliation jobs.
+
+Job-store persistence
+---------------------
+By default APScheduler keeps scheduled fire-times in memory only, which means
+that if the process restarts between midnight and the scheduled run time those
+jobs are silently lost.
+
+To fix this, ``build_scheduler()`` attempts to configure a ``SQLAlchemyJobStore``
+backed by the same PostgreSQL database used for application data.  On restart
+APScheduler reloads the persisted next-run times and immediately fires any job
+whose scheduled time has passed within its ``misfire_grace_time`` window.
+
+The job store requires the *sync* ``psycopg2`` driver (``psycopg2-binary`` in
+``pyproject.toml``) which is separate from the async ``asyncpg`` driver used by
+the main application.  If the job store cannot be configured (missing driver,
+unreachable database) the scheduler falls back to the default in-memory store —
+all other functionality remains unaffected.
+"""
 
 from __future__ import annotations
 
@@ -179,6 +197,17 @@ async def job_send_monthly_email() -> None:
         logger.error("job_send_monthly_email_failed error=%s", exc, exc_info=True)
 
 
+async def job_check_trend_alerts() -> None:
+    """Detect trending / new-entry songs and fire webhook events (runs 23:00 UTC daily)."""
+    try:
+        from app.application.alerts.trend_alert_service import check_and_fire_trend_alerts
+
+        summary = await check_and_fire_trend_alerts()
+        logger.info("trend_alerts_done summary=%s", summary)
+    except Exception as exc:
+        logger.error("job_check_trend_alerts_failed error=%s", exc, exc_info=True)
+
+
 async def job_nightly_reconciliation() -> None:
     """Nightly deduplication and normalization reconciliation (runs daily 17:00 UTC)."""
     from datetime import UTC, datetime, timedelta
@@ -251,9 +280,44 @@ async def job_nightly_reconciliation() -> None:
     logger.info("nightly_reconciliation completed total_dupes=%d", total_dupes)
 
 
+def _build_job_stores() -> dict:
+    """Build APScheduler job stores.
+
+    Returns a dict mapping ``"default"`` to a ``SQLAlchemyJobStore`` when the
+    PostgreSQL database is reachable, or an empty dict (APScheduler falls back
+    to its built-in ``MemoryJobStore``) when it isn't.
+
+    The store uses psycopg2 (sync) rather than asyncpg because APScheduler's
+    SQLAlchemy integration is synchronous.  Both drivers can coexist — asyncpg
+    is used by the main async application, psycopg2 only by the scheduler.
+    """
+    db_url = settings.database_url
+    if not db_url:
+        return {}
+    try:
+        from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore  # type: ignore[import]
+
+        # Rewrite the async asyncpg URL to the sync psycopg2 URL.
+        # e.g. postgresql+asyncpg://user:pass@host/db → postgresql+psycopg2://…
+        sync_url = db_url.replace("+asyncpg", "+psycopg2")
+        store = SQLAlchemyJobStore(url=sync_url, tablename="apscheduler_jobs")
+        logger.debug("apscheduler_jobstore=sqlalchemy url_prefix=%s", sync_url.split("@")[-1])
+        return {"default": store}
+    except Exception as exc:
+        logger.warning(
+            "apscheduler_jobstore_unavailable reason=%s using=memory", exc
+        )
+        return {}
+
+
 def build_scheduler() -> AsyncIOScheduler:
-    """Create and configure the APScheduler instance with all registered jobs."""
-    sched = AsyncIOScheduler(timezone="UTC")
+    """Create and configure the APScheduler instance with all registered jobs.
+
+    The scheduler uses a persistent SQLAlchemy job store (PostgreSQL) when
+    available so that missed firings are recovered after a restart.  Falls back
+    to in-memory storage if the job store cannot be initialised.
+    """
+    sched = AsyncIOScheduler(timezone="UTC", jobstores=_build_job_stores())
 
     # Nova Radiowave diary — 16:00 UTC daily (02:00 AEST)
     sched.add_job(
@@ -335,6 +399,22 @@ def build_scheduler() -> AsyncIOScheduler:
         CronTrigger(day=1, hour=22, minute=0, timezone="UTC"),
         id="email_monthly_report",
         name="Monthly email report",
+        replace_existing=True,
+        misfire_grace_time=3600,
+        max_instances=1,
+        coalesce=True,
+    )
+
+    # ── Trend alerts ──────────────────────────────────────────────────────────
+
+    # Trend alert sweep — 23:00 UTC daily (09:00 AEST), after the email report
+    # run.  Fires song.trending, song.new_entry, and song.aria_match webhooks
+    # for songs that crossed configured thresholds since yesterday.
+    sched.add_job(
+        job_check_trend_alerts,
+        CronTrigger(hour=23, minute=0, timezone="UTC"),
+        id="trend_alerts",
+        name="Nightly trend alert sweep",
         replace_existing=True,
         misfire_grace_time=3600,
         max_instances=1,

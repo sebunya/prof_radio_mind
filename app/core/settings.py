@@ -32,6 +32,14 @@ class Settings(BaseSettings):
     smtp_from_email: str = "reports@rmias.example.com"
     smtp_from_name: str = "RMIAS Radio Reports"
 
+    # Trend alert thresholds — used by the nightly trend-alert scheduler job
+    # song.trending fires when a song reaches this many plays in 7 days for
+    # the first time (i.e. was below threshold the prior 7 days).
+    trend_plays_threshold: int = 50
+    # song.new_entry fires when a brand-new song (zero plays last week) reaches
+    # this many plays in its first 7-day window.
+    trend_new_entry_plays: int = 10
+
     # S3 / Hetzner Object Storage (leave blank to use local filesystem)
     s3_endpoint_url: str = ""       # e.g. https://fsn1.your-objectstorage.com
     s3_access_key_id: str = ""
