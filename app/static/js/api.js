@@ -93,6 +93,19 @@ export const API = {
     apiCall('PATCH', `/email-reports/recipients/${id}`, body),
   removeEmailRecipient: (id) => apiCall('DELETE', `/email-reports/recipients/${id}`),
   emailLogs: (limit = 50) => apiCall('GET', `/email-reports/logs?limit=${limit}`),
-  sendEmailNow: (frequency) => apiCall('POST', '/email-reports/send-now', { frequency }),
-  previewEmail: (frequency) => apiCall('GET', `/email-reports/preview/${frequency}`),
+  sendEmailNow: (frequency, startDate = null, endDate = null) => {
+    const body = { frequency };
+    if (startDate) body.start_date = startDate;
+    if (endDate)   body.end_date   = endDate;
+    return apiCall('POST', '/email-reports/send-now', body);
+  },
+  previewEmail: (frequency, startDate = null, endDate = null) => {
+    if (startDate && endDate) {
+      return apiCall(
+        'GET',
+        `/email-reports/preview/${frequency}?start_date=${startDate}&end_date=${endDate}`,
+      );
+    }
+    return apiCall('GET', `/email-reports/preview/${frequency}`);
+  },
 };

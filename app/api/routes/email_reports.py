@@ -13,10 +13,10 @@ Endpoints:
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import UTC, date, datetime, timedelta
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -25,8 +25,8 @@ from app.infrastructure.database.session import get_db
 
 router = APIRouter(prefix="/email-reports", tags=["email-reports"])
 
-Frequency = Literal["daily", "weekly", "monthly"]
-_VALID_FREQ = {"daily", "weekly", "monthly"}
+Frequency = Literal["daily", "weekly", "monthly", "custom"]
+_VALID_FREQ = {"daily", "weekly", "monthly", "custom"}
 
 
 # ── Request / Response models ─────────────────────────────────────────────────
@@ -67,6 +67,17 @@ class SendLogResponse(BaseModel):
 
 class SendNowRequest(BaseModel):
     frequency: Frequency
+    start_date: date | None = Field(
+        None,
+        description="Inclusive start date (YYYY-MM-DD). Required when frequency='custom'.",
+    )
+    end_date: date | None = Field(
+        None,
+        description=(
+            "Inclusive end date (YYYY-MM-DD). Required when frequency='custom'. "
+            "The window covers up to and including 23:59:59 UTC on this date."
+        ),
+    )
 
 
 class SendNowResponse(BaseModel):
@@ -264,13 +275,45 @@ async def send_log(
 async def send_now(body: SendNowRequest) -> SendNowResponse:
     """Trigger an immediate report send for the given frequency.
 
-    This runs synchronously in the request context; use for on-demand sends
-    and testing. For scheduled sends the APScheduler jobs are preferred.
+    For ``frequency="custom"`` supply ``start_date`` and ``end_date``
+    (both inclusive, YYYY-MM-DD).  The custom window covers 00:00 UTC on
+    *start_date* through 23:59:59 UTC on *end_date* and is sent to every
+    active recipient regardless of their individual frequency subscriptions.
+
+    For scheduled frequencies (daily / weekly / monthly) the window is
+    computed automatically using the system's rolling-window definitions.
+
+    This runs synchronously in the request context; for scheduled production
+    sends the APScheduler jobs are preferred.
     """
     from app.application.reports.email_report_builder import send_frequency_report
 
+    custom_start: datetime | None = None
+    custom_end:   datetime | None = None
+
+    if body.frequency == "custom":
+        if body.start_date is None or body.end_date is None:
+            raise HTTPException(
+                status_code=422,
+                detail="frequency='custom' requires both start_date and end_date",
+            )
+        if body.start_date > body.end_date:
+            raise HTTPException(
+                status_code=422,
+                detail="start_date must not be after end_date",
+            )
+        custom_start = datetime(
+            body.start_date.year, body.start_date.month, body.start_date.day,
+            tzinfo=UTC,
+        )
+        # end is inclusive: cover the full day by pointing to the next day's midnight
+        custom_end = datetime(
+            body.end_date.year, body.end_date.month, body.end_date.day,
+            tzinfo=UTC,
+        ) + timedelta(days=1)
+
     try:
-        result = await send_frequency_report(body.frequency)
+        result = await send_frequency_report(body.frequency, custom_start, custom_end)
     except Exception as exc:
         raise HTTPException(status_code=503, detail=f"Report generation failed: {exc}") from exc
 
@@ -291,15 +334,49 @@ async def send_now(body: SendNowRequest) -> SendNowResponse:
     "/preview/{frequency}",
     dependencies=[Depends(require_api_key)],
 )
-async def preview_email(frequency: Frequency, response: Response) -> Response:
+async def preview_email(
+    frequency: Frequency,
+    response: Response,
+    start_date: date | None = Query(
+        None,
+        description="Inclusive start date (YYYY-MM-DD). Required for frequency='custom'.",
+    ),
+    end_date: date | None = Query(
+        None,
+        description="Inclusive end date (YYYY-MM-DD). Required for frequency='custom'.",
+    ),
+) -> Response:
     """Return a preview of the HTML email for the given frequency.
 
-    Opens in the browser — useful for template verification before sending.
+    For ``frequency="custom"`` add ``?start_date=YYYY-MM-DD&end_date=YYYY-MM-DD``
+    query parameters.  Opens directly in the browser — useful for template
+    verification before sending.
     """
     from app.application.reports.email_report_builder import build_report_data, render_html_email
 
+    custom_start: datetime | None = None
+    custom_end:   datetime | None = None
+
+    if frequency == "custom":
+        if start_date is None or end_date is None:
+            raise HTTPException(
+                status_code=422,
+                detail="frequency='custom' requires start_date and end_date query params",
+            )
+        if start_date > end_date:
+            raise HTTPException(
+                status_code=422,
+                detail="start_date must not be after end_date",
+            )
+        custom_start = datetime(
+            start_date.year, start_date.month, start_date.day, tzinfo=UTC,
+        )
+        custom_end = datetime(
+            end_date.year, end_date.month, end_date.day, tzinfo=UTC,
+        ) + timedelta(days=1)
+
     try:
-        data = await build_report_data(frequency)
+        data = await build_report_data(frequency, custom_start, custom_end)
     except Exception as exc:
         raise HTTPException(status_code=503, detail=f"Report build failed: {exc}") from exc
 

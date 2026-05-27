@@ -24,7 +24,7 @@ from typing import Literal
 
 logger = logging.getLogger(__name__)
 
-Frequency = Literal["daily", "weekly", "monthly", "manual"]
+Frequency = Literal["daily", "weekly", "monthly", "manual", "custom"]
 
 # ── Palette (inline-safe hex values for email clients) ─────────────────────────
 _C = {
@@ -87,15 +87,33 @@ class ReportData:
 
 # ── Data aggregation ────────────────────────────────────────────────────────────
 
-async def build_report_data(frequency: Frequency) -> ReportData:
-    """Query the DB and produce a ``ReportData`` for the given frequency."""
+async def build_report_data(
+    frequency: Frequency,
+    custom_start: datetime | None = None,
+    custom_end: datetime | None = None,
+) -> ReportData:
+    """Query the DB and produce a ``ReportData`` for the given frequency.
+
+    Parameters
+    ----------
+    frequency:
+        One of ``daily``, ``weekly``, ``monthly``, ``manual``, or ``custom``.
+    custom_start / custom_end:
+        Required when *frequency* is ``"custom"``; ignored otherwise.
+        Both must be timezone-aware UTC datetimes.
+    """
     from app.infrastructure.database.repositories.play_event_repo import SQLPlayEventRepository
     from app.infrastructure.database.repositories.station_repo import SQLStationRepository
     from app.infrastructure.database.session import _get_factory
 
     now = datetime.now(UTC)
-    period_start, period_end = _period_bounds(frequency, now)
-    prev_start, prev_end    = _period_bounds(frequency, period_start - timedelta(seconds=1))
+    period_start, period_end = _period_bounds(frequency, now, custom_start, custom_end)
+
+    # Previous period: mirror of the current window shifted back by the same duration.
+    # e.g. daily → day-before-yesterday; weekly → 14–7 days ago; monthly → 60–30 days ago.
+    period_delta = period_end - period_start
+    prev_end     = period_start
+    prev_start   = prev_end - period_delta
 
     async with _get_factory()() as session:
         station_repo = SQLStationRepository(session)
@@ -222,27 +240,52 @@ async def build_report_data(frequency: Frequency) -> ReportData:
     )
 
 
-def _period_bounds(frequency: Frequency, now: datetime) -> tuple[datetime, datetime]:
-    """Return (start, end) UTC datetimes for the report period."""
+def _period_bounds(
+    frequency: Frequency,
+    now: datetime,
+    custom_start: datetime | None = None,
+    custom_end: datetime | None = None,
+) -> tuple[datetime, datetime]:
+    """Return ``(start, end)`` UTC datetimes that define the report window.
+
+    Period definitions (all windows end at today's UTC midnight so every day
+    counted is a *complete* 24-hour day):
+
+    +-----------+----------------------------------------------------------+
+    | Frequency | Window                                                   |
+    +===========+==========================================================+
+    | daily     | Yesterday: 1-day window  (T-1 00:00 → T 00:00 UTC)      |
+    | weekly    | Rolling 7-day window     (T-7 00:00 → T 00:00 UTC)      |
+    | monthly   | Rolling 30-day window    (T-30 00:00 → T 00:00 UTC)     |
+    | manual    | Same as daily (on-demand trigger)                        |
+    | custom    | Caller-supplied start / end (both must be UTC-aware)     |
+    +-----------+----------------------------------------------------------+
+
+    Using rolling windows (rather than calendar Mon–Sun or calendar months)
+    ensures the window is always a predictable, fixed number of complete days
+    regardless of when in the week or month the job runs.
+    """
+    if frequency == "custom":
+        if custom_start is None or custom_end is None:
+            raise ValueError(
+                "frequency='custom' requires both custom_start and custom_end"
+            )
+        if custom_start.tzinfo is None or custom_end.tzinfo is None:
+            raise ValueError("custom_start and custom_end must be UTC-aware datetimes")
+        return custom_start, custom_end
+
+    # Anchor: today's midnight UTC — the last complete day ends here.
+    today = now.replace(hour=0, minute=0, second=0, microsecond=0)
+
     if frequency in ("daily", "manual"):
-        # Yesterday 00:00 → 23:59:59 UTC
-        yesterday = (now - timedelta(days=1)).date()
-        start = datetime(yesterday.year, yesterday.month, yesterday.day, tzinfo=UTC)
-        end   = start + timedelta(days=1)
+        # 1-day rolling window: yesterday (T-1 → T)
+        return today - timedelta(days=1), today
     elif frequency == "weekly":
-        # Last 7 days (Monday–Sunday week that just ended)
-        days_since_monday = now.weekday()  # Mon=0, Sun=6
-        last_monday = (now - timedelta(days=days_since_monday + 7)).date()
-        start = datetime(last_monday.year, last_monday.month, last_monday.day, tzinfo=UTC)
-        end   = start + timedelta(days=7)
+        # 7-day rolling window: T-7 → T
+        return today - timedelta(days=7), today
     else:  # monthly
-        # Previous calendar month
-        first_of_this = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-        last_month_end = first_of_this - timedelta(seconds=1)
-        first_of_last = last_month_end.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-        start = first_of_last
-        end   = first_of_this
-    return start, end
+        # 30-day rolling window: T-30 → T
+        return today - timedelta(days=30), today
 
 
 def _find_aria_hits(
@@ -278,6 +321,7 @@ _FREQ_LABEL = {
     "weekly": "Weekly",
     "monthly": "Monthly",
     "manual": "On-Demand",
+    "custom": "Custom Range",
 }
 
 _PERIOD_FMT = {
@@ -664,20 +708,33 @@ def _format_period(data: ReportData) -> str:
     s, e = data.period_start, data.period_end - timedelta(seconds=1)
     if freq == "daily":
         return s.strftime("%A, %-d %B %Y")
-    elif freq == "weekly":
+    elif freq in ("weekly", "custom", "manual"):
+        # Show the inclusive date range: e.g. "20 May – 26 May 2025"
         return f"{s.strftime('%-d %b')} – {e.strftime('%-d %b %Y')}"
     elif freq == "monthly":
-        return s.strftime("%B %Y")
+        # Show the inclusive range for clarity: e.g. "27 Apr – 26 May 2025"
+        return f"{s.strftime('%-d %b')} – {e.strftime('%-d %b %Y')}"
     else:
         return f"{s.strftime('%-d %b')} – {e.strftime('%-d %b %Y')}"
 
 
 # ── Orchestrator ────────────────────────────────────────────────────────────────
 
-async def send_frequency_report(frequency: Frequency) -> dict:
+async def send_frequency_report(
+    frequency: Frequency,
+    custom_start: datetime | None = None,
+    custom_end: datetime | None = None,
+) -> dict:
     """Build the report, send to all subscribed recipients, log the result.
 
-    Returns a stats dict for caller logging.
+    Parameters
+    ----------
+    frequency:
+        Scheduled cadence or ``"custom"`` for an ad-hoc date range.
+    custom_start / custom_end:
+        Required when *frequency* is ``"custom"``.
+
+    Returns a stats dict for the caller to log / forward.
     """
     from app.infrastructure.database.models.notifications import EmailSendLogDB
     from app.infrastructure.database.repositories.email_recipient_repo import (
@@ -690,15 +747,21 @@ async def send_frequency_report(frequency: Frequency) -> dict:
     logger.info("email_report_start frequency=%s", frequency)
 
     try:
-        data = await build_report_data(frequency)
+        data = await build_report_data(frequency, custom_start, custom_end)
     except Exception as exc:
         logger.error("email_report_build_failed frequency=%s error=%s", frequency, exc)
         return {"status": "failed", "error": str(exc)}
 
-    # Fetch recipients for this frequency
+    # Fetch recipients.
+    # Custom sends go to every active recipient; scheduled sends respect the
+    # per-recipient frequency subscription so people only get what they signed
+    # up for.
     async with _get_factory()() as session:
         repo = SQLEmailRecipientRepository(session)
-        recipients = await repo.list_for_frequency(frequency)
+        if frequency == "custom":
+            recipients = await repo.list_active()
+        else:
+            recipients = await repo.list_for_frequency(frequency)
 
     if not recipients:
         logger.info("email_report_no_recipients frequency=%s", frequency)

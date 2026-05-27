@@ -80,7 +80,13 @@ function _render(recipients, logs) {
         Trigger an immediate report for all subscribed recipients.
         If SMTP is not configured the email is logged in dry-run mode.
       </p>
-      <div class="flex gap-2" style="flex-wrap:wrap">
+
+      <!-- Scheduled frequency quick-send -->
+      <div style="font-size:12px;font-weight:600;color:var(--text3);
+                  text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">
+        Scheduled Periods
+      </div>
+      <div class="flex gap-2 mb-4" style="flex-wrap:wrap">
         <button class="btn btn-secondary" id="send-daily-btn"
                 onclick="window._emailPage.sendNow('daily')">
           📅 Send Daily Now
@@ -102,6 +108,49 @@ function _render(recipients, logs) {
         <a class="btn btn-ghost" href="/email-reports/preview/monthly" target="_blank">
           👁 Preview Monthly
         </a>
+      </div>
+
+      <!-- Custom date range -->
+      <div style="border-top:1px solid var(--border);padding-top:16px">
+        <div style="font-size:12px;font-weight:600;color:var(--text3);
+                    text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">
+          Custom Date Range
+        </div>
+        <p class="text-2 text-sm mb-3" style="margin-top:0">
+          Send (or preview) a report for any arbitrary date window.
+          Sent to <em>all active recipients</em> regardless of their
+          frequency subscriptions. Both dates are inclusive.
+        </p>
+        <div class="flex gap-3" style="align-items:flex-end;flex-wrap:wrap">
+          <div class="form-group" style="margin:0;flex:1;min-width:150px">
+            <label style="font-size:12px;color:var(--text2);margin-bottom:4px;display:block">
+              Start Date
+            </label>
+            <input type="date" id="custom-start-date" class="input"
+                   style="width:100%;box-sizing:border-box"
+                   max="${new Date().toISOString().slice(0,10)}">
+          </div>
+          <div class="form-group" style="margin:0;flex:1;min-width:150px">
+            <label style="font-size:12px;color:var(--text2);margin-bottom:4px;display:block">
+              End Date
+            </label>
+            <input type="date" id="custom-end-date" class="input"
+                   style="width:100%;box-sizing:border-box"
+                   max="${new Date().toISOString().slice(0,10)}">
+          </div>
+          <button class="btn btn-secondary" id="send-custom-btn"
+                  onclick="window._emailPage.sendCustom()">
+            📊 Send Custom Range
+          </button>
+          <button class="btn btn-ghost" id="preview-custom-btn"
+                  onclick="window._emailPage.previewCustom()">
+            👁 Preview Custom
+          </button>
+        </div>
+        <p class="text-3 text-xs" style="margin-top:8px;font-size:11px">
+          💡 <strong>Period definitions</strong> — Daily: yesterday (1 day) ·
+          Weekly: rolling 7-day window · Monthly: rolling 30-day window
+        </p>
       </div>
     </div>
 
@@ -178,7 +227,9 @@ function _logRow(l) {
   const statusColor = l.status === 'sent' ? 'success'
     : l.status === 'dry_run' ? 'info' : 'danger';
   const freqColor = l.frequency === 'daily' ? 'info'
-    : l.frequency === 'weekly' ? 'accent' : 'success';
+    : l.frequency === 'weekly' ? 'accent'
+    : l.frequency === 'monthly' ? 'success'
+    : 'warning';  // custom / manual / on-demand
   const dt = new Date(l.sent_at);
   const dtStr = dt.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })
     + ' ' + dt.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' });
@@ -363,9 +414,64 @@ async function sendNow(frequency) {
   }
 }
 
+async function sendCustom() {
+  const startDate = document.getElementById('custom-start-date')?.value;
+  const endDate   = document.getElementById('custom-end-date')?.value;
+
+  if (!startDate || !endDate) {
+    toast('warning', 'Select a date range', 'Choose both a start and end date first');
+    return;
+  }
+  if (startDate > endDate) {
+    toast('warning', 'Invalid range', 'Start date must be on or before end date');
+    return;
+  }
+
+  const btn = document.getElementById('send-custom-btn');
+  setBtnLoading(btn, true, 'Sending…');
+  try {
+    const result = await API.sendEmailNow('custom', startDate, endDate);
+    if (result.dry_run) {
+      toast('info', 'Dry run complete',
+        `${result.total_plays} plays, ${result.recipients_count} recipient(s) — SMTP not configured`);
+    } else {
+      toast('success', 'Custom report sent',
+        `Sent to ${result.sent_count}/${result.recipients_count} recipient(s)`);
+    }
+    await _refresh();
+  } catch (err) {
+    toast('error', 'Send failed', err.message);
+  } finally {
+    setBtnLoading(btn, false);
+  }
+}
+
+function previewCustom() {
+  const startDate = document.getElementById('custom-start-date')?.value;
+  const endDate   = document.getElementById('custom-end-date')?.value;
+
+  if (!startDate || !endDate) {
+    toast('warning', 'Select a date range', 'Choose both a start and end date before previewing');
+    return;
+  }
+  if (startDate > endDate) {
+    toast('warning', 'Invalid range', 'Start date must be on or before end date');
+    return;
+  }
+
+  window.open(
+    `/email-reports/preview/custom?start_date=${startDate}&end_date=${endDate}`,
+    '_blank',
+  );
+}
+
 function reload() {
   _container.innerHTML = '<div class="loader-center"><div class="loader"></div></div>';
   _refresh();
 }
 
-window._emailPage = { openAddModal, openEditModal, toggleActive, sendNow, reload };
+window._emailPage = {
+  openAddModal, openEditModal, toggleActive,
+  sendNow, sendCustom, previewCustom,
+  reload,
+};
