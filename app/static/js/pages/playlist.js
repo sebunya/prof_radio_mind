@@ -1,5 +1,5 @@
 import { API } from '../api.js';
-import { toast, showModal, closeModal, fmtDateTime, tierBadge, recBadge, esc } from '../ui.js';
+import { toast, showModal, closeModal, fmtDateTime, tierBadge, recBadge, esc, setBtnLoading } from '../ui.js';
 
 let _stations     = [];
 let _recs         = [];
@@ -24,14 +24,14 @@ function renderForm(actions) {
       <div class="card-header"><span class="card-title">Analyse Rotation</span></div>
       <div class="form-row" style="align-items:flex-end;flex-wrap:wrap">
         <div class="form-group" style="flex:3;min-width:200px">
-          <label>Station</label>
+          <label for="pl-station">Station</label>
           <select id="pl-station">
             <option value="">— Select station —</option>
             ${_stations.map(s => `<option value="${s.id}">${esc(s.call_sign)} — ${esc(s.name)}</option>`).join('')}
           </select>
         </div>
         <div class="form-group" style="flex:1;min-width:120px">
-          <label>Lookback (days)</label>
+          <label for="pl-days">Lookback (days)</label>
           <input type="number" id="pl-days" value="7" min="1" max="90">
         </div>
         <div class="form-group" style="flex:0;margin-bottom:14px">
@@ -52,8 +52,7 @@ async function analyse() {
   if (!stationId) { toast('warning', 'Select a station first'); return; }
 
   const btn = document.getElementById('pl-btn');
-  btn.disabled = true;
-  btn.innerHTML = '<span class="loader loader-sm" style="display:inline-block;margin-right:6px"></span>Analysing…';
+  setBtnLoading(btn, true, 'Analysing…');
 
   try {
     _recs = await API.analyseRotation(stationId, days);
@@ -64,8 +63,7 @@ async function analyse() {
     toast('error', 'Analysis failed', err.message);
     document.getElementById('pl-results').innerHTML = `<div class="alert alert-danger">${esc(err.message)}</div>`;
   } finally {
-    btn.disabled = false;
-    btn.textContent = 'Analyse Rotation';
+    setBtnLoading(btn, false);
   }
 }
 

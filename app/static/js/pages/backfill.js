@@ -20,7 +20,7 @@ function today() {
 
 function renderPage() {
   _container.innerHTML = `
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:20px;align-items:start">
 
       <!-- ── Left: Form ── -->
       <div>
@@ -33,7 +33,7 @@ function renderPage() {
           </div>
 
           <div class="form-group">
-            <label>Station</label>
+            <label for="bf-station">Station</label>
             <select id="bf-station">
               <option value="">— Select station —</option>
               ${_stations.map(s => `<option value="${s.id}">${esc(s.call_sign)} — ${esc(s.name)}</option>`).join('')}
@@ -41,7 +41,7 @@ function renderPage() {
           </div>
 
           <div class="form-group">
-            <label>Broadcast Date</label>
+            <label for="bf-date">Broadcast Date</label>
             <input type="date" id="bf-date" value="${today()}">
             <div class="form-hint">The date these plays were broadcast</div>
           </div>
@@ -49,7 +49,9 @@ function renderPage() {
           <div class="form-group">
             <label>CSV File</label>
             <div class="upload-zone" id="drop-zone" onclick="document.getElementById('bf-file').click()">
-              <input type="file" id="bf-file" accept=".csv,text/csv" onchange="window._backfillPage.onFileChange(event)">
+              <input type="file" id="bf-file" accept=".csv,text/csv"
+                     onclick="event.stopPropagation()"
+                     onchange="window._backfillPage.onFileChange(event)">
               <div class="upload-icon">📄</div>
               <div class="upload-label" id="upload-label">Click to browse or drag & drop</div>
               <div class="upload-hint">CSV files only · max 10 MB</div>

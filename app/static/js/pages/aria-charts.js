@@ -1,5 +1,5 @@
 import { API } from '../api.js';
-import { toast, fmtDate, posBadge, esc } from '../ui.js';
+import { toast, fmtDate, posBadge, esc, setBtnLoading } from '../ui.js';
 
 let _chart = null;
 let _container;
@@ -118,7 +118,10 @@ function buildChartHtml(data) {
 
     <!-- ── Bar chart ── -->
     <div class="card mt-4">
-      <div class="card-header"><span class="card-title">Positions 1–20</span></div>
+      <div class="card-header">
+        <span class="card-title">Positions 1–20</span>
+        <span class="text-3 text-xs">Bar height = chart rank (taller = higher)</span>
+      </div>
       <div class="chart-wrap" style="height:160px"><canvas id="ch-aria"></canvas></div>
     </div>`;
 }
@@ -147,19 +150,17 @@ function buildEntryRow(e) {
 async function ingest() {
   const date = document.getElementById('aria-date')?.value || null;
   const btn  = document.getElementById('aria-btn');
-  btn.disabled = true;
-  btn.innerHTML = '<span class="loader loader-sm" style="display:inline-block;margin-right:6px"></span>Fetching…';
+  setBtnLoading(btn, true, 'Fetching…');
 
   try {
     const data = await API.ingestAria(date || undefined);
     document.getElementById('aria-display').innerHTML = buildChartHtml(data);
     requestAnimationFrame(() => renderPositionsChart(data.entries || []));
-    toast('success', `ARIA chart ingested`, `${data.entry_count} entries for ${fmtDate(data.chart_date)}`);
+    toast('success', 'ARIA chart ingested', `${data.entry_count} entries for ${fmtDate(data.chart_date)}`);
   } catch (err) {
     toast('error', 'Ingest failed', err.message);
   } finally {
-    btn.disabled = false;
-    btn.textContent = 'Fetch ARIA Chart';
+    setBtnLoading(btn, false);
   }
 }
 
@@ -186,7 +187,8 @@ function renderPositionsChart(entries) {
       labels: top20.map(e => `#${e.position}`),
       datasets: [{
         label: 'Position',
-        data: top20.map(e => 21 - e.position), // invert so #1 is tallest
+        // Invert so #1 is tallest bar. Values are bounded to top20 so never negative.
+        data: top20.map(e => 21 - e.position),
         backgroundColor: top20.map((e, i) => {
           if (e.position === 1) return 'rgba(251,191,36,.8)';
           if (e.position === 2) return 'rgba(156,163,175,.7)';
