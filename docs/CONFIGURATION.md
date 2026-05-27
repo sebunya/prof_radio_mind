@@ -35,6 +35,7 @@ docker compose exec app alembic upgrade head
 | `APP_ENV` | `development` | Runtime environment. Set to `production` to enable security warnings on missing API key. Valid values: `development`, `staging`, `production`. |
 | `APP_HOST` | `0.0.0.0` | IP address uvicorn binds to. Use `0.0.0.0` inside Docker to accept external connections. |
 | `APP_PORT` | `8000` | TCP port uvicorn listens on. Exposed through the Docker Compose `ports` mapping. |
+| `BASE_URL` | *(empty)* | Public-facing base URL used to build absolute links in outgoing emails (e.g. one-click unsubscribe). **No trailing slash.** Example: `https://rmias.shopgoldplus.com`. Leave blank to omit unsubscribe links (not recommended for production). |
 
 ---
 
@@ -181,6 +182,7 @@ Before going live, verify:
 - [ ] `POSTGRES_PASSWORD` changed from the default
 - [ ] `DATABASE_URL` uses the production password
 - [ ] `CORS_ORIGINS` set to the exact admin frontend origin (not `*`)
+- [ ] `BASE_URL` set to the public hostname (enables one-click unsubscribe links in emails)
 - [ ] `SMTP_HOST` configured — emails will not be delivered otherwise
 - [ ] `SMTP_FROM_EMAIL` set to a domain you own (improves deliverability)
 - [ ] Database migrations applied: `docker compose exec app alembic upgrade head`

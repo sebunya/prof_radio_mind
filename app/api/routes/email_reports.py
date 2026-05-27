@@ -328,6 +328,130 @@ async def send_now(body: SendNowRequest) -> SendNowResponse:
     )
 
 
+# ── GET /email-reports/unsubscribe ───────────────────────────────────────────
+# Public endpoint — NO API key required.  Email clients follow this URL when the
+# subscriber clicks "Unsubscribe" or triggers one-click via the List-Unsubscribe
+# header (RFC 8058).
+
+@router.get(
+    "/unsubscribe",
+    include_in_schema=True,
+    tags=["email-reports"],
+)
+async def unsubscribe_get(
+    id: uuid.UUID = Query(..., description="Recipient UUID from unsubscribe link"),
+    token: str = Query(..., description="HMAC-SHA256 token binding id+email"),
+    session: AsyncSession = Depends(get_db),
+) -> Response:
+    """Unsubscribe a recipient via a signed link (used by browser clicks).
+
+    Verifies the HMAC token, deactivates the recipient, and returns a plain
+    HTML confirmation page.  Token is bound to both ``id`` and ``email`` so it
+    cannot be replayed across accounts even if an ID is guessed.
+    """
+    from app.application.reports.email_report_builder import verify_unsubscribe_token
+    from app.infrastructure.database.repositories.email_recipient_repo import (
+        SQLEmailRecipientRepository,
+    )
+
+    repo = SQLEmailRecipientRepository(session)
+    row = await repo.get(id)
+
+    # Use a generic message for both "not found" and "bad token" to avoid leaking
+    # whether a given UUID exists.
+    if row is None or not verify_unsubscribe_token(token, row.id, row.email):
+        html_body = _unsub_page(
+            "Invalid or expired unsubscribe link",
+            "This link is invalid or has already been used. "
+            "Contact your RMIAS administrator if you need assistance.",
+            success=False,
+        )
+        return Response(content=html_body, media_type="text/html", status_code=400)
+
+    if row.is_active:
+        row.is_active = False
+        await session.flush()
+        await session.commit()
+
+    html_body = _unsub_page(
+        "Unsubscribed",
+        f"You have been unsubscribed from RMIAS radio reports. "
+        f"Your address ({row.email}) will not receive any further automated emails.",
+        success=True,
+    )
+    return Response(content=html_body, media_type="text/html")
+
+
+@router.post(
+    "/unsubscribe",
+    include_in_schema=True,
+    tags=["email-reports"],
+    status_code=200,
+)
+async def unsubscribe_post(
+    id: uuid.UUID = Query(...),
+    token: str = Query(...),
+    session: AsyncSession = Depends(get_db),
+) -> dict:
+    """One-click unsubscribe handler (RFC 8058 ``List-Unsubscribe-Post``).
+
+    Email clients (Gmail, Apple Mail, Yahoo) POST to this URL with the body
+    ``List-Unsubscribe=One-Click``.  The response is a plain 200 JSON — the
+    client doesn't render it.  Same token verification as the GET endpoint.
+    """
+    from app.application.reports.email_report_builder import verify_unsubscribe_token
+    from app.infrastructure.database.repositories.email_recipient_repo import (
+        SQLEmailRecipientRepository,
+    )
+
+    repo = SQLEmailRecipientRepository(session)
+    row = await repo.get(id)
+
+    if row is None or not verify_unsubscribe_token(token, row.id, row.email):
+        raise HTTPException(status_code=400, detail="Invalid unsubscribe token")
+
+    if row.is_active:
+        row.is_active = False
+        await session.flush()
+        await session.commit()
+
+    return {"status": "unsubscribed", "id": str(id)}
+
+
+def _unsub_page(title: str, message: str, success: bool) -> str:
+    """Return a minimal, self-contained HTML confirmation page."""
+    import html as _html
+
+    colour = "#10b981" if success else "#ef4444"
+    icon   = "✓" if success else "✗"
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{_html.escape(title)} — RMIAS</title>
+<style>
+  body{{margin:0;padding:0;background:#0f172a;font-family:sans-serif;
+        display:flex;align-items:center;justify-content:center;min-height:100vh}}
+  .card{{background:#1e293b;border-radius:12px;padding:40px 48px;max-width:480px;
+         text-align:center;border:1px solid #334155}}
+  .icon{{font-size:48px;color:{colour};margin-bottom:16px}}
+  h1{{margin:0 0 12px;font-size:22px;font-weight:700;color:#f1f5f9}}
+  p{{margin:0;font-size:14px;color:#94a3b8;line-height:1.6}}
+  .brand{{margin-top:32px;font-size:11px;color:#334155}}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="icon">{icon}</div>
+  <h1>{_html.escape(title)}</h1>
+  <p>{_html.escape(message)}</p>
+  <p class="brand">RMIAS · Radio Music Intelligence &amp; Automation System</p>
+</div>
+</body>
+</html>"""
+
+
 # ── GET /email-reports/preview/{frequency} ────────────────────────────────────
 
 @router.get(

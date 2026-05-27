@@ -7,6 +7,10 @@ class Settings(BaseSettings):
     app_env: str = "development"
     app_host: str = "0.0.0.0"
     app_port: int = 8000
+    # Public-facing base URL used to build absolute links in outgoing emails
+    # (e.g. unsubscribe links).  No trailing slash.
+    # Example: https://rmias.shopgoldplus.com
+    base_url: str = ""
 
     database_url: str = "postgresql+asyncpg://rmias:rmias@db:5432/rmias"
     raw_payload_storage_path: str = "/data/raw_payloads"

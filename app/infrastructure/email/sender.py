@@ -45,11 +45,22 @@ class EmailSender:
         subject: str,
         html_body: str,
         text_body: str = "",
+        extra_headers: dict[str, str] | None = None,
     ) -> None:
-        """Send an email to one or more addresses.
+        """Send a multipart/alternative email to one or more addresses.
+
+        Parameters
+        ----------
+        text_body:
+            Plain-text fallback (strongly recommended for deliverability).
+            Attached before the HTML part so legacy clients see it first.
+        extra_headers:
+            Additional RFC 5322 headers merged into the message, e.g.
+            ``{"List-Unsubscribe": "<https://...>", "List-Unsubscribe-Post":
+            "List-Unsubscribe=One-Click"}``.
 
         Raises ``EmailSendError`` on SMTP failure.
-        In dry-run mode (no smtp_host) logs the email and returns.
+        In dry-run mode logs the subject/recipients and returns without sending.
         """
         if self.is_dry_run:
             logger.info(
@@ -63,6 +74,8 @@ class EmailSender:
         msg["Subject"] = subject
         msg["From"] = f"{self._from_name} <{self._from_email}>"
         msg["To"] = ", ".join(to_addresses)
+        for header, value in (extra_headers or {}).items():
+            msg[header] = value
 
         if text_body:
             msg.attach(MIMEText(text_body, "plain", "utf-8"))
