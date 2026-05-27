@@ -1,7 +1,14 @@
 """Webhook notification service.
 
 Fires HTTP POST events to registered subscriber URLs when new plays are detected.
-Subscriptions are stored in memory in MVP — replace with DB-backed store for production.
+
+Subscriptions are persisted to the database (via WebhookSubscriptionDB) and loaded
+into an in-memory store at startup so that ``fire_event`` is a zero-DB-query hot path.
+
+Write-through pattern:
+  - register / unregister write to DB first, then update the in-memory store.
+  - fire_event reads from the in-memory store (fast).
+  - On startup call ``load_from_db(session)`` to repopulate memory from DB.
 
 Payload format:
   {
@@ -42,20 +49,24 @@ class WebhookSubscription:
 
 
 class WebhookStore:
-    """In-memory subscription store — replace with SQLAlchemy repo for production."""
+    """In-memory subscription store backed by DB persistence.
+
+    Use ``load_from_db`` at startup and ``persist_register`` / ``persist_unregister``
+    in routes to keep DB and memory in sync.
+    """
 
     def __init__(self) -> None:
         self._subs: dict[uuid.UUID, WebhookSubscription] = {}
 
-    def register(
-        self, url: str, event_types: list[str], secret: str | None = None
-    ) -> WebhookSubscription:
-        sub = WebhookSubscription(id=uuid.uuid4(), url=url, event_types=event_types, secret=secret)
-        self._subs[sub.id] = sub
-        return sub
+    # ── Memory-only helpers (used internally and by fire_event) ───────────────
 
-    def unregister(self, sub_id: uuid.UUID) -> bool:
+    def _add(self, sub: WebhookSubscription) -> None:
+        self._subs[sub.id] = sub
+
+    def _remove(self, sub_id: uuid.UUID) -> bool:
         return self._subs.pop(sub_id, None) is not None
+
+    # ── Read ──────────────────────────────────────────────────────────────────
 
     def list_active(self, event_type: str) -> list[WebhookSubscription]:
         return [
@@ -68,6 +79,69 @@ class WebhookStore:
 
     def __len__(self) -> int:
         return len(self._subs)
+
+    # ── Write-through DB helpers (called from routes with a live session) ─────
+
+    def register(
+        self, url: str, event_types: list[str], secret: str | None = None
+    ) -> WebhookSubscription:
+        """Add to in-memory store only. Persist separately with ``persist_register``."""
+        sub = WebhookSubscription(id=uuid.uuid4(), url=url, event_types=event_types, secret=secret)
+        self._add(sub)
+        return sub
+
+    def unregister(self, sub_id: uuid.UUID) -> bool:
+        """Remove from in-memory store only. Persist separately with ``persist_unregister``."""
+        return self._remove(sub_id)
+
+    # ── DB persistence helpers ────────────────────────────────────────────────
+
+    async def load_from_db(self, session: object) -> None:
+        """Load all active subscriptions from DB into memory (idempotent)."""
+        from app.infrastructure.database.repositories.webhook_subscription_repo import (
+            SQLWebhookSubscriptionRepository,
+        )
+
+        repo = SQLWebhookSubscriptionRepository(session)  # type: ignore[arg-type]
+        rows = await repo.list_active()
+        for row in rows:
+            sub = WebhookSubscription(
+                id=row.id,
+                url=row.url,
+                event_types=list(row.event_types or []),
+                secret=row.secret,
+                is_active=row.is_active,
+                created_at=row.created_at,
+            )
+            self._add(sub)
+        logger.info("webhook_store_loaded count=%d", len(rows))
+
+    async def persist_register(self, sub: WebhookSubscription, session: object) -> None:
+        """Persist a newly registered subscription to DB."""
+        from app.infrastructure.database.models.operations import WebhookSubscriptionDB
+        from app.infrastructure.database.repositories.webhook_subscription_repo import (
+            SQLWebhookSubscriptionRepository,
+        )
+
+        row = WebhookSubscriptionDB(
+            id=sub.id,
+            url=sub.url,
+            event_types=sub.event_types,
+            secret=sub.secret,
+            is_active=sub.is_active,
+            created_at=sub.created_at,
+        )
+        repo = SQLWebhookSubscriptionRepository(session)  # type: ignore[arg-type]
+        await repo.save(row)
+
+    async def persist_unregister(self, sub_id: uuid.UUID, session: object) -> bool:
+        """Hard-delete a subscription from DB. Returns True if found."""
+        from app.infrastructure.database.repositories.webhook_subscription_repo import (
+            SQLWebhookSubscriptionRepository,
+        )
+
+        repo = SQLWebhookSubscriptionRepository(session)  # type: ignore[arg-type]
+        return await repo.hard_delete(sub_id)
 
 
 webhook_store = WebhookStore()
@@ -106,7 +180,10 @@ async def _deliver(
             try:
                 resp = await client.post(sub.url, content=body, headers=headers)
                 if resp.status_code < 300:
-                    logger.debug("webhook_delivered sub=%s event=%s", sub.id, event_type)
+                    logger.debug(
+                        "webhook_delivered sub=%s event=%s status=%d",
+                        sub.id, event_type, resp.status_code,
+                    )
                     return
                 logger.warning(
                     "webhook_non_2xx sub=%s event=%s status=%d attempt=%d",

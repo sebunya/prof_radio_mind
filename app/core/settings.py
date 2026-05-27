@@ -15,6 +15,9 @@ class Settings(BaseSettings):
     max_upload_bytes: int = 10 * 1024 * 1024  # 10 MB
     rate_limit_rpm: int = 30
     api_key: str = ""  # empty = auth disabled (dev); set in production
+    # Comma-separated allowed CORS origins. Empty = allow all (*) — acceptable when
+    # the admin frontend and API share the same origin. Set explicitly in production.
+    cors_origins: str = ""
 
     # Proxy rotation — comma-separated list of proxy URLs (http:// or socks5://)
     # Example: http://user:pass@proxy1:8080,socks5://proxy2:1080

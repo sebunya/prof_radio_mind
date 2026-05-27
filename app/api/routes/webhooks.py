@@ -6,9 +6,11 @@ import uuid
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import require_api_key
+from app.infrastructure.database.session import get_db
 
 router = APIRouter(prefix="/webhooks", tags=["webhooks"])
 
@@ -16,9 +18,9 @@ _VALID_EVENTS = {"play.detected", "no_track.detected", "reconciliation.completed
 
 
 class SubscriptionRequest(BaseModel):
-    url: str
-    event_types: list[str]
-    secret: str | None = None
+    url: str = Field(..., max_length=2048)
+    event_types: list[str] = Field(..., max_length=10)
+    secret: str | None = Field(None, max_length=512)
 
 
 class SubscriptionResponse(BaseModel):
@@ -48,8 +50,11 @@ def _to_response(sub: object) -> SubscriptionResponse:
     status_code=201,
     dependencies=[Depends(require_api_key)],
 )
-async def register_webhook(body: SubscriptionRequest) -> SubscriptionResponse:
-    """Register a new webhook subscription."""
+async def register_webhook(
+    body: SubscriptionRequest,
+    session: AsyncSession = Depends(get_db),
+) -> SubscriptionResponse:
+    """Register a new webhook subscription (persisted to DB)."""
     from app.application.webhooks.service import webhook_store
 
     invalid = [e for e in body.event_types if e not in _VALID_EVENTS]
@@ -64,6 +69,13 @@ async def register_webhook(body: SubscriptionRequest) -> SubscriptionResponse:
         event_types=body.event_types,
         secret=body.secret,
     )
+    try:
+        await webhook_store.persist_register(sub, session)
+        await session.commit()
+    except Exception as exc:
+        # Roll back in-memory add if DB write fails
+        webhook_store.unregister(sub.id)
+        raise HTTPException(status_code=503, detail=f"Database unavailable: {exc}") from exc
     return _to_response(sub)
 
 
@@ -72,15 +84,26 @@ async def register_webhook(body: SubscriptionRequest) -> SubscriptionResponse:
     response_model=list[SubscriptionResponse],
     dependencies=[Depends(require_api_key)],
 )
-async def list_webhooks() -> list[SubscriptionResponse]:
-    """List all active webhook subscriptions."""
-    from app.application.webhooks.service import webhook_store
+async def list_webhooks(session: AsyncSession = Depends(get_db)) -> list[SubscriptionResponse]:
+    """List all active webhook subscriptions (reads from DB for cross-worker consistency)."""
+    from app.infrastructure.database.repositories.webhook_subscription_repo import (
+        SQLWebhookSubscriptionRepository,
+    )
 
-    seen: dict[str, object] = {}
-    for event_type in _VALID_EVENTS:
-        for sub in webhook_store.list_active(event_type):
-            seen.setdefault(str(sub.id), sub)
-    return [_to_response(s) for s in seen.values()]
+    repo = SQLWebhookSubscriptionRepository(session)
+    rows = await repo.list_active()
+
+
+    return [
+        SubscriptionResponse(
+            id=str(row.id),
+            url=row.url,
+            event_types=list(row.event_types or []),
+            is_active=row.is_active,
+            created_at=row.created_at,
+        )
+        for row in rows
+    ]
 
 
 @router.delete(
@@ -88,13 +111,24 @@ async def list_webhooks() -> list[SubscriptionResponse]:
     status_code=204,
     dependencies=[Depends(require_api_key)],
 )
-async def unregister_webhook(subscription_id: uuid.UUID) -> None:
-    """Remove a webhook subscription."""
+async def unregister_webhook(
+    subscription_id: uuid.UUID,
+    session: AsyncSession = Depends(get_db),
+) -> None:
+    """Remove a webhook subscription (hard-deletes from DB)."""
     from app.application.webhooks.service import webhook_store
 
-    removed = webhook_store.unregister(subscription_id)
-    if not removed:
+    # Hard-delete from DB first
+    try:
+        deleted = await webhook_store.persist_unregister(subscription_id, session)
+        await session.commit()
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"Database unavailable: {exc}") from exc
+
+    if not deleted:
         raise HTTPException(
             status_code=404,
             detail=f"Subscription {subscription_id} not found",
         )
+    # Also remove from in-memory store
+    webhook_store.unregister(subscription_id)

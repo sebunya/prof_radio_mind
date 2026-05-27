@@ -10,7 +10,16 @@ export async function apiCall(method, path, body = null, isFormData = false) {
   const opts = { method, headers };
   if (body) opts.body = isFormData ? body : JSON.stringify(body);
 
-  const resp = await fetch(path, opts);
+  let resp;
+  try {
+    resp = await fetch(path, opts);
+  } catch (networkErr) {
+    // fetch() itself threw — network unreachable, DNS failure, CORS preflight blocked, etc.
+    const err = new Error('Network error — server unreachable');
+    err.status = 0;
+    err.cause = networkErr;
+    throw err;
+  }
 
   if (!resp.ok) {
     let detail = `HTTP ${resp.status}`;
@@ -18,10 +27,12 @@ export async function apiCall(method, path, body = null, isFormData = false) {
       const j = await resp.json();
       if (Array.isArray(j.detail)) {
         detail = j.detail.map(e => e.msg || JSON.stringify(e)).join('; ');
+      } else if (j.detail && typeof j.detail === 'object') {
+        detail = j.detail.message || JSON.stringify(j.detail);
       } else {
         detail = j.detail || detail;
       }
-    } catch { /* ignore */ }
+    } catch { /* non-JSON body — keep the HTTP status text */ }
     const err = new Error(detail);
     err.status = resp.status;
     throw err;

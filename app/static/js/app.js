@@ -152,6 +152,11 @@ navigate(getRoute());
 refreshApiStatus();
 refreshPendingBadge();
 
-// Soft refresh every 30 s
-setInterval(refreshApiStatus,   30_000);
-setInterval(refreshPendingBadge, 30_000);
+// Soft refresh every 30 s — store IDs so we can clear on unload
+const _statusInterval  = setInterval(refreshApiStatus,    30_000);
+const _badgeInterval   = setInterval(refreshPendingBadge, 30_000);
+
+window.addEventListener('beforeunload', () => {
+  clearInterval(_statusInterval);
+  clearInterval(_badgeInterval);
+});

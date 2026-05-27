@@ -88,53 +88,62 @@ async def _persist_result(result: object) -> None:
 
 async def job_collect_nova_diary() -> None:
     """Collect Nova 96.9 Radiowave diary for the previous day (runs daily 16:00 UTC)."""
-    collector = NovaRadiowaveCollector(
-        source_id=_NOVA_SOURCE_ID,
-        station_id=_NOVA_STATION_ID,
-        storage_root=settings.raw_payload_storage_path,
-    )
-    result = await collector.run()
-    logger.info(
-        "nova_diary_collected status=%s plays=%d no_tracks=%d",
-        result.collector_run.status.value,
-        len(result.play_events),
-        len(result.no_track_events),
-    )
-    await _persist_result(result)
+    try:
+        collector = NovaRadiowaveCollector(
+            source_id=_NOVA_SOURCE_ID,
+            station_id=_NOVA_STATION_ID,
+            storage_root=settings.raw_payload_storage_path,
+        )
+        result = await collector.run()
+        logger.info(
+            "nova_diary_collected status=%s plays=%d no_tracks=%d",
+            result.collector_run.status.value,
+            len(result.play_events),
+            len(result.no_track_events),
+        )
+        await _persist_result(result)
+    except Exception as exc:
+        logger.error("job_collect_nova_diary_failed error=%s", exc, exc_info=True)
 
 
 async def job_collect_kiis_now_playing() -> None:
     """Poll KIIS-FM iHeart now-playing endpoint (runs every 5 minutes)."""
-    collector = KIISIHeartCollector(
-        source_id=_KIIS_SOURCE_ID,
-        station_id=_KIIS_STATION_ID,
-        storage_root=settings.raw_payload_storage_path,
-    )
-    result = await collector.run()
-    logger.debug(
-        "kiis_now_playing status=%s plays=%d no_tracks=%d",
-        result.collector_run.status.value,
-        len(result.play_events),
-        len(result.no_track_events),
-    )
-    await _persist_result(result)
+    try:
+        collector = KIISIHeartCollector(
+            source_id=_KIIS_SOURCE_ID,
+            station_id=_KIIS_STATION_ID,
+            storage_root=settings.raw_payload_storage_path,
+        )
+        result = await collector.run()
+        logger.debug(
+            "kiis_now_playing status=%s plays=%d no_tracks=%d",
+            result.collector_run.status.value,
+            len(result.play_events),
+            len(result.no_track_events),
+        )
+        await _persist_result(result)
+    except Exception as exc:
+        logger.error("job_collect_kiis_now_playing_failed error=%s", exc, exc_info=True)
 
 
 async def job_collect_capital_now_playing() -> None:
     """Poll Capital FM iHeart now-playing endpoint (runs every 5 minutes)."""
-    collector = CapitalIHeartCollector(
-        source_id=_CAPITAL_SOURCE_ID,
-        station_id=_CAPITAL_STATION_ID,
-        storage_root=settings.raw_payload_storage_path,
-    )
-    result = await collector.run()
-    logger.debug(
-        "capital_now_playing status=%s plays=%d no_tracks=%d",
-        result.collector_run.status.value,
-        len(result.play_events),
-        len(result.no_track_events),
-    )
-    await _persist_result(result)
+    try:
+        collector = CapitalIHeartCollector(
+            source_id=_CAPITAL_SOURCE_ID,
+            station_id=_CAPITAL_STATION_ID,
+            storage_root=settings.raw_payload_storage_path,
+        )
+        result = await collector.run()
+        logger.debug(
+            "capital_now_playing status=%s plays=%d no_tracks=%d",
+            result.collector_run.status.value,
+            len(result.play_events),
+            len(result.no_track_events),
+        )
+        await _persist_result(result)
+    except Exception as exc:
+        logger.error("job_collect_capital_now_playing_failed error=%s", exc, exc_info=True)
 
 
 async def job_nightly_reconciliation() -> None:
