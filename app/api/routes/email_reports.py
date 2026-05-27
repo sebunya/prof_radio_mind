@@ -131,16 +131,20 @@ def _log_to_response(row: object) -> SendLogResponse:
     response_model=list[RecipientResponse],
     dependencies=[Depends(require_api_key)],
 )
-async def list_recipients(session: AsyncSession = Depends(get_db)) -> list[RecipientResponse]:
-    """Return all recipients (active and inactive)."""
-    from sqlalchemy import select
-
-    from app.infrastructure.database.models.notifications import EmailRecipientDB
-
-    result = await session.execute(
-        select(EmailRecipientDB).order_by(EmailRecipientDB.created_at)
+async def list_recipients(
+    response: Response,
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    session: AsyncSession = Depends(get_db),
+) -> list[RecipientResponse]:
+    """Return recipients.  Total count in ``X-Total-Count`` response header."""
+    from app.infrastructure.database.repositories.email_recipient_repo import (
+        SQLEmailRecipientRepository,
     )
-    rows = result.scalars().all()
+
+    repo = SQLEmailRecipientRepository(session)
+    rows, total = await repo.list_page(limit=limit, offset=offset)
+    response.headers["X-Total-Count"] = str(total)
     return [_row_to_response(r) for r in rows]
 
 
@@ -252,16 +256,19 @@ async def remove_recipient(
     dependencies=[Depends(require_api_key)],
 )
 async def send_log(
-    limit: int = 50,
+    response: Response,
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
     session: AsyncSession = Depends(get_db),
 ) -> list[SendLogResponse]:
-    """Return recent email send log entries."""
+    """Return email send log entries.  Total count in ``X-Total-Count`` header."""
     from app.infrastructure.database.repositories.email_recipient_repo import (
         SQLEmailSendLogRepository,
     )
 
     repo = SQLEmailSendLogRepository(session)
-    rows = await repo.list_recent(limit=min(limit, 200))
+    rows, total = await repo.list_page(limit=limit, offset=offset)
+    response.headers["X-Total-Count"] = str(total)
     return [_log_to_response(r) for r in rows]
 
 

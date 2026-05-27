@@ -11,6 +11,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.api.routes.backfill import router as backfill_router
 from app.api.routes.charts import router as charts_router
+from app.api.routes.collector_health import router as collector_health_router
 from app.api.routes.email_reports import router as email_reports_router
 from app.api.routes.health import router as health_router
 from app.api.routes.imports import router as imports_router
@@ -22,6 +23,7 @@ from app.api.routes.sources import router as sources_router
 from app.api.routes.stations import router as stations_router
 from app.api.routes.webhooks import router as webhooks_router
 from app.core.logging_config import configure_logging
+from app.core.rate_limiter import RateLimitMiddleware
 from app.core.settings import settings
 from app.infrastructure.database.session import dispose_engine
 from app.infrastructure.scheduler.scheduler import build_scheduler
@@ -82,6 +84,10 @@ app = FastAPI(
 # Defaults to allow all (*) which is fine for the admin-only scenario where
 # the frontend is served from the same origin.
 _cors_origins = [o.strip() for o in settings.cors_origins.split(",") if o.strip()]
+# Rate limit runs inside CORS so preflights (OPTIONS) are handled first.
+# add_middleware prepends: last-added = outermost = first to execute.
+# Order here: RateLimitMiddleware added first (inner) → CORS added second (outer).
+app.add_middleware(RateLimitMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors_origins if _cors_origins else ["*"],
@@ -123,6 +129,7 @@ app.include_router(charts_router)
 app.include_router(webhooks_router)
 app.include_router(backfill_router)
 app.include_router(email_reports_router)
+app.include_router(collector_health_router)
 
 app.mount(
     "/admin",

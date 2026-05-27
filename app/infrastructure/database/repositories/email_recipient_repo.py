@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.infrastructure.database.models.notifications import EmailRecipientDB, EmailSendLogDB
@@ -54,6 +54,25 @@ class SQLEmailRecipientRepository:
         )
         return list(result.scalars().all())
 
+    async def list_page(
+        self,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> tuple[list[EmailRecipientDB], int]:
+        """Return (rows, total_count) for paginated list endpoint."""
+        total: int = (
+            await self._session.execute(
+                select(func.count()).select_from(EmailRecipientDB)
+            )
+        ).scalar_one()
+        result = await self._session.execute(
+            select(EmailRecipientDB)
+            .order_by(EmailRecipientDB.created_at)
+            .limit(limit)
+            .offset(offset)
+        )
+        return list(result.scalars().all()), total
+
     async def delete(self, recipient_id: uuid.UUID) -> bool:
         row = await self._session.get(EmailRecipientDB, recipient_id)
         if row is None:
@@ -78,3 +97,22 @@ class SQLEmailSendLogRepository:
             .limit(limit)
         )
         return list(result.scalars().all())
+
+    async def list_page(
+        self,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> tuple[list[EmailSendLogDB], int]:
+        """Return (rows, total_count) for paginated log endpoint."""
+        total: int = (
+            await self._session.execute(
+                select(func.count()).select_from(EmailSendLogDB)
+            )
+        ).scalar_one()
+        result = await self._session.execute(
+            select(EmailSendLogDB)
+            .order_by(EmailSendLogDB.sent_at.desc())
+            .limit(limit)
+            .offset(offset)
+        )
+        return list(result.scalars().all()), total

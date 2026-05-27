@@ -3,32 +3,34 @@
  * API status polling, pending-review badge refresh.
  */
 
-import { API } from './api.js';
+import { API, apiCallPaged } from './api.js';
 import { toast, closeModal, esc } from './ui.js';
 
 // ── Page registry ────────────────────────────────────────────────
 const PAGES = {
-  dashboard:     () => import('./pages/dashboard.js'),
-  stations:      () => import('./pages/stations.js'),
-  review:        () => import('./pages/review.js'),
-  reports:       () => import('./pages/reports.js'),
-  playlist:      () => import('./pages/playlist.js'),
-  charts:        () => import('./pages/aria-charts.js'),
-  webhooks:      () => import('./pages/webhooks.js'),
-  backfill:      () => import('./pages/backfill.js'),
-  'email-reports': () => import('./pages/email-reports.js'),
+  dashboard:          () => import('./pages/dashboard.js'),
+  stations:           () => import('./pages/stations.js'),
+  review:             () => import('./pages/review.js'),
+  reports:            () => import('./pages/reports.js'),
+  playlist:           () => import('./pages/playlist.js'),
+  charts:             () => import('./pages/aria-charts.js'),
+  webhooks:           () => import('./pages/webhooks.js'),
+  backfill:           () => import('./pages/backfill.js'),
+  'email-reports':    () => import('./pages/email-reports.js'),
+  'collector-health': () => import('./pages/collector-health.js'),
 };
 
 const TITLES = {
-  dashboard:     'Dashboard',
-  stations:      'Radio Stations',
-  review:        'Review Queue',
-  reports:       'Reports',
-  playlist:      'Playlist Automation',
-  charts:        'ARIA Charts',
-  webhooks:      'Webhooks',
-  backfill:      'Historical Backfill',
-  'email-reports': 'Email Reports',
+  dashboard:          'Dashboard',
+  stations:           'Radio Stations',
+  review:             'Review Queue',
+  reports:            'Reports',
+  playlist:           'Playlist Automation',
+  charts:             'ARIA Charts',
+  webhooks:           'Webhooks',
+  backfill:           'Historical Backfill',
+  'email-reports':    'Email Reports',
+  'collector-health': 'Collector Health',
 };
 
 // ── Router ───────────────────────────────────────────────────────
@@ -91,11 +93,11 @@ async function refreshApiStatus() {
 // ── Pending review badge ─────────────────────────────────────────
 async function refreshPendingBadge() {
   try {
-    const items = await API.reviewItems('pending');
+    // Fetch just 1 item to get the total from X-Total-Count; avoids loading all items.
+    const { total } = await apiCallPaged('GET', '/review-items?status=pending&limit=1&offset=0');
     const badge = document.getElementById('nav-pending-badge');
-    const n = items.length;
-    if (n > 0) {
-      badge.textContent = n > 99 ? '99+' : n;
+    if (total > 0) {
+      badge.textContent = total > 99 ? '99+' : total;
       badge.hidden = false;
     } else {
       badge.hidden = true;

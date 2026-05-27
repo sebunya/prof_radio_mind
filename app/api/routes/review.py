@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -64,9 +64,13 @@ def _to_response(item: ReviewItem) -> ReviewItemResponse:
 
 @router.get("", response_model=list[ReviewItemResponse], dependencies=[Depends(require_api_key)])
 async def list_review_items(
+    response: Response,
     status: str | None = Query(default=None, description="Filter by status"),
+    limit: int = Query(50, ge=1, le=200, description="Max items to return"),
+    offset: int = Query(0, ge=0, description="Number of items to skip"),
     session: AsyncSession = Depends(get_db),
 ) -> list[ReviewItemResponse]:
+    """List review items.  Total count is in the ``X-Total-Count`` response header."""
     filter_status: ReviewItemStatus | None = None
     if status is not None:
         try:
@@ -78,7 +82,8 @@ async def list_review_items(
                 detail=f"Invalid status '{status}'. Valid values: {valid}",
             )
     repo = SQLReviewItemRepository(session)
-    items = await repo.list(filter_status)
+    items, total = await repo.list_page(filter_status, limit=limit, offset=offset)
+    response.headers["X-Total-Count"] = str(total)
     return [_to_response(i) for i in items]
 
 

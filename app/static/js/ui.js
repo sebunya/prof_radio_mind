@@ -288,9 +288,50 @@ export function confirmModal({ title, message, confirmLabel = 'Confirm', cancelL
   });
 }
 
+// ── Pagination ───────────────────────────────────────────────────
+/**
+ * Render a pagination bar into `container`.
+ *
+ * @param {HTMLElement} container  - Element that receives the pagination bar.
+ * @param {object} opts
+ * @param {number} opts.total      - Total item count from X-Total-Count header.
+ * @param {number} opts.limit      - Page size.
+ * @param {number} opts.offset     - Current offset.
+ * @param {function} opts.onNavigate - Called with new offset when user clicks.
+ */
+export function mountPagination(container, { total, limit, offset, onNavigate }) {
+  if (!container) return;
+  if (total <= limit) {
+    container.innerHTML = '';
+    return;
+  }
+  const currentPage = Math.floor(offset / limit) + 1;
+  const totalPages  = Math.ceil(total / limit);
+  const hasPrev = offset > 0;
+  const hasNext = offset + limit < total;
+
+  container.innerHTML = `
+    <div class="pagination">
+      <button class="btn btn-ghost btn-sm" id="pg-prev" ${hasPrev ? '' : 'disabled'}>← Prev</button>
+      <span class="pagination-info">Page ${currentPage} of ${totalPages} &nbsp;·&nbsp; ${total.toLocaleString()} total</span>
+      <button class="btn btn-ghost btn-sm" id="pg-next" ${hasNext ? '' : 'disabled'}>Next →</button>
+    </div>`;
+
+  if (hasPrev) {
+    container.querySelector('#pg-prev').addEventListener('click', () =>
+      onNavigate(Math.max(0, offset - limit))
+    );
+  }
+  if (hasNext) {
+    container.querySelector('#pg-next').addEventListener('click', () =>
+      onNavigate(offset + limit)
+    );
+  }
+}
+
 // ── Expose on window for inline onclick handlers ─────────────────
 window.UI = {
   toast, showModal, closeModal, fmtDate, fmtDateTime, fmtRelative,
   dlBlob, badge, tierBadge, recBadge, confBadge, posBadge, esc,
-  setLoading, setSkeleton, setBtnLoading, confirmModal,
+  setLoading, setSkeleton, setBtnLoading, confirmModal, mountPagination,
 };

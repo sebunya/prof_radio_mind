@@ -62,6 +62,29 @@ class SQLReviewItemRepository:
         result = await self._session.execute(stmt)
         return [_to_domain(r) for r in result.scalars().all()]
 
+    async def list_page(
+        self,
+        status: ReviewItemStatus | None = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> tuple[list[ReviewItemEntity], int]:
+        """Return (items, total_count) for paginated API responses."""
+        count_stmt = select(func.count()).select_from(ReviewItemModel)
+        if status is not None:
+            count_stmt = count_stmt.where(ReviewItemModel.status == status.value)
+        total: int = (await self._session.execute(count_stmt)).scalar_one()
+
+        items_stmt = (
+            select(ReviewItemModel)
+            .order_by(ReviewItemModel.created_at.desc())
+            .limit(limit)
+            .offset(offset)
+        )
+        if status is not None:
+            items_stmt = items_stmt.where(ReviewItemModel.status == status.value)
+        result = await self._session.execute(items_stmt)
+        return [_to_domain(r) for r in result.scalars().all()], total
+
     async def update(self, item: ReviewItemEntity) -> None:
         row = await self._session.get(ReviewItemModel, item.id)
         if row:

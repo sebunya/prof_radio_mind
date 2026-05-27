@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -84,16 +84,20 @@ async def register_webhook(
     response_model=list[SubscriptionResponse],
     dependencies=[Depends(require_api_key)],
 )
-async def list_webhooks(session: AsyncSession = Depends(get_db)) -> list[SubscriptionResponse]:
-    """List all active webhook subscriptions (reads from DB for cross-worker consistency)."""
+async def list_webhooks(
+    response: Response,
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    session: AsyncSession = Depends(get_db),
+) -> list[SubscriptionResponse]:
+    """List active webhook subscriptions.  Total in ``X-Total-Count`` header."""
     from app.infrastructure.database.repositories.webhook_subscription_repo import (
         SQLWebhookSubscriptionRepository,
     )
 
     repo = SQLWebhookSubscriptionRepository(session)
-    rows = await repo.list_active()
-
-
+    rows, total = await repo.list_page(limit=limit, offset=offset)
+    response.headers["X-Total-Count"] = str(total)
     return [
         SubscriptionResponse(
             id=str(row.id),
