@@ -63,6 +63,18 @@ async def _persist_result(result: object) -> None:
                     play_event.fingerprint = compute_fingerprint(
                         clean_artist, play_event.raw_title
                     )
+                # Deduplicate: skip if the same fingerprint was seen within 6 hours
+                if play_event.fingerprint and await play_repo.exists_by_fingerprint(
+                    station_id=play_event.station_id,
+                    fingerprint=play_event.fingerprint,
+                    within_seconds=6 * 3600,
+                ):
+                    logger.debug(
+                        "play_event_duplicate_skipped fingerprint=%s station=%s",
+                        play_event.fingerprint,
+                        play_event.station_id,
+                    )
+                    continue
                 await play_repo.save(play_event)
 
             no_track_repo = SQLNoTrackEventRepository(session)

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.entities.review_item import ReviewItem as ReviewItemEntity
@@ -72,6 +72,10 @@ class SQLReviewItemRepository:
             await self._session.flush()
 
     async def count_pending(self) -> int:
-        stmt = select(ReviewItemModel).where(ReviewItemModel.status == "pending")
+        stmt = (
+            select(func.count())
+            .select_from(ReviewItemModel)
+            .where(ReviewItemModel.status == "pending")
+        )
         result = await self._session.execute(stmt)
-        return len(result.scalars().all())
+        return result.scalar_one()

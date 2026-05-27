@@ -224,7 +224,13 @@ async function masterDownload() {
 
 async function downloadSummaryReport() {
   if (!_summary) return;
-  await download(); // re-use dl-station / dl-date if set, else fall back to summary values
+  try {
+    const blob = await API.downloadReport(_summary.station_id, _summary.report_date);
+    dlBlob(blob, `rmias_report_${_summary.station_id.slice(0,8)}_${_summary.report_date}.csv`);
+    toast('success', 'Download started');
+  } catch (err) {
+    toast('error', 'Download failed', err.message);
+  }
 }
 
 window._reportsPage = { generate, download, masterDownload, downloadSummaryReport };

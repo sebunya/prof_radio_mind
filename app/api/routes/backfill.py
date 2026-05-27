@@ -152,7 +152,11 @@ async def backfill_station(
 
     review_item_id = str(uuid.uuid4())
     try:
+        from app.domain.entities.collector_run import CollectorRun
         from app.domain.entities.review_item import ReviewItem, ReviewItemType
+        from app.infrastructure.database.repositories.collector_run_repo import (
+            SQLCollectorRunRepository,
+        )
         from app.infrastructure.database.repositories.play_event_repo import (
             SQLPlayEventRepository,
         )
@@ -162,6 +166,19 @@ async def backfill_station(
         from app.infrastructure.database.session import _get_factory as _factory
 
         async with _factory()() as session:
+            # Create and persist a CollectorRun so play_events FK is satisfied
+            run = CollectorRun.create(
+                source_id=uuid.uuid5(uuid.NAMESPACE_DNS, f"source.backfill.{station_id}"),
+                station_id=station_id,
+            )
+            run_repo = SQLCollectorRunRepository(session)
+            await run_repo.save(run)
+            collector_run_id = run.id
+
+            # Re-stamp all play events with the persisted collector_run_id
+            for ev in play_events:
+                ev.collector_run_id = collector_run_id
+
             play_repo = SQLPlayEventRepository(session)
             for ev in play_events:
                 await play_repo.save(ev)

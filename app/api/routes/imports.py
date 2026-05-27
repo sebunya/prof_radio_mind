@@ -12,6 +12,9 @@ from app.application.imports.manual_csv import ImportStatus
 from app.core.auth import require_api_key
 from app.core.rate_limiter import require_not_rate_limited
 from app.core.settings import settings
+from app.infrastructure.database.repositories.collector_run_repo import SQLCollectorRunRepository
+from app.infrastructure.database.repositories.play_event_repo import SQLPlayEventRepository
+from app.infrastructure.database.session import _get_factory as _get_session_factory
 
 router = APIRouter(prefix="/manual-imports", tags=["imports"])
 
@@ -59,8 +62,16 @@ async def create_manual_import(
             detail=f"File exceeds maximum allowed size of {limit_mb} MB",
         )
 
+    from app.domain.entities.collector_run import CollectorRun
+
     source_id = uuid.uuid5(uuid.NAMESPACE_DNS, f"manual_csv_{station_id}")
-    collector_run_id = uuid.uuid4()
+
+    # Create and persist a CollectorRun first so play_events FK is satisfied
+    collector_run = CollectorRun.create(
+        source_id=source_id,
+        station_id=station_id,
+    )
+    collector_run_id = collector_run.id
 
     result = import_csv(
         raw_bytes,
@@ -78,6 +89,19 @@ async def create_manual_import(
                 "errors": result.batch.errors,
             },
         )
+
+    if result.play_events:
+        try:
+            async with _get_session_factory()() as session:
+                run_repo = SQLCollectorRunRepository(session)
+                await run_repo.save(collector_run)
+
+                play_repo = SQLPlayEventRepository(session)
+                for ev in result.play_events:
+                    await play_repo.save(ev)
+                await session.commit()
+        except Exception as exc:
+            raise HTTPException(status_code=503, detail=f"Database unavailable: {exc}") from exc
 
     return ImportResponse(
         batch_id=str(result.batch.id),
