@@ -64,7 +64,12 @@ async def validate_source(
             detail=f"No validation adapter registered for source type '{source_type}'",
         )
 
-    result = await adapter.validate(source_id, source.config)
+    try:
+        result = await adapter.validate(source_id, source.config)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Collector error: {exc}") from exc
 
     val_repo = SQLSourceValidationRepository(session)
     await val_repo.save(result)

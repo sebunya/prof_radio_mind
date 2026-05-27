@@ -11,7 +11,10 @@ from app.core.auth import require_api_key
 
 router = APIRouter(prefix="/charts", tags=["charts"])
 
-# In-memory cache keyed by (chart_name, chart_date) — replace with DB repo in next pass.
+# In-memory cache keyed by (chart_name, chart_date) — capped at 1 entry to prevent
+# unbounded growth. Each worker process has an independent cache; a DB-backed repo
+# should replace this in a future pass.
+_MAX_CACHE_ENTRIES = 1
 _chart_cache: dict[tuple[str, str], list[dict]] = {}
 
 
@@ -58,6 +61,8 @@ async def ingest_aria_chart(
 
     target_date = chart_date or (entries[0].chart_date if entries else date.today())
     cache_key = ("ARIA Singles", str(target_date))
+    if len(_chart_cache) >= _MAX_CACHE_ENTRIES:
+        _chart_cache.clear()
     _chart_cache[cache_key] = [
         {
             "position": e.position,

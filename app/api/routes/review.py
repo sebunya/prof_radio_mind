@@ -62,7 +62,7 @@ def _to_response(item: ReviewItem) -> ReviewItemResponse:
     )
 
 
-@router.get("", response_model=list[ReviewItemResponse])
+@router.get("", response_model=list[ReviewItemResponse], dependencies=[Depends(require_api_key)])
 async def list_review_items(
     status: str | None = Query(default=None, description="Filter by status"),
     session: AsyncSession = Depends(get_db),
@@ -82,7 +82,11 @@ async def list_review_items(
     return [_to_response(i) for i in items]
 
 
-@router.get("/{item_id}", response_model=ReviewItemResponse)
+@router.get(
+    "/{item_id}",
+    response_model=ReviewItemResponse,
+    dependencies=[Depends(require_api_key)],
+)
 async def get_review_item(
     item_id: uuid.UUID,
     session: AsyncSession = Depends(get_db),
