@@ -1,3 +1,9 @@
+import os
+
+# Disable Sentry before any app module is imported so the init block is skipped.
+# This prevents test runs from sending spurious events to the real Sentry project.
+os.environ.setdefault("SENTRY_DSN", "")
+
 import pytest
 from fastapi.testclient import TestClient
 

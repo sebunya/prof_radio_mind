@@ -159,6 +159,37 @@ Register a webhook at `POST /webhooks` and subscribe to any of:
 
 ---
 
+## Sentry (Error & Performance Monitoring)
+
+Leave `SENTRY_DSN` blank to disable Sentry — this is the safe default for development.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `SENTRY_DSN` | *(empty)* | Sentry Data Source Name. Get it from **Sentry → Project → Settings → Client Keys (DSN)**. Leave blank to disable. |
+| `SENTRY_TRACES_SAMPLE_RATE` | `0.1` | Fraction of transactions captured for performance monitoring. `0.1` = 10 % (production default). `1.0` = 100 % (development / debug only — high volume). |
+
+### What gets captured
+
+| Integration | What it captures |
+|-------------|----------------|
+| `FastApiIntegration` | Unhandled exceptions, request context (URL, method, headers, IP) |
+| `SqlAlchemyIntegration` | Slow queries as breadcrumbs, DB query spans in transactions |
+| `LoggingIntegration` | `ERROR`+ log records become Sentry events; `INFO`+ become breadcrumbs |
+
+### Verification
+
+With the app running in development (`APP_ENV=development`):
+```
+GET http://localhost:8000/sentry-debug
+```
+This triggers a deliberate `ZeroDivisionError`.  Within a few seconds you should see:
+- An **error event** in Sentry → Issues
+- A **performance transaction** in Sentry → Performance
+
+The `/sentry-debug` route is automatically **removed** when `APP_ENV=production`.
+
+---
+
 ## S3 / Object Storage
 
 Leave `S3_ENDPOINT_URL` blank to use the local filesystem (`RAW_PAYLOAD_STORAGE_PATH`).

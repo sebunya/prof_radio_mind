@@ -30,6 +30,33 @@ from app.infrastructure.scheduler.scheduler import build_scheduler
 
 logger = logging.getLogger(__name__)
 
+# ── Sentry — initialise before the app object is created so startup errors ────
+# are captured too.  Disabled when SENTRY_DSN is empty (the default).
+if settings.sentry_dsn:
+    import sentry_sdk
+    from sentry_sdk.integrations.fastapi import FastApiIntegration
+    from sentry_sdk.integrations.logging import LoggingIntegration
+    from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
+
+    sentry_sdk.init(
+        dsn=settings.sentry_dsn,
+        integrations=[
+            FastApiIntegration(),          # request context on every error
+            SqlalchemyIntegration(),       # DB query breadcrumbs + slow-query spans
+            LoggingIntegration(
+                level=logging.INFO,        # INFO+ → Sentry breadcrumbs
+                event_level=logging.ERROR, # ERROR+ → Sentry error events
+            ),
+        ],
+        traces_sample_rate=settings.sentry_traces_sample_rate,
+        send_default_pii=True,             # attach request headers / IP
+        environment=settings.app_env,
+    )
+    _dsn_host = settings.sentry_dsn.split("@")[-1] if "@" in settings.sentry_dsn else "?"
+    logger.info(
+        "sentry_enabled host=%s sample_rate=%.2f", _dsn_host, settings.sentry_traces_sample_rate
+    )
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -115,6 +142,16 @@ async def add_security_headers(request: Request, call_next: object) -> Response:
         "font-src 'self'"
     )
     return response
+
+
+# ── Sentry verification endpoint (non-production only) ───────────────────────
+# Hit GET /sentry-debug to send a test error + transaction to Sentry.
+# Automatically absent in production (APP_ENV=production) so it can't be abused.
+if settings.app_env != "production":
+    @app.get("/sentry-debug", include_in_schema=False)
+    async def sentry_debug() -> None:
+        """Trigger a deliberate ZeroDivisionError to verify Sentry capture."""
+        _ = 1 / 0  # noqa: F841 — intentional error for Sentry smoke-test
 
 
 app.include_router(health_router)

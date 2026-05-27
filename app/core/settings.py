@@ -44,6 +44,12 @@ class Settings(BaseSettings):
     # this many plays in its first 7-day window.
     trend_new_entry_plays: int = 10
 
+    # Sentry — leave sentry_dsn blank to disable (safe default)
+    sentry_dsn: str = ""
+    # Fraction of transactions sent to Sentry for performance monitoring (0–1).
+    # 0.1 = 10 % sampled — good production default.  1.0 = everything (dev only).
+    sentry_traces_sample_rate: float = 0.1
+
     # S3 / Hetzner Object Storage (leave blank to use local filesystem)
     s3_endpoint_url: str = ""       # e.g. https://fsn1.your-objectstorage.com
     s3_access_key_id: str = ""
