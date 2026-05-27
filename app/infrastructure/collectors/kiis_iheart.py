@@ -88,5 +88,6 @@ class KIISIHeartCollector(BaseCollector):
             raw_artist=result.artist,
             raw_title=result.title,
             source_event_id=result.source_event_id,
+            attribution="iheart",
         )
         return [play], []

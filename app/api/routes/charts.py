@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -56,7 +56,7 @@ async def ingest_aria_chart(
             status_code=503, detail=f"Failed to fetch ARIA chart: {exc}"
         ) from exc
 
-    target_date = chart_date or entries[0].chart_date if entries else date.today()
+    target_date = chart_date or (entries[0].chart_date if entries else date.today())
     cache_key = ("ARIA Singles", str(target_date))
     _chart_cache[cache_key] = [
         {
@@ -74,7 +74,7 @@ async def ingest_aria_chart(
         chart_name="ARIA Singles",
         chart_date=str(target_date),
         entry_count=len(entries),
-        fetched_at=datetime.utcnow().isoformat(),
+        fetched_at=datetime.now(UTC).isoformat(),
         entries=[
             ChartEntryResponse(
                 position=e.position,
@@ -110,6 +110,6 @@ async def get_latest_aria_chart() -> ChartResponse:
         chart_name=chart_name,
         chart_date=chart_date_str,
         entry_count=len(entries_data),
-        fetched_at=datetime.utcnow().isoformat(),
+        fetched_at=datetime.now(UTC).isoformat(),
         entries=[ChartEntryResponse(**e) for e in entries_data],
     )

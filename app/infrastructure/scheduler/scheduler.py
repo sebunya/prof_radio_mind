@@ -209,6 +209,8 @@ def build_scheduler() -> AsyncIOScheduler:
         name="Nova 96.9 Radiowave diary",
         replace_existing=True,
         misfire_grace_time=3600,
+        max_instances=1,
+        coalesce=True,
     )
 
     # KIIS iHeart now-playing — every 5 minutes
@@ -219,6 +221,8 @@ def build_scheduler() -> AsyncIOScheduler:
         name="KIIS-FM iHeart now-playing poll",
         replace_existing=True,
         misfire_grace_time=60,
+        max_instances=1,
+        coalesce=True,
     )
 
     # Capital FM iHeart now-playing — every 5 minutes
@@ -229,6 +233,8 @@ def build_scheduler() -> AsyncIOScheduler:
         name="Capital FM iHeart now-playing poll",
         replace_existing=True,
         misfire_grace_time=60,
+        max_instances=1,
+        coalesce=True,
     )
 
     # Nightly reconciliation — 17:00 UTC daily (03:00 AEST)
@@ -239,6 +245,8 @@ def build_scheduler() -> AsyncIOScheduler:
         name="Nightly deduplication & normalization reconciliation",
         replace_existing=True,
         misfire_grace_time=3600,
+        max_instances=1,
+        coalesce=True,
     )
 
     return sched

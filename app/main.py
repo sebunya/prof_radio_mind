@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
@@ -68,4 +69,8 @@ app.include_router(charts_router)
 app.include_router(webhooks_router)
 app.include_router(backfill_router)
 
-app.mount("/admin", StaticFiles(directory="app/static", html=True), name="admin")
+app.mount(
+    "/admin",
+    StaticFiles(directory=Path(__file__).parent / "static", html=True),
+    name="admin",
+)

@@ -76,12 +76,11 @@ async def list_webhooks() -> list[SubscriptionResponse]:
     """List all active webhook subscriptions."""
     from app.application.webhooks.service import webhook_store
 
-    return [
-        _to_response(s)
-        for s in webhook_store.list_active("play.detected")
-        + webhook_store.list_active("no_track.detected")
-        + webhook_store.list_active("reconciliation.completed")
-    ]
+    seen: dict[str, object] = {}
+    for event_type in _VALID_EVENTS:
+        for sub in webhook_store.list_active(event_type):
+            seen.setdefault(str(sub.id), sub)
+    return [_to_response(s) for s in seen.values()]
 
 
 @router.delete(

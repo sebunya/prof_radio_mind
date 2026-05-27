@@ -62,7 +62,10 @@ def parse_iheart_now_playing(
     start_time = current.get("startTime")
 
     if start_time is not None:
-        played_at = datetime.fromtimestamp(int(start_time), tz=UTC)
+        ts = int(start_time)
+        if ts > 1_000_000_000_000:  # milliseconds
+            ts //= 1000
+        played_at = datetime.fromtimestamp(ts, tz=UTC)
     else:
         played_at = datetime.now(tz=UTC)
 
