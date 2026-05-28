@@ -9,7 +9,11 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.application.webhooks.service import WebhookSubscription, webhook_store
 from app.core.auth import require_api_key
+from app.infrastructure.database.repositories.webhook_subscription_repo import (
+    SQLWebhookSubscriptionRepository,
+)
 from app.infrastructure.database.session import get_db
 
 router = APIRouter(prefix="/webhooks", tags=["webhooks"])
@@ -31,10 +35,7 @@ class SubscriptionResponse(BaseModel):
     created_at: datetime
 
 
-def _to_response(sub: object) -> SubscriptionResponse:
-    from app.application.webhooks.service import WebhookSubscription
-
-    assert isinstance(sub, WebhookSubscription)
+def _to_response(sub: WebhookSubscription) -> SubscriptionResponse:
     return SubscriptionResponse(
         id=str(sub.id),
         url=sub.url,
@@ -55,8 +56,6 @@ async def register_webhook(
     session: AsyncSession = Depends(get_db),
 ) -> SubscriptionResponse:
     """Register a new webhook subscription (persisted to DB)."""
-    from app.application.webhooks.service import webhook_store
-
     invalid = [e for e in body.event_types if e not in _VALID_EVENTS]
     if invalid:
         raise HTTPException(
@@ -91,10 +90,6 @@ async def list_webhooks(
     session: AsyncSession = Depends(get_db),
 ) -> list[SubscriptionResponse]:
     """List active webhook subscriptions.  Total in ``X-Total-Count`` header."""
-    from app.infrastructure.database.repositories.webhook_subscription_repo import (
-        SQLWebhookSubscriptionRepository,
-    )
-
     repo = SQLWebhookSubscriptionRepository(session)
     rows, total = await repo.list_page(limit=limit, offset=offset)
     response.headers["X-Total-Count"] = str(total)
@@ -120,9 +115,6 @@ async def unregister_webhook(
     session: AsyncSession = Depends(get_db),
 ) -> None:
     """Remove a webhook subscription (hard-deletes from DB)."""
-    from app.application.webhooks.service import webhook_store
-
-    # Hard-delete from DB first
     try:
         deleted = await webhook_store.persist_unregister(subscription_id, session)
         await session.commit()

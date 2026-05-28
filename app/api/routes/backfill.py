@@ -21,11 +21,11 @@ from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from pydantic import BaseModel
 
 from app.core.auth import require_api_key
+from app.core.settings import settings
 
 router = APIRouter(prefix="/backfill", tags=["backfill"])
 
 _REQUIRED_COLUMNS = {"artist", "title", "played_at"}
-_MAX_BYTES = 10 * 1024 * 1024  # 10 MB
 
 
 class BackfillResult(BaseModel):
@@ -53,8 +53,9 @@ async def backfill_station(
     CSV must have columns: artist, title, played_at (ISO 8601 or HH:MM:SS).
     """
     raw = await file.read()
-    if len(raw) > _MAX_BYTES:
-        raise HTTPException(status_code=413, detail="File too large (max 10 MB)")
+    if len(raw) > settings.max_upload_bytes:
+        limit_mb = settings.max_upload_bytes // (1024 * 1024)
+        raise HTTPException(status_code=413, detail=f"File too large (max {limit_mb} MB)")
 
     try:
         text = raw.decode("utf-8-sig")

@@ -12,6 +12,7 @@ Endpoints:
 
 from __future__ import annotations
 
+import html as _html
 import uuid
 from datetime import UTC, date, datetime, timedelta
 from typing import Literal
@@ -20,7 +21,18 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.application.reports.email_report_builder import (
+    build_report_data,
+    render_html_email,
+    send_frequency_report,
+    verify_unsubscribe_token,
+)
 from app.core.auth import require_api_key
+from app.infrastructure.database.models.notifications import EmailRecipientDB, EmailSendLogDB
+from app.infrastructure.database.repositories.email_recipient_repo import (
+    SQLEmailRecipientRepository,
+    SQLEmailSendLogRepository,
+)
 from app.infrastructure.database.session import get_db
 
 router = APIRouter(prefix="/email-reports", tags=["email-reports"])
@@ -92,10 +104,7 @@ class SendNowResponse(BaseModel):
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-def _row_to_response(row: object) -> RecipientResponse:
-    from app.infrastructure.database.models.notifications import EmailRecipientDB
-
-    assert isinstance(row, EmailRecipientDB)
+def _row_to_response(row: EmailRecipientDB) -> RecipientResponse:
     return RecipientResponse(
         id=str(row.id),
         name=row.name,
@@ -107,10 +116,7 @@ def _row_to_response(row: object) -> RecipientResponse:
     )
 
 
-def _log_to_response(row: object) -> SendLogResponse:
-    from app.infrastructure.database.models.notifications import EmailSendLogDB
-
-    assert isinstance(row, EmailSendLogDB)
+def _log_to_response(row: EmailSendLogDB) -> SendLogResponse:
     snapshot = row.stats_snapshot or {}
     return SendLogResponse(
         id=str(row.id),
@@ -122,6 +128,34 @@ def _log_to_response(row: object) -> SendLogResponse:
         total_plays=snapshot.get("total_plays"),
         sent_at=row.sent_at,
     )
+
+
+def _parse_custom_date_range(
+    start_date: date | None,
+    end_date: date | None,
+) -> tuple[datetime, datetime]:
+    """Validate and convert start/end dates for a custom frequency window.
+
+    Raises HTTPException 422 on missing or invalid input.
+    Returns (window_start, window_end) where window_end is exclusive
+    (i.e. points to midnight of the day after end_date).
+    """
+    if start_date is None or end_date is None:
+        raise HTTPException(
+            status_code=422,
+            detail="frequency='custom' requires both start_date and end_date",
+        )
+    if start_date > end_date:
+        raise HTTPException(
+            status_code=422,
+            detail="start_date must not be after end_date",
+        )
+    window_start = datetime(start_date.year, start_date.month, start_date.day, tzinfo=UTC)
+    window_end = (
+        datetime(end_date.year, end_date.month, end_date.day, tzinfo=UTC)
+        + timedelta(days=1)
+    )
+    return window_start, window_end
 
 
 # ── GET /email-reports/recipients ─────────────────────────────────────────────
@@ -138,10 +172,6 @@ async def list_recipients(
     session: AsyncSession = Depends(get_db),
 ) -> list[RecipientResponse]:
     """Return recipients.  Total count in ``X-Total-Count`` response header."""
-    from app.infrastructure.database.repositories.email_recipient_repo import (
-        SQLEmailRecipientRepository,
-    )
-
     repo = SQLEmailRecipientRepository(session)
     rows, total = await repo.list_page(limit=limit, offset=offset)
     response.headers["X-Total-Count"] = str(total)
@@ -161,11 +191,6 @@ async def add_recipient(
     session: AsyncSession = Depends(get_db),
 ) -> RecipientResponse:
     """Add a new email recipient."""
-    from app.infrastructure.database.models.notifications import EmailRecipientDB
-    from app.infrastructure.database.repositories.email_recipient_repo import (
-        SQLEmailRecipientRepository,
-    )
-
     repo = SQLEmailRecipientRepository(session)
     existing = await repo.get_by_email(str(body.email))
     if existing:
@@ -198,10 +223,6 @@ async def update_recipient(
     session: AsyncSession = Depends(get_db),
 ) -> RecipientResponse:
     """Partially update a recipient's name, email, frequencies, or active status."""
-    from app.infrastructure.database.repositories.email_recipient_repo import (
-        SQLEmailRecipientRepository,
-    )
-
     repo = SQLEmailRecipientRepository(session)
     row = await repo.get(recipient_id)
     if row is None:
@@ -210,7 +231,6 @@ async def update_recipient(
     if body.name is not None:
         row.name = body.name
     if body.email is not None:
-        # Check for conflicts
         conflict = await repo.get_by_email(str(body.email))
         if conflict and conflict.id != recipient_id:
             raise HTTPException(status_code=409, detail="Email already used by another recipient")
@@ -237,10 +257,6 @@ async def remove_recipient(
     session: AsyncSession = Depends(get_db),
 ) -> None:
     """Deactivate a recipient (soft delete)."""
-    from app.infrastructure.database.repositories.email_recipient_repo import (
-        SQLEmailRecipientRepository,
-    )
-
     repo = SQLEmailRecipientRepository(session)
     removed = await repo.delete(recipient_id)
     if not removed:
@@ -262,10 +278,6 @@ async def send_log(
     session: AsyncSession = Depends(get_db),
 ) -> list[SendLogResponse]:
     """Return email send log entries.  Total count in ``X-Total-Count`` header."""
-    from app.infrastructure.database.repositories.email_recipient_repo import (
-        SQLEmailSendLogRepository,
-    )
-
     repo = SQLEmailSendLogRepository(session)
     rows, total = await repo.list_page(limit=limit, offset=offset)
     response.headers["X-Total-Count"] = str(total)
@@ -293,31 +305,11 @@ async def send_now(body: SendNowRequest) -> SendNowResponse:
     This runs synchronously in the request context; for scheduled production
     sends the APScheduler jobs are preferred.
     """
-    from app.application.reports.email_report_builder import send_frequency_report
-
     custom_start: datetime | None = None
-    custom_end:   datetime | None = None
+    custom_end: datetime | None = None
 
     if body.frequency == "custom":
-        if body.start_date is None or body.end_date is None:
-            raise HTTPException(
-                status_code=422,
-                detail="frequency='custom' requires both start_date and end_date",
-            )
-        if body.start_date > body.end_date:
-            raise HTTPException(
-                status_code=422,
-                detail="start_date must not be after end_date",
-            )
-        custom_start = datetime(
-            body.start_date.year, body.start_date.month, body.start_date.day,
-            tzinfo=UTC,
-        )
-        # end is inclusive: cover the full day by pointing to the next day's midnight
-        custom_end = datetime(
-            body.end_date.year, body.end_date.month, body.end_date.day,
-            tzinfo=UTC,
-        ) + timedelta(days=1)
+        custom_start, custom_end = _parse_custom_date_range(body.start_date, body.end_date)
 
     try:
         result = await send_frequency_report(body.frequency, custom_start, custom_end)
@@ -356,11 +348,6 @@ async def unsubscribe_get(
     HTML confirmation page.  Token is bound to both ``id`` and ``email`` so it
     cannot be replayed across accounts even if an ID is guessed.
     """
-    from app.application.reports.email_report_builder import verify_unsubscribe_token
-    from app.infrastructure.database.repositories.email_recipient_repo import (
-        SQLEmailRecipientRepository,
-    )
-
     repo = SQLEmailRecipientRepository(session)
     row = await repo.get(id)
 
@@ -406,11 +393,6 @@ async def unsubscribe_post(
     ``List-Unsubscribe=One-Click``.  The response is a plain 200 JSON — the
     client doesn't render it.  Same token verification as the GET endpoint.
     """
-    from app.application.reports.email_report_builder import verify_unsubscribe_token
-    from app.infrastructure.database.repositories.email_recipient_repo import (
-        SQLEmailRecipientRepository,
-    )
-
     repo = SQLEmailRecipientRepository(session)
     row = await repo.get(id)
 
@@ -427,8 +409,6 @@ async def unsubscribe_post(
 
 def _unsub_page(title: str, message: str, success: bool) -> str:
     """Return a minimal, self-contained HTML confirmation page."""
-    import html as _html
-
     colour = "#10b981" if success else "#ef4444"
     icon   = "✓" if success else "✗"
     return f"""<!DOCTYPE html>
@@ -483,28 +463,11 @@ async def preview_email(
     query parameters.  Opens directly in the browser — useful for template
     verification before sending.
     """
-    from app.application.reports.email_report_builder import build_report_data, render_html_email
-
     custom_start: datetime | None = None
-    custom_end:   datetime | None = None
+    custom_end: datetime | None = None
 
     if frequency == "custom":
-        if start_date is None or end_date is None:
-            raise HTTPException(
-                status_code=422,
-                detail="frequency='custom' requires start_date and end_date query params",
-            )
-        if start_date > end_date:
-            raise HTTPException(
-                status_code=422,
-                detail="start_date must not be after end_date",
-            )
-        custom_start = datetime(
-            start_date.year, start_date.month, start_date.day, tzinfo=UTC,
-        )
-        custom_end = datetime(
-            end_date.year, end_date.month, end_date.day, tzinfo=UTC,
-        ) + timedelta(days=1)
+        custom_start, custom_end = _parse_custom_date_range(start_date, end_date)
 
     try:
         data = await build_report_data(frequency, custom_start, custom_end)

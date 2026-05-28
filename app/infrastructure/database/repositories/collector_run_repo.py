@@ -5,13 +5,14 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import func, select
+from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.entities.collector_run import CollectorRun as RunEntity
 from app.domain.entities.collector_run import CollectorStatus
 from app.domain.ports.collector_run_repository import CollectorRunRepository
 from app.infrastructure.database.models.collector_runs import CollectorRun as RunModel
+from app.infrastructure.database.pagination import paginate
 
 
 def _to_domain(row: RunModel) -> RunEntity:
@@ -79,27 +80,12 @@ class SQLCollectorRunRepository(CollectorRunRepository):
         offset: int = 0,
     ) -> tuple[list[RunModel], int]:
         """Return (model_rows, total_count) for the health dashboard."""
-        where = []
+        stmt = select(RunModel).order_by(RunModel.created_at.desc())
         if status:
-            where.append(RunModel.status == status)
+            stmt = stmt.where(RunModel.status == status)
         if station_id:
-            where.append(RunModel.station_id == station_id)
-
-        count_stmt = select(func.count()).select_from(RunModel)
-        if where:
-            count_stmt = count_stmt.where(*where)
-        total: int = (await self._session.execute(count_stmt)).scalar_one()
-
-        items_stmt = (
-            select(RunModel)
-            .order_by(RunModel.created_at.desc())
-            .limit(limit)
-            .offset(offset)
-        )
-        if where:
-            items_stmt = items_stmt.where(*where)
-        result = await self._session.execute(items_stmt)
-        return list(result.scalars().all()), total
+            stmt = stmt.where(RunModel.station_id == station_id)
+        return await paginate(self._session, stmt, limit=limit, offset=offset)
 
     async def summary(self) -> dict:
         """Aggregated stats for the health-dashboard summary cards."""
@@ -141,31 +127,26 @@ class SQLCollectorRunRepository(CollectorRunRepository):
             )
         ).scalar_one()
 
-        statuses_24h: list[str] = list(
-            (
-                await self._session.execute(
-                    select(RunModel.status).where(RunModel.created_at >= since_24h)
+        agg_24h = (
+            await self._session.execute(
+                select(
+                    func.count().label("total"),
+                    func.count(case((RunModel.status == "completed", 1))).label("ok"),
                 )
-            ).scalars().all()
-        )
-        total_24h = len(statuses_24h)
-        ok_24h = sum(1 for s in statuses_24h if s == "completed")
+                .select_from(RunModel)
+                .where(RunModel.created_at >= since_24h)
+            )
+        ).one()
         success_rate: int | None = (
-            round(ok_24h / total_24h * 100) if total_24h else None
+            round(agg_24h.ok / agg_24h.total * 100) if agg_24h.total else None
         )
 
         return {
-            "last_completed_at": (
-                last_ok.completed_at.isoformat()
-                if last_ok and last_ok.completed_at
-                else None
-            ),
+            "last_completed_at": last_ok.completed_at if last_ok else None,
             "last_completed_run_id": str(last_ok.id) if last_ok else None,
             "runs_today": runs_today,
             "running_count": running_count,
             "success_rate_24h": success_rate,
-            "last_failed_at": (
-                last_fail.created_at.isoformat() if last_fail else None
-            ),
+            "last_failed_at": last_fail.created_at if last_fail else None,
             "last_error_message": last_fail.error_message if last_fail else None,
         }

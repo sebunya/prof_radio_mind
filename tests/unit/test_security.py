@@ -122,19 +122,19 @@ def test_resolve_too_long_resolved_by_returns_422(client: TestClient) -> None:
 # --- Rate limiter integration via API ---
 
 def test_rate_limited_endpoint_returns_429_when_exceeded(client: TestClient) -> None:
-    from app.core.rate_limiter import get_limiter
+    from app.core.rate_limiter import get_strict_limiter
     from app.core.settings import settings
 
-    limiter = get_limiter()
+    # /manual-imports/ is in _STRICT_PREFIXES — the middleware uses the strict
+    # tier (rate_limit_rpm // 3).  Exhaust that bucket for the testclient IP.
+    limiter = get_strict_limiter()
     station_id = uuid.uuid4()
-
-    # Exhaust the limit for testclient's loopback IP
-    for _ in range(settings.rate_limit_rpm):
+    strict_limit = max(5, settings.rate_limit_rpm // 3)
+    for _ in range(strict_limit):
         limiter.is_allowed("testclient")
 
     r = client.post(
         f"/manual-imports/{station_id}",
         files={"file": ("test.csv", _VALID_CSV.read_bytes(), "text/csv")},
     )
-    # TestClient uses "testclient" as host — already exhausted above
     assert r.status_code == 429

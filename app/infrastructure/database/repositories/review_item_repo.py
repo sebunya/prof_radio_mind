@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.domain.entities.review_item import ReviewItem as ReviewItemEntity
 from app.domain.entities.review_item import ReviewItemStatus, ReviewItemType
 from app.infrastructure.database.models.events import ReviewItem as ReviewItemModel
+from app.infrastructure.database.pagination import paginate
 
 
 def _to_domain(row: ReviewItemModel) -> ReviewItemEntity:
@@ -69,21 +70,11 @@ class SQLReviewItemRepository:
         offset: int = 0,
     ) -> tuple[list[ReviewItemEntity], int]:
         """Return (items, total_count) for paginated API responses."""
-        count_stmt = select(func.count()).select_from(ReviewItemModel)
+        stmt = select(ReviewItemModel).order_by(ReviewItemModel.created_at.desc())
         if status is not None:
-            count_stmt = count_stmt.where(ReviewItemModel.status == status.value)
-        total: int = (await self._session.execute(count_stmt)).scalar_one()
-
-        items_stmt = (
-            select(ReviewItemModel)
-            .order_by(ReviewItemModel.created_at.desc())
-            .limit(limit)
-            .offset(offset)
-        )
-        if status is not None:
-            items_stmt = items_stmt.where(ReviewItemModel.status == status.value)
-        result = await self._session.execute(items_stmt)
-        return [_to_domain(r) for r in result.scalars().all()], total
+            stmt = stmt.where(ReviewItemModel.status == status.value)
+        rows, total = await paginate(self._session, stmt, limit=limit, offset=offset)
+        return [_to_domain(r) for r in rows], total
 
     async def update(self, item: ReviewItemEntity) -> None:
         row = await self._session.get(ReviewItemModel, item.id)

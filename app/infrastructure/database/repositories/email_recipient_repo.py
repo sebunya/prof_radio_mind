@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import uuid
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.infrastructure.database.models.notifications import EmailRecipientDB, EmailSendLogDB
+from app.infrastructure.database.pagination import paginate
 
 
 class SQLEmailRecipientRepository:
@@ -60,18 +61,8 @@ class SQLEmailRecipientRepository:
         offset: int = 0,
     ) -> tuple[list[EmailRecipientDB], int]:
         """Return (rows, total_count) for paginated list endpoint."""
-        total: int = (
-            await self._session.execute(
-                select(func.count()).select_from(EmailRecipientDB)
-            )
-        ).scalar_one()
-        result = await self._session.execute(
-            select(EmailRecipientDB)
-            .order_by(EmailRecipientDB.created_at)
-            .limit(limit)
-            .offset(offset)
-        )
-        return list(result.scalars().all()), total
+        stmt = select(EmailRecipientDB).order_by(EmailRecipientDB.created_at)
+        return await paginate(self._session, stmt, limit=limit, offset=offset)
 
     async def delete(self, recipient_id: uuid.UUID) -> bool:
         row = await self._session.get(EmailRecipientDB, recipient_id)
@@ -104,15 +95,5 @@ class SQLEmailSendLogRepository:
         offset: int = 0,
     ) -> tuple[list[EmailSendLogDB], int]:
         """Return (rows, total_count) for paginated log endpoint."""
-        total: int = (
-            await self._session.execute(
-                select(func.count()).select_from(EmailSendLogDB)
-            )
-        ).scalar_one()
-        result = await self._session.execute(
-            select(EmailSendLogDB)
-            .order_by(EmailSendLogDB.sent_at.desc())
-            .limit(limit)
-            .offset(offset)
-        )
-        return list(result.scalars().all()), total
+        stmt = select(EmailSendLogDB).order_by(EmailSendLogDB.sent_at.desc())
+        return await paginate(self._session, stmt, limit=limit, offset=offset)

@@ -31,17 +31,7 @@ class ReviewItemResponse(BaseModel):
     created_at: datetime
 
 
-class ResolveRequest(BaseModel):
-    resolved_by: str = Field(min_length=1, max_length=255)
-    notes: str | None = Field(default=None, max_length=2000)
-
-
-class DismissRequest(BaseModel):
-    resolved_by: str = Field(min_length=1, max_length=255)
-    notes: str | None = Field(default=None, max_length=2000)
-
-
-class EscalateRequest(BaseModel):
+class ReviewActionRequest(BaseModel):
     resolved_by: str = Field(min_length=1, max_length=255)
     notes: str | None = Field(default=None, max_length=2000)
 
@@ -60,6 +50,21 @@ def _to_response(item: ReviewItem) -> ReviewItemResponse:
         notes=item.notes,
         created_at=item.created_at,
     )
+
+
+async def _fetch_open_item(
+    item_id: uuid.UUID, repo: SQLReviewItemRepository
+) -> ReviewItem:
+    """Load a review item and assert it exists and is still open."""
+    item = await repo.get(item_id)
+    if item is None:
+        raise HTTPException(status_code=404, detail=f"Review item {item_id} not found")
+    if not item.is_open:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Review item {item_id} is already {item.status.value}",
+        )
+    return item
 
 
 @router.get("", response_model=list[ReviewItemResponse], dependencies=[Depends(require_api_key)])
@@ -110,18 +115,11 @@ async def get_review_item(
 )
 async def resolve_review_item(
     item_id: uuid.UUID,
-    body: ResolveRequest,
+    body: ReviewActionRequest,
     session: AsyncSession = Depends(get_db),
 ) -> ReviewItemResponse:
     repo = SQLReviewItemRepository(session)
-    item = await repo.get(item_id)
-    if item is None:
-        raise HTTPException(status_code=404, detail=f"Review item {item_id} not found")
-    if not item.is_open:
-        raise HTTPException(
-            status_code=409,
-            detail=f"Review item {item_id} is already {item.status.value}",
-        )
+    item = await _fetch_open_item(item_id, repo)
     item.resolve(resolved_by=body.resolved_by, notes=body.notes)
     await repo.update(item)
     return _to_response(item)
@@ -134,18 +132,11 @@ async def resolve_review_item(
 )
 async def dismiss_review_item(
     item_id: uuid.UUID,
-    body: DismissRequest,
+    body: ReviewActionRequest,
     session: AsyncSession = Depends(get_db),
 ) -> ReviewItemResponse:
     repo = SQLReviewItemRepository(session)
-    item = await repo.get(item_id)
-    if item is None:
-        raise HTTPException(status_code=404, detail=f"Review item {item_id} not found")
-    if not item.is_open:
-        raise HTTPException(
-            status_code=409,
-            detail=f"Review item {item_id} is already {item.status.value}",
-        )
+    item = await _fetch_open_item(item_id, repo)
     item.dismiss(resolved_by=body.resolved_by, notes=body.notes)
     await repo.update(item)
     return _to_response(item)
@@ -158,18 +149,11 @@ async def dismiss_review_item(
 )
 async def escalate_review_item(
     item_id: uuid.UUID,
-    body: EscalateRequest,
+    body: ReviewActionRequest,
     session: AsyncSession = Depends(get_db),
 ) -> ReviewItemResponse:
     repo = SQLReviewItemRepository(session)
-    item = await repo.get(item_id)
-    if item is None:
-        raise HTTPException(status_code=404, detail=f"Review item {item_id} not found")
-    if not item.is_open:
-        raise HTTPException(
-            status_code=409,
-            detail=f"Review item {item_id} is already {item.status.value}",
-        )
+    item = await _fetch_open_item(item_id, repo)
     item.escalate(resolved_by=body.resolved_by, notes=body.notes)
     await repo.update(item)
     return _to_response(item)

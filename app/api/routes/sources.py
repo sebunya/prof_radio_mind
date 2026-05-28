@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import uuid
 from datetime import datetime
 
@@ -100,12 +101,14 @@ async def get_source_validation_history(
     )
 
     val_repo = SQLSourceValidationRepository(session)
-    latest = await val_repo.latest_for_source(source_id)
-    all_runs = await val_repo.list_for_source(source_id)
+    latest, total_runs = await asyncio.gather(
+        val_repo.latest_for_source(source_id),
+        val_repo.count_for_source(source_id),
+    )
 
     return SourceValidationSummary(
         source_id=str(source_id),
         latest_status=latest.status if latest else None,
         latest_validated_at=latest.validated_at if latest else None,
-        total_runs=len(all_runs),
+        total_runs=total_runs,
     )
