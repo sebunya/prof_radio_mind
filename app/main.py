@@ -3,12 +3,16 @@ from __future__ import annotations
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, Response
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.api.routes.backfill import router as backfill_router
 from app.api.routes.charts import router as charts_router
+from app.api.routes.collector_health import router as collector_health_router
+from app.api.routes.email_reports import router as email_reports_router
 from app.api.routes.health import router as health_router
 from app.api.routes.imports import router as imports_router
 from app.api.routes.playlist import router as playlist_router
@@ -19,17 +23,53 @@ from app.api.routes.sources import router as sources_router
 from app.api.routes.stations import router as stations_router
 from app.api.routes.webhooks import router as webhooks_router
 from app.core.logging_config import configure_logging
+from app.core.rate_limiter import RateLimitMiddleware
+from app.core.settings import settings
 from app.infrastructure.database.session import dispose_engine
 from app.infrastructure.scheduler.scheduler import build_scheduler
 
 logger = logging.getLogger(__name__)
+
+# ── Sentry — initialise before the app object is created so startup errors ────
+# are captured too.  Disabled when SENTRY_DSN is empty (the default).
+if settings.sentry_dsn:
+    import sentry_sdk
+    from sentry_sdk.integrations.fastapi import FastApiIntegration
+    from sentry_sdk.integrations.logging import LoggingIntegration
+    from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
+
+    sentry_sdk.init(
+        dsn=settings.sentry_dsn,
+        integrations=[
+            FastApiIntegration(),          # request context on every error
+            SqlalchemyIntegration(),       # DB query breadcrumbs + slow-query spans
+            LoggingIntegration(
+                level=logging.INFO,        # INFO+ → Sentry breadcrumbs
+                event_level=logging.ERROR, # ERROR+ → Sentry error events
+            ),
+        ],
+        traces_sample_rate=settings.sentry_traces_sample_rate,
+        send_default_pii=True,             # attach request headers / IP
+        environment=settings.app_env,
+    )
+    _dsn_host = settings.sentry_dsn.split("@")[-1] if "@" in settings.sentry_dsn else "?"
+    logger.info(
+        "sentry_enabled host=%s sample_rate=%.2f", _dsn_host, settings.sentry_traces_sample_rate
+    )
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     configure_logging()
 
-    # Seed DB (idempotent — safe to run on every startup)
+    # ── Production security guard ─────────────────────────────────────────
+    if settings.app_env == "production" and not settings.api_key:
+        logger.critical(
+            "SECURITY: APP_ENV=production but API_KEY is not set — "
+            "all protected endpoints are publicly accessible! Set API_KEY immediately."
+        )
+
+    # ── Seed DB (idempotent) ──────────────────────────────────────────────
     try:
         from app.application.seeder import seed_database
         from app.infrastructure.database.session import _get_factory
@@ -38,6 +78,16 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             await seed_database(session)
     except Exception as exc:
         logger.warning("db_seed_failed error=%s (continuing without DB)", exc)
+
+    # ── Load webhook subscriptions from DB into in-memory store ──────────
+    try:
+        from app.application.webhooks.service import webhook_store
+        from app.infrastructure.database.session import _get_factory as _sf
+
+        async with _sf()() as session:
+            await webhook_store.load_from_db(session)
+    except Exception as exc:
+        logger.warning("webhook_store_load_failed error=%s (starting with empty store)", exc)
 
     scheduler = build_scheduler()
     scheduler.start()
@@ -56,6 +106,54 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# ── CORS ──────────────────────────────────────────────────────────────────────
+# Explicit origins should be set via CORS_ORIGINS env var in production.
+# Defaults to allow all (*) which is fine for the admin-only scenario where
+# the frontend is served from the same origin.
+_cors_origins = [o.strip() for o in settings.cors_origins.split(",") if o.strip()]
+# Rate limit runs inside CORS so preflights (OPTIONS) are handled first.
+# add_middleware prepends: last-added = outermost = first to execute.
+# Order here: RateLimitMiddleware added first (inner) → CORS added second (outer).
+app.add_middleware(RateLimitMiddleware)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=_cors_origins if _cors_origins else ["*"],
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "X-API-Key"],
+)
+
+
+# ── Security headers ──────────────────────────────────────────────────────────
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next: object) -> Response:
+    response: Response = await call_next(request)  # type: ignore[operator]
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    # Allow inline scripts/styles (required for onclick handlers and Chart.js CDN)
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+        "style-src 'self' 'unsafe-inline'; "
+        "img-src 'self' data:; "
+        "connect-src 'self'; "
+        "font-src 'self'"
+    )
+    return response
+
+
+# ── Sentry verification endpoint (non-production only) ───────────────────────
+# Hit GET /sentry-debug to send a test error + transaction to Sentry.
+# Automatically absent in production (APP_ENV=production) so it can't be abused.
+if settings.app_env != "production":
+    @app.get("/sentry-debug", include_in_schema=False)
+    async def sentry_debug() -> None:
+        """Trigger a deliberate ZeroDivisionError to verify Sentry capture."""
+        _ = 1 / 0  # noqa: F841 — intentional error for Sentry smoke-test
+
+
 app.include_router(health_router)
 app.include_router(stations_router)
 app.include_router(imports_router)
@@ -67,5 +165,11 @@ app.include_router(proof_of_play_router)
 app.include_router(charts_router)
 app.include_router(webhooks_router)
 app.include_router(backfill_router)
+app.include_router(email_reports_router)
+app.include_router(collector_health_router)
 
-app.mount("/admin", StaticFiles(directory="app/static", html=True), name="admin")
+app.mount(
+    "/admin",
+    StaticFiles(directory=Path(__file__).parent / "static", html=True),
+    name="admin",
+)

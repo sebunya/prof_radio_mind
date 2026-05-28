@@ -22,6 +22,7 @@ def _make_mock_repo(items: list[ReviewItem] | None = None) -> AsyncMock:
     items = items or []
     repo = AsyncMock()
     repo.list.return_value = items
+    repo.list_page.return_value = (items, len(items))
     repo.get.side_effect = lambda item_id: next(
         (i for i in items if i.id == item_id), None
     )

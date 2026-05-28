@@ -1,0 +1,84 @@
+name: Snyk Security
+
+# Snyk scans Python dependencies and the Docker image for known CVEs.
+# Requires SNYK_TOKEN secret (free tier available at https://snyk.io).
+# Results upload to GitHub Security → Code scanning alerts via SARIF.
+# On PRs the step is advisory (continue-on-error) so it never blocks merges —
+# fix findings manually or add them to .snyk with an expiry date.
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  schedule:
+    - cron: "0 6 * * 1"   # Weekly Monday 06:00 UTC
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  # ── Python dependency scan ────────────────────────────────────────────────
+  snyk-python:
+    name: Snyk — Python dependencies
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install app dependencies
+        run: pip install .
+
+      - name: Snyk — test Python packages
+        uses: snyk/actions/python@master
+        continue-on-error: true
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          args: >-
+            --severity-threshold=high
+            --sarif-file-output=snyk-python.sarif
+
+      - name: Upload SARIF to GitHub Code Scanning
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: snyk-python.sarif
+          category: snyk-python
+
+  # ── Docker image scan ─────────────────────────────────────────────────────
+  snyk-docker:
+    name: Snyk — Docker image
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build -t rmias:ci .
+
+      - name: Snyk — test Docker image
+        uses: snyk/actions/docker@master
+        continue-on-error: true
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          image: rmias:ci
+          args: >-
+            --severity-threshold=high
+            --file=Dockerfile
+            --sarif-file-output=snyk-docker.sarif
+
+      - name: Upload SARIF to GitHub Code Scanning
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: snyk-docker.sarif
+          category: snyk-docker

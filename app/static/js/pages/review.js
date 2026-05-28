@@ -3,8 +3,9 @@ import { toast, showModal, closeModal, fmtRelative, fmtDateTime, badge, esc } fr
 
 const STATUSES = ['all', 'pending', 'reviewed', 'dismissed', 'escalated'];
 
-let _items    = [];
-let _filter   = 'all';
+let _items     = [];
+let _filter    = 'all';
+let _loadError = null;
 let _container;
 
 export async function init(container, actions) {
@@ -15,10 +16,12 @@ export async function init(container, actions) {
 }
 
 async function loadItems() {
+  _loadError = null;
   try {
     _items = await API.reviewItems();
   } catch (err) {
     _items = [];
+    _loadError = err.message;
     toast('error', 'Failed to load review items', err.message);
   }
 }
@@ -47,6 +50,10 @@ function render(actions) {
     </button>`;
 
   _container.innerHTML = `
+    ${_loadError ? `<div class="alert alert-danger" style="margin-bottom:16px">
+      Failed to load review items: ${esc(_loadError)}
+      <button class="btn btn-ghost btn-sm" style="margin-left:12px" onclick="window._reviewPage.refresh()">Retry</button>
+    </div>` : ''}
     <div class="filter-tabs">
       ${STATUSES.map(s => `
         <button class="filter-tab ${_filter === s ? 'active' : ''}"
@@ -101,11 +108,11 @@ function resolve(id) {
     'Resolve Review Item',
     `<p class="text-2 text-sm mb-4">${esc(item.title)}</p>
      <div class="form-group">
-       <label>Resolved by</label>
+       <label for="m-resolved-by">Resolved by</label>
        <input type="text" id="m-resolved-by" placeholder="operator@station.com">
      </div>
      <div class="form-group">
-       <label>Notes (optional)</label>
+       <label for="m-notes">Notes (optional)</label>
        <textarea id="m-notes" rows="3" placeholder="What was confirmed or fixed…"></textarea>
      </div>`,
     `<button class="btn btn-ghost" onclick="UI.closeModal()">Cancel</button>
@@ -137,7 +144,7 @@ async function escalate(id) {
     'Escalate Review Item',
     `<p class="text-2 text-sm mb-4">${esc(item.title)}</p>
      <div class="form-group">
-       <label>Escalated by</label>
+       <label for="m-esc-by">Escalated by</label>
        <input type="text" id="m-esc-by" placeholder="operator@station.com">
      </div>`,
     `<button class="btn btn-ghost" onclick="UI.closeModal()">Cancel</button>
@@ -168,7 +175,7 @@ async function dismiss(id) {
     'Dismiss Review Item',
     `<p class="text-2 text-sm mb-4">${esc(item.title)}</p>
      <div class="form-group">
-       <label>Dismissed by</label>
+       <label for="m-dis-by">Dismissed by</label>
        <input type="text" id="m-dis-by" placeholder="operator@station.com">
      </div>`,
     `<button class="btn btn-ghost" onclick="UI.closeModal()">Cancel</button>

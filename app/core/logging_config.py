@@ -19,6 +19,7 @@ class _JsonFormatter(logging.Formatter):
             "ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(record.created)),
             "level": record.levelname,
             "logger": record.name,
+            "service": "rmias",
             "msg": record.getMessage(),
         }
         if record.exc_info:

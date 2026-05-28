@@ -1,0 +1,15 @@
+# Auto-provisioned Loki datasource for RMIAS.
+# Grafana reads this file at startup — no manual UI steps needed.
+
+apiVersion: 1
+
+datasources:
+  - name: Loki
+    type: loki
+    access: proxy
+    url: http://loki:3100
+    isDefault: true
+    version: 1
+    editable: false
+    jsonData:
+      maxLines: 1000

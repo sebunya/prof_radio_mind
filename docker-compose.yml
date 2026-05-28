@@ -34,6 +34,86 @@ services:
       retries: 5
     restart: unless-stopped
 
+  # ── PgHero: PostgreSQL performance dashboard ──────────────────────────────
+  # UI: http://localhost:8081  (credentials from PGHERO_USERNAME/PASSWORD)
+  pghero:
+    image: ankane/pghero:latest
+    environment:
+      DATABASE_URL: ${PGHERO_DATABASE_URL:-postgres://rmias:rmias@db:5432/rmias}
+      PGHERO_USERNAME: ${PGHERO_USERNAME:-admin}
+      PGHERO_PASSWORD: ${PGHERO_PASSWORD:-admin}
+    ports:
+      - "8081:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ── Uptime Kuma: self-hosted uptime monitoring ────────────────────────────
+  # UI: http://localhost:3001  (create admin account on first visit)
+  # Configure monitors for: http://app:8000/health and any external URLs.
+  uptime-kuma:
+    image: louislam/uptime-kuma:1
+    ports:
+      - "3001:3001"
+    volumes:
+      - uptime_kuma_data:/app/data
+    restart: unless-stopped
+
+  # ── Loki: log aggregation backend ────────────────────────────────────────
+  loki:
+    image: grafana/loki:2.9.10
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./config/loki/loki-config.yml:/etc/loki/local-config.yaml:ro
+      - loki_data:/loki
+    command: -config.file=/etc/loki/local-config.yaml
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:3100/ready || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ── Promtail: Docker log collector → Loki ────────────────────────────────
+  # Reads all Docker container logs via /var/run/docker.sock and ships to Loki.
+  promtail:
+    image: grafana/promtail:2.9.10
+    volumes:
+      - ./config/promtail/promtail-config.yml:/etc/promtail/config.yml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+    command: -config.file=/etc/promtail/config.yml
+    depends_on:
+      loki:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ── Grafana: dashboards & log explorer ───────────────────────────────────
+  # UI: http://localhost:3000  (admin / value of GRAFANA_PASSWORD, default: admin)
+  # Loki datasource is auto-provisioned — go to Explore → Loki to query logs.
+  grafana:
+    image: grafana/grafana:11.4.0
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_LOG_LEVEL: warn
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./config/grafana/provisioning:/etc/grafana/provisioning:ro
+    depends_on:
+      loki:
+        condition: service_healthy
+    restart: unless-stopped
+
 volumes:
   postgres_data:
   raw_payloads:
+  uptime_kuma_data:
+  loki_data:
+  grafana_data:

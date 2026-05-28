@@ -1,6 +1,9 @@
 import { API } from '../api.js';
 import { fmtRelative, badge, esc } from '../ui.js';
 
+let _statusChart = null;
+let _typesChart  = null;
+
 export async function init(container) {
   container.innerHTML = '<div class="loader-center"><div class="loader"></div></div>';
 
@@ -126,12 +129,18 @@ export async function init(container) {
 function renderStatusChart(d) {
   const ctx = document.getElementById('ch-status');
   if (!ctx || !window.Chart) return;
-  new Chart(ctx, {
+  if (_statusChart) { _statusChart.destroy(); _statusChart = null; }
+  const data = [d.pending, d.reviewed, d.dismissed, d.escalated];
+  if (data.every(v => !v)) {
+    ctx.parentElement.innerHTML = '<div class="empty-state" style="padding:24px"><div class="empty-desc">No data yet</div></div>';
+    return;
+  }
+  _statusChart = new Chart(ctx, {
     type: 'doughnut',
     data: {
       labels: ['Pending', 'Reviewed', 'Dismissed', 'Escalated'],
       datasets: [{
-        data: [d.pending, d.reviewed, d.dismissed, d.escalated],
+        data,
         backgroundColor: [
           'rgba(245,158,11,.75)',
           'rgba(16,185,129,.75)',
@@ -154,9 +163,14 @@ function renderStatusChart(d) {
 function renderTypeChart(d) {
   const ctx = document.getElementById('ch-type');
   if (!ctx || !window.Chart) return;
+  if (_typesChart) { _typesChart.destroy(); _typesChart = null; }
   const labels = Object.keys(d).map(k => k.replace(/_/g, ' '));
   const values = Object.values(d);
-  new Chart(ctx, {
+  if (values.every(v => !v)) {
+    ctx.parentElement.innerHTML = '<div class="empty-state" style="padding:24px"><div class="empty-desc">No data yet</div></div>';
+    return;
+  }
+  _typesChart = new Chart(ctx, {
     type: 'bar',
     data: {
       labels,

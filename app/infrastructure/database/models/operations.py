@@ -84,3 +84,20 @@ class SystemSetting(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
+
+
+class WebhookSubscriptionDB(Base):
+    """Persisted webhook subscription — survives container restarts."""
+
+    __tablename__ = "webhook_subscriptions"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    url: Mapped[str] = mapped_column(String(2048), nullable=False)
+    # JSON array of event-type strings, e.g. ["play.detected", "reconciliation.completed"]
+    event_types: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    # Optional HMAC secret (stored as plain text; encrypt at rest via DB-level encryption in prod)
+    secret: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )

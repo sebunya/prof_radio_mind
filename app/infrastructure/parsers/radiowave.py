@@ -15,7 +15,8 @@ from __future__ import annotations
 import re
 import uuid
 from dataclasses import dataclass, field
-from datetime import UTC, date, datetime, time
+from datetime import UTC, date, datetime
+from zoneinfo import ZoneInfo
 
 from bs4 import BeautifulSoup, Tag
 
@@ -26,6 +27,7 @@ _DRIFT_FRACTION = 0.5
 _MIN_EXPECTED_ROWS = 4
 
 _LABEL_TAG_RE = re.compile(r"\s*\[.*?\]\s*$")
+_SYDNEY = ZoneInfo("Australia/Sydney")
 
 
 @dataclass
@@ -48,12 +50,13 @@ def _strip_label_from_artist(artist_raw: str) -> str:
 def _parse_time_cell(time_str: str, diary_date: date) -> datetime:
     """Convert 'HH:MM' string + diary date to a UTC-aware datetime.
 
-    Radiowave times are Sydney local time. For MVP we store them as-is
-    with UTC timezone marker; DST conversion is deferred to Pass 11.
+    Radiowave times are Sydney local time (AEST/AEDT); convert to UTC.
     """
     h, m = (int(p) for p in time_str.strip().split(":"))
-    naive = datetime.combine(diary_date, time(h, m))
-    return naive.replace(tzinfo=UTC)
+    dt_local = datetime(
+        diary_date.year, diary_date.month, diary_date.day, h, m, 0, tzinfo=_SYDNEY
+    )
+    return dt_local.astimezone(UTC)
 
 
 def parse_radiowave_diary(

@@ -1,0 +1,54 @@
+name: Semgrep SAST
+
+# Semgrep scans on every PR + weekly Monday 06:00 UTC.
+# Results are uploaded to GitHub Security → Code scanning alerts.
+# No Semgrep account required; set SEMGREP_APP_TOKEN secret to also push
+# results to the Semgrep Cloud Platform dashboard.
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  schedule:
+    - cron: "0 6 * * 1"
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  semgrep:
+    name: Semgrep SAST scan
+    runs-on: ubuntu-latest
+    container:
+      image: semgrep/semgrep:latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # ── Run Semgrep ───────────────────────────────────────────────────────
+      # Combines three curated rulesets with project-specific rules.
+      # SARIF output is used for GitHub Code Scanning integration.
+      - name: Run Semgrep
+        run: |
+          semgrep \
+            --config "p/security-audit" \
+            --config "p/secrets" \
+            --config "p/python" \
+            --config ".semgrep/rules.yml" \
+            --sarif \
+            --output semgrep.sarif \
+            --error \
+            --quiet \
+            app/
+        env:
+          # Optional: set to push findings to Semgrep Cloud Platform
+          SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
+
+      - name: Upload SARIF to GitHub Code Scanning
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: semgrep.sarif
+          category: semgrep

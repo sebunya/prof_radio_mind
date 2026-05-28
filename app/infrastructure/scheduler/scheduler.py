@@ -1,4 +1,22 @@
-"""APScheduler wiring — registers all background collection and reconciliation jobs."""
+"""APScheduler wiring — registers all background collection and reconciliation jobs.
+
+Job-store persistence
+---------------------
+By default APScheduler keeps scheduled fire-times in memory only, which means
+that if the process restarts between midnight and the scheduled run time those
+jobs are silently lost.
+
+To fix this, ``build_scheduler()`` attempts to configure a ``SQLAlchemyJobStore``
+backed by the same PostgreSQL database used for application data.  On restart
+APScheduler reloads the persisted next-run times and immediately fires any job
+whose scheduled time has passed within its ``misfire_grace_time`` window.
+
+The job store requires the *sync* ``psycopg2`` driver (``psycopg2-binary`` in
+``pyproject.toml``) which is separate from the async ``asyncpg`` driver used by
+the main application.  If the job store cannot be configured (missing driver,
+unreachable database) the scheduler falls back to the default in-memory store —
+all other functionality remains unaffected.
+"""
 
 from __future__ import annotations
 
@@ -63,6 +81,18 @@ async def _persist_result(result: object) -> None:
                     play_event.fingerprint = compute_fingerprint(
                         clean_artist, play_event.raw_title
                     )
+                # Deduplicate: skip if the same fingerprint was seen within 6 hours
+                if play_event.fingerprint and await play_repo.exists_by_fingerprint(
+                    station_id=play_event.station_id,
+                    fingerprint=play_event.fingerprint,
+                    within_seconds=6 * 3600,
+                ):
+                    logger.debug(
+                        "play_event_duplicate_skipped fingerprint=%s station=%s",
+                        play_event.fingerprint,
+                        play_event.station_id,
+                    )
+                    continue
                 await play_repo.save(play_event)
 
             no_track_repo = SQLNoTrackEventRepository(session)
@@ -76,53 +106,106 @@ async def _persist_result(result: object) -> None:
 
 async def job_collect_nova_diary() -> None:
     """Collect Nova 96.9 Radiowave diary for the previous day (runs daily 16:00 UTC)."""
-    collector = NovaRadiowaveCollector(
-        source_id=_NOVA_SOURCE_ID,
-        station_id=_NOVA_STATION_ID,
-        storage_root=settings.raw_payload_storage_path,
-    )
-    result = await collector.run()
-    logger.info(
-        "nova_diary_collected status=%s plays=%d no_tracks=%d",
-        result.collector_run.status.value,
-        len(result.play_events),
-        len(result.no_track_events),
-    )
-    await _persist_result(result)
+    try:
+        collector = NovaRadiowaveCollector(
+            source_id=_NOVA_SOURCE_ID,
+            station_id=_NOVA_STATION_ID,
+            storage_root=settings.raw_payload_storage_path,
+        )
+        result = await collector.run()
+        logger.info(
+            "nova_diary_collected status=%s plays=%d no_tracks=%d",
+            result.collector_run.status.value,
+            len(result.play_events),
+            len(result.no_track_events),
+        )
+        await _persist_result(result)
+    except Exception as exc:
+        logger.error("job_collect_nova_diary_failed error=%s", exc, exc_info=True)
 
 
 async def job_collect_kiis_now_playing() -> None:
     """Poll KIIS-FM iHeart now-playing endpoint (runs every 5 minutes)."""
-    collector = KIISIHeartCollector(
-        source_id=_KIIS_SOURCE_ID,
-        station_id=_KIIS_STATION_ID,
-        storage_root=settings.raw_payload_storage_path,
-    )
-    result = await collector.run()
-    logger.debug(
-        "kiis_now_playing status=%s plays=%d no_tracks=%d",
-        result.collector_run.status.value,
-        len(result.play_events),
-        len(result.no_track_events),
-    )
-    await _persist_result(result)
+    try:
+        collector = KIISIHeartCollector(
+            source_id=_KIIS_SOURCE_ID,
+            station_id=_KIIS_STATION_ID,
+            storage_root=settings.raw_payload_storage_path,
+        )
+        result = await collector.run()
+        logger.debug(
+            "kiis_now_playing status=%s plays=%d no_tracks=%d",
+            result.collector_run.status.value,
+            len(result.play_events),
+            len(result.no_track_events),
+        )
+        await _persist_result(result)
+    except Exception as exc:
+        logger.error("job_collect_kiis_now_playing_failed error=%s", exc, exc_info=True)
 
 
 async def job_collect_capital_now_playing() -> None:
     """Poll Capital FM iHeart now-playing endpoint (runs every 5 minutes)."""
-    collector = CapitalIHeartCollector(
-        source_id=_CAPITAL_SOURCE_ID,
-        station_id=_CAPITAL_STATION_ID,
-        storage_root=settings.raw_payload_storage_path,
-    )
-    result = await collector.run()
-    logger.debug(
-        "capital_now_playing status=%s plays=%d no_tracks=%d",
-        result.collector_run.status.value,
-        len(result.play_events),
-        len(result.no_track_events),
-    )
-    await _persist_result(result)
+    try:
+        collector = CapitalIHeartCollector(
+            source_id=_CAPITAL_SOURCE_ID,
+            station_id=_CAPITAL_STATION_ID,
+            storage_root=settings.raw_payload_storage_path,
+        )
+        result = await collector.run()
+        logger.debug(
+            "capital_now_playing status=%s plays=%d no_tracks=%d",
+            result.collector_run.status.value,
+            len(result.play_events),
+            len(result.no_track_events),
+        )
+        await _persist_result(result)
+    except Exception as exc:
+        logger.error("job_collect_capital_now_playing_failed error=%s", exc, exc_info=True)
+
+
+async def job_send_daily_email() -> None:
+    """Send daily email report to subscribed recipients (runs 22:00 UTC = 08:00 AEST)."""
+    try:
+        from app.application.reports.email_report_builder import send_frequency_report
+
+        result = await send_frequency_report("daily")
+        logger.info("daily_email_report_done result=%s", result)
+    except Exception as exc:
+        logger.error("job_send_daily_email_failed error=%s", exc, exc_info=True)
+
+
+async def job_send_weekly_email() -> None:
+    """Send weekly email report every Monday 22:00 UTC (= Tue 08:00 AEST)."""
+    try:
+        from app.application.reports.email_report_builder import send_frequency_report
+
+        result = await send_frequency_report("weekly")
+        logger.info("weekly_email_report_done result=%s", result)
+    except Exception as exc:
+        logger.error("job_send_weekly_email_failed error=%s", exc, exc_info=True)
+
+
+async def job_send_monthly_email() -> None:
+    """Send monthly email report on 1st of month 22:00 UTC (= 2nd 08:00 AEST)."""
+    try:
+        from app.application.reports.email_report_builder import send_frequency_report
+
+        result = await send_frequency_report("monthly")
+        logger.info("monthly_email_report_done result=%s", result)
+    except Exception as exc:
+        logger.error("job_send_monthly_email_failed error=%s", exc, exc_info=True)
+
+
+async def job_check_trend_alerts() -> None:
+    """Detect trending / new-entry songs and fire webhook events (runs 23:00 UTC daily)."""
+    try:
+        from app.application.alerts.trend_alert_service import check_and_fire_trend_alerts
+
+        summary = await check_and_fire_trend_alerts()
+        logger.info("trend_alerts_done summary=%s", summary)
+    except Exception as exc:
+        logger.error("job_check_trend_alerts_failed error=%s", exc, exc_info=True)
 
 
 async def job_nightly_reconciliation() -> None:
@@ -197,9 +280,44 @@ async def job_nightly_reconciliation() -> None:
     logger.info("nightly_reconciliation completed total_dupes=%d", total_dupes)
 
 
+def _build_job_stores() -> dict:
+    """Build APScheduler job stores.
+
+    Returns a dict mapping ``"default"`` to a ``SQLAlchemyJobStore`` when the
+    PostgreSQL database is reachable, or an empty dict (APScheduler falls back
+    to its built-in ``MemoryJobStore``) when it isn't.
+
+    The store uses psycopg2 (sync) rather than asyncpg because APScheduler's
+    SQLAlchemy integration is synchronous.  Both drivers can coexist — asyncpg
+    is used by the main async application, psycopg2 only by the scheduler.
+    """
+    db_url = settings.database_url
+    if not db_url:
+        return {}
+    try:
+        from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore  # type: ignore[import]
+
+        # Rewrite the async asyncpg URL to the sync psycopg2 URL.
+        # e.g. postgresql+asyncpg://user:pass@host/db → postgresql+psycopg2://…
+        sync_url = db_url.replace("+asyncpg", "+psycopg2")
+        store = SQLAlchemyJobStore(url=sync_url, tablename="apscheduler_jobs")
+        logger.debug("apscheduler_jobstore=sqlalchemy url_prefix=%s", sync_url.split("@")[-1])
+        return {"default": store}
+    except Exception as exc:
+        logger.warning(
+            "apscheduler_jobstore_unavailable reason=%s using=memory", exc
+        )
+        return {}
+
+
 def build_scheduler() -> AsyncIOScheduler:
-    """Create and configure the APScheduler instance with all registered jobs."""
-    sched = AsyncIOScheduler(timezone="UTC")
+    """Create and configure the APScheduler instance with all registered jobs.
+
+    The scheduler uses a persistent SQLAlchemy job store (PostgreSQL) when
+    available so that missed firings are recovered after a restart.  Falls back
+    to in-memory storage if the job store cannot be initialised.
+    """
+    sched = AsyncIOScheduler(timezone="UTC", jobstores=_build_job_stores())
 
     # Nova Radiowave diary — 16:00 UTC daily (02:00 AEST)
     sched.add_job(
@@ -209,6 +327,8 @@ def build_scheduler() -> AsyncIOScheduler:
         name="Nova 96.9 Radiowave diary",
         replace_existing=True,
         misfire_grace_time=3600,
+        max_instances=1,
+        coalesce=True,
     )
 
     # KIIS iHeart now-playing — every 5 minutes
@@ -219,6 +339,8 @@ def build_scheduler() -> AsyncIOScheduler:
         name="KIIS-FM iHeart now-playing poll",
         replace_existing=True,
         misfire_grace_time=60,
+        max_instances=1,
+        coalesce=True,
     )
 
     # Capital FM iHeart now-playing — every 5 minutes
@@ -229,6 +351,8 @@ def build_scheduler() -> AsyncIOScheduler:
         name="Capital FM iHeart now-playing poll",
         replace_existing=True,
         misfire_grace_time=60,
+        max_instances=1,
+        coalesce=True,
     )
 
     # Nightly reconciliation — 17:00 UTC daily (03:00 AEST)
@@ -239,6 +363,62 @@ def build_scheduler() -> AsyncIOScheduler:
         name="Nightly deduplication & normalization reconciliation",
         replace_existing=True,
         misfire_grace_time=3600,
+        max_instances=1,
+        coalesce=True,
+    )
+
+    # ── Email reports ─────────────────────────────────────────────────────────
+
+    # Daily email — 22:00 UTC (08:00 AEST next day), covers yesterday's plays
+    sched.add_job(
+        job_send_daily_email,
+        CronTrigger(hour=22, minute=0, timezone="UTC"),
+        id="email_daily_report",
+        name="Daily email report",
+        replace_existing=True,
+        misfire_grace_time=3600,
+        max_instances=1,
+        coalesce=True,
+    )
+
+    # Weekly email — Monday 22:00 UTC (Tue 08:00 AEST), covers last Mon–Sun
+    sched.add_job(
+        job_send_weekly_email,
+        CronTrigger(day_of_week="mon", hour=22, minute=0, timezone="UTC"),
+        id="email_weekly_report",
+        name="Weekly email report",
+        replace_existing=True,
+        misfire_grace_time=3600,
+        max_instances=1,
+        coalesce=True,
+    )
+
+    # Monthly email — 1st of month 22:00 UTC (2nd 08:00 AEST), covers last month
+    sched.add_job(
+        job_send_monthly_email,
+        CronTrigger(day=1, hour=22, minute=0, timezone="UTC"),
+        id="email_monthly_report",
+        name="Monthly email report",
+        replace_existing=True,
+        misfire_grace_time=3600,
+        max_instances=1,
+        coalesce=True,
+    )
+
+    # ── Trend alerts ──────────────────────────────────────────────────────────
+
+    # Trend alert sweep — 23:00 UTC daily (09:00 AEST), after the email report
+    # run.  Fires song.trending, song.new_entry, and song.aria_match webhooks
+    # for songs that crossed configured thresholds since yesterday.
+    sched.add_job(
+        job_check_trend_alerts,
+        CronTrigger(hour=23, minute=0, timezone="UTC"),
+        id="trend_alerts",
+        name="Nightly trend alert sweep",
+        replace_existing=True,
+        misfire_grace_time=3600,
+        max_instances=1,
+        coalesce=True,
     )
 
     return sched

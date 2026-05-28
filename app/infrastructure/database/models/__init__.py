@@ -6,7 +6,14 @@ from app.infrastructure.database.models.events import (
     ReviewItem,
     Song,
 )
-from app.infrastructure.database.models.operations import Alert, AuditLog, Error, SystemSetting
+from app.infrastructure.database.models.notifications import EmailRecipientDB, EmailSendLogDB
+from app.infrastructure.database.models.operations import (
+    Alert,
+    AuditLog,
+    Error,
+    SystemSetting,
+    WebhookSubscriptionDB,
+)
 from app.infrastructure.database.models.reports import DailyReport, Export, ReportVersion
 from app.infrastructure.database.models.sources import Source, SourceRoutePriority, SourceValidation
 from app.infrastructure.database.models.stations import Station, StationBroadcastDay, StationMarket
@@ -35,4 +42,7 @@ __all__ = [
     "DailyReport",
     "ReportVersion",
     "Export",
+    "WebhookSubscriptionDB",
+    "EmailRecipientDB",
+    "EmailSendLogDB",
 ]

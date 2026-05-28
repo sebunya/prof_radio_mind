@@ -18,6 +18,12 @@ from dataclasses import dataclass
 logger = logging.getLogger(__name__)
 
 _MB_BASE = "https://musicbrainz.org/ws/2"
+
+
+def _escape_lucene(s: str) -> str:
+    """Escape Lucene special characters."""
+    special = r'+-&|!(){}[]^"~*?:\/'
+    return ''.join(f'\\{c}' if c in special else c for c in s)
 _MB_USER_AGENT = "RMIAS/0.1.0 (radio-music-intelligence; contact@example.com)"
 _REQUEST_TIMEOUT = 10.0
 
@@ -44,7 +50,7 @@ async def lookup_recording(artist: str, title: str) -> EnrichmentResult:
     """
     from app.infrastructure.http.client import build_client
 
-    query = f'recording:"{title}" AND artist:"{artist}"'
+    query = f'recording:"{_escape_lucene(title)}" AND artist:"{_escape_lucene(artist)}"'
     params = {
         "query": query,
         "fmt": "json",

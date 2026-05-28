@@ -17,8 +17,12 @@ dependencies = [
     "httpx>=0.27.0",
     "rapidfuzz>=3.0.0",
     "python-multipart>=0.0.9",
-    "apscheduler>=3.10.0",
+    "apscheduler[sqlalchemy]>=3.10.0",
+    "psycopg2-binary>=2.9.0",
     "aioboto3>=13.0.0",
+    "aiosmtplib>=3.0.0",
+    "email-validator>=2.0.0",
+    "sentry-sdk[fastapi]>=2.0.0",
 ]
 
 [project.optional-dependencies]
@@ -27,6 +31,9 @@ dev = [
     "pytest>=8.0.0",
     "ruff>=0.7.0",
     "types-beautifulsoup4>=4.12.0",
+    # Security scanning — run locally with ./scripts/sast.sh
+    "semgrep>=1.70.0",
+    "bandit>=1.7.0",
 ]
 
 [build-system]

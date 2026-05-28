@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -18,7 +18,7 @@ class SQLDailyReportRepository:
     async def get_for_station_date(
         self, station_id: uuid.UUID, report_date: date
     ) -> DailyReport | None:
-        from_dt = datetime(report_date.year, report_date.month, report_date.day)
+        from_dt = datetime(report_date.year, report_date.month, report_date.day, tzinfo=UTC)
         stmt = (
             select(DailyReport)
             .where(
@@ -49,7 +49,7 @@ class SQLDailyReportRepository:
     ) -> tuple[DailyReport, int]:
         """Create or update a DailyReport; return the model and the new version number."""
         existing = await self.get_for_station_date(station_id, report_date)
-        report_dt = datetime(report_date.year, report_date.month, report_date.day)
+        report_dt = datetime(report_date.year, report_date.month, report_date.day, tzinfo=UTC)
 
         if existing is None:
             report = DailyReport(
@@ -98,4 +98,4 @@ class SQLDailyReportRepository:
         )
         result = await self._session.execute(stmt)
         val = result.scalar()
-        return val if val is not None else 1
+        return val if val is not None else 0

@@ -7,14 +7,11 @@ import io
 import uuid
 from datetime import date
 
-import pytest
-
-from app.domain.entities.proof_of_play import AirplayCertificate
 from app.application.proof_of_play.certificate_service import (
     export_certificates_csv,
     generate_certificates,
 )
-
+from app.domain.entities.proof_of_play import AirplayCertificate
 
 _STATION_ID = uuid.uuid4()
 _DATE = date(2026, 5, 24)

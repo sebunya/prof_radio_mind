@@ -14,8 +14,25 @@ from app.infrastructure.database.session import get_db
 
 router = APIRouter(prefix="/playlist", tags=["playlist"])
 
-# In-memory recommendation store (replace with DB repo in next pass).
+# In-memory recommendation store.
+# NOTE: data is lost on worker restart. Recommendations are short-lived (approve within
+# the same session) so this is acceptable for MVP. A DB-backed repo would be needed for
+# multi-worker HA deployments.
 _recommendation_store: dict[str, object] = {}
+# Timestamp of when each recommendation was added (for TTL eviction)
+_recommendation_ts: dict[str, float] = {}
+# Evict recommendations older than 4 hours to prevent unbounded memory growth
+_REC_TTL_SECONDS = 4 * 3600
+
+
+def _evict_expired_recommendations() -> None:
+    """Remove recommendations older than _REC_TTL_SECONDS from the in-memory store."""
+    import time
+    cutoff = time.monotonic() - _REC_TTL_SECONDS
+    expired = [k for k, ts in _recommendation_ts.items() if ts < cutoff]
+    for k in expired:
+        _recommendation_store.pop(k, None)
+        _recommendation_ts.pop(k, None)
 
 
 class RecommendationResponse(BaseModel):
@@ -96,9 +113,14 @@ async def analyse_rotation(
     spin_counts = spin_counts_from_plays(plays)
     recommendations = build_recommendations(station_id, spin_counts)
 
-    # Cache in memory for approval
+    # Cache in memory for approval; evict stale entries first
+    import time
+    _evict_expired_recommendations()
+    now_mono = time.monotonic()
     for rec in recommendations:
-        _recommendation_store[str(rec.id)] = rec
+        key = str(rec.id)
+        _recommendation_store[key] = rec
+        _recommendation_ts[key] = now_mono
 
     return [_to_response(r) for r in recommendations]
 

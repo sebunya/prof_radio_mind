@@ -126,7 +126,7 @@ function openRegisterModal() {
   showModal(
     'Register Webhook',
     `<div class="form-group">
-       <label>Endpoint URL</label>
+       <label for="m-wh-url">Endpoint URL</label>
        <input type="url" id="m-wh-url" placeholder="https://yourdomain.com/webhook">
      </div>
      <div class="form-group">
@@ -140,7 +140,7 @@ function openRegisterModal() {
        </div>
      </div>
      <div class="form-group">
-       <label>Secret (optional)</label>
+       <label for="m-wh-secret">Secret (optional)</label>
        <input type="password" id="m-wh-secret" placeholder="Used for HMAC-SHA256 signing">
        <div class="form-hint">Leave blank for unsigned deliveries</div>
      </div>`,

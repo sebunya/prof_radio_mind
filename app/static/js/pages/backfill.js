@@ -20,7 +20,7 @@ function today() {
 
 function renderPage() {
   _container.innerHTML = `
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:20px;align-items:start">
 
       <!-- ── Left: Form ── -->
       <div>
@@ -33,7 +33,7 @@ function renderPage() {
           </div>
 
           <div class="form-group">
-            <label>Station</label>
+            <label for="bf-station">Station</label>
             <select id="bf-station">
               <option value="">— Select station —</option>
               ${_stations.map(s => `<option value="${s.id}">${esc(s.call_sign)} — ${esc(s.name)}</option>`).join('')}
@@ -41,7 +41,7 @@ function renderPage() {
           </div>
 
           <div class="form-group">
-            <label>Broadcast Date</label>
+            <label for="bf-date">Broadcast Date</label>
             <input type="date" id="bf-date" value="${today()}">
             <div class="form-hint">The date these plays were broadcast</div>
           </div>
@@ -49,7 +49,9 @@ function renderPage() {
           <div class="form-group">
             <label>CSV File</label>
             <div class="upload-zone" id="drop-zone" onclick="document.getElementById('bf-file').click()">
-              <input type="file" id="bf-file" accept=".csv,text/csv" onchange="window._backfillPage.onFileChange(event)">
+              <input type="file" id="bf-file" accept=".csv,text/csv"
+                     onclick="event.stopPropagation()"
+                     onchange="window._backfillPage.onFileChange(event)">
               <div class="upload-icon">📄</div>
               <div class="upload-label" id="upload-label">Click to browse or drag & drop</div>
               <div class="upload-hint">CSV files only · max 10 MB</div>
@@ -136,6 +138,9 @@ function setFile(file) {
     label.textContent = `${file.name} (${kb} KB)`;
     label.style.color = 'var(--accent)';
   }
+  if (file.size > 10 * 1024 * 1024) {
+    toast('warning', 'File may be too large', `${(file.size/1024/1024).toFixed(1)} MB exceeds the 10 MB limit`);
+  }
 }
 
 async function submit() {
@@ -145,6 +150,10 @@ async function submit() {
   if (!stationId)     { toast('warning', 'Select a station'); return; }
   if (!date)          { toast('warning', 'Select a broadcast date'); return; }
   if (!_selectedFile) { toast('warning', 'Choose a CSV file'); return; }
+  if (_selectedFile.size > 10 * 1024 * 1024) {
+    toast('error', 'File too large', 'Maximum size is 10 MB');
+    return;
+  }
 
   const btn = document.getElementById('bf-btn');
   btn.disabled = true;
@@ -189,8 +198,8 @@ function renderResults(r) {
           <div class="result-num" style="color:var(--success)">${r.rows_accepted}</div>
           <div class="result-lbl">Accepted</div>
         </div>
-        <div class="result-card ${r.rows_rejected > 0 ? 'style="background:rgba(239,68,68,.12)"' : ''}">
-          <div class="result-num" ${r.rows_rejected > 0 ? 'style="color:var(--danger)"' : ''}>${r.rows_rejected}</div>
+        <div class="result-card"${r.rows_rejected > 0 ? ' style="background:rgba(239,68,68,.12)"' : ''}>
+          <div class="result-num"${r.rows_rejected > 0 ? ' style="color:var(--danger)"' : ''}>${r.rows_rejected}</div>
           <div class="result-lbl">Rejected</div>
         </div>
       </div>

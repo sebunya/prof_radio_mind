@@ -4,11 +4,8 @@ from __future__ import annotations
 
 import uuid
 
-import pytest
-
 from app.domain.entities.no_track_event import NoTrackReason
 from app.infrastructure.collectors.streamtheworld_icy import StreamTheWorldICYCollector
-
 
 _SOURCE_ID = uuid.uuid4()
 _STATION_ID = uuid.uuid4()
@@ -24,7 +21,7 @@ def _collector() -> StreamTheWorldICYCollector:
 
 
 def _icy_bytes(stream_title: str) -> bytes:
-    return f"StreamTitle='{stream_title}';".encode("utf-8")
+    return f"StreamTitle='{stream_title}';".encode()
 
 
 # --- parse() ---

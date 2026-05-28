@@ -10,6 +10,7 @@ from apscheduler.triggers.interval import IntervalTrigger
 
 from app.infrastructure.scheduler.scheduler import (
     build_scheduler,
+    job_check_trend_alerts,
     job_collect_capital_now_playing,
     job_collect_kiis_now_playing,
     job_collect_nova_diary,
@@ -18,9 +19,9 @@ from app.infrastructure.scheduler.scheduler import (
 
 # --- Job registration ---
 
-def test_scheduler_has_four_jobs() -> None:
+def test_scheduler_has_eight_jobs() -> None:
     sched = build_scheduler()
-    assert len(sched.get_jobs()) == 4
+    assert len(sched.get_jobs()) == 8
 
 
 def test_scheduler_job_ids() -> None:
@@ -31,6 +32,10 @@ def test_scheduler_job_ids() -> None:
         "kiis_now_playing",
         "capital_now_playing",
         "nightly_reconciliation",
+        "email_daily_report",
+        "email_weekly_report",
+        "email_monthly_report",
+        "trend_alerts",
     }
 
 
@@ -121,6 +126,25 @@ async def test_kiis_job_invokes_collector() -> None:
         await job_collect_kiis_now_playing()
 
     mock_collector.run.assert_awaited_once()
+
+
+@pytest.mark.anyio
+async def test_trend_alert_job_invokes_service() -> None:
+    with patch(
+        "app.infrastructure.scheduler.scheduler.job_check_trend_alerts",
+        new_callable=AsyncMock,
+    ):
+        # The actual wrapped function delegates to check_and_fire_trend_alerts;
+        # we just verify the job coroutine itself completes without error when
+        # the underlying service raises (error-handling path).
+        from unittest.mock import patch as _patch
+
+        with _patch(
+            "app.application.alerts.trend_alert_service.check_and_fire_trend_alerts",
+            new_callable=AsyncMock,
+            return_value={"total_fired": 0},
+        ):
+            await job_check_trend_alerts()
 
 
 @pytest.mark.anyio

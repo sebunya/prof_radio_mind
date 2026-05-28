@@ -14,6 +14,7 @@ Invariants:
 
 from __future__ import annotations
 
+import asyncio
 import os
 import uuid
 from abc import ABC, abstractmethod
@@ -93,7 +94,7 @@ class BaseCollector(ABC):
 
         run.transition(CollectorStatus.RAW_STORED)
         storage_path = self._build_storage_path(run.id)
-        raw_payload = self._store_payload(
+        raw_payload = await self._store_payload(
             run.id,
             raw_bytes,
             storage_path,
@@ -128,7 +129,7 @@ class BaseCollector(ABC):
         date_str = datetime.now(tz=UTC).strftime("%Y/%m/%d")
         return os.path.join(self.storage_root, date_str, f"{run_id}.bin")
 
-    def _store_payload(
+    async def _store_payload(
         self,
         run_id: uuid.UUID,
         raw_bytes: bytes,
@@ -137,9 +138,12 @@ class BaseCollector(ABC):
         content_type: str | None = None,
         http_status: int | None = None,
     ) -> RawPayload:
-        Path(storage_path).parent.mkdir(parents=True, exist_ok=True)
-        with open(storage_path, "wb") as f:
-            f.write(raw_bytes)
+        def _write() -> None:
+            Path(storage_path).parent.mkdir(parents=True, exist_ok=True)
+            with open(storage_path, "wb") as f:
+                f.write(raw_bytes)
+
+        await asyncio.to_thread(_write)
 
         return RawPayload.create(
             run_id,

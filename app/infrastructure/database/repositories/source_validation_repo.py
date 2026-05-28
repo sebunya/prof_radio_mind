@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.validation.base import ValidationResult
@@ -49,3 +49,11 @@ class SQLSourceValidationRepository:
         )
         result = await self._session.execute(stmt)
         return result.scalar()
+
+    async def count_for_source(self, source_id: uuid.UUID) -> int:
+        result = await self._session.execute(
+            select(func.count())
+            .select_from(SourceValidation)
+            .where(SourceValidation.source_id == source_id)
+        )
+        return result.scalar_one()

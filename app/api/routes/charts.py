@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -11,7 +11,10 @@ from app.core.auth import require_api_key
 
 router = APIRouter(prefix="/charts", tags=["charts"])
 
-# In-memory cache keyed by (chart_name, chart_date) — replace with DB repo in next pass.
+# In-memory cache keyed by (chart_name, chart_date) — capped at 1 entry to prevent
+# unbounded growth. Each worker process has an independent cache; a DB-backed repo
+# should replace this in a future pass.
+_MAX_CACHE_ENTRIES = 1
 _chart_cache: dict[tuple[str, str], list[dict]] = {}
 
 
@@ -56,8 +59,10 @@ async def ingest_aria_chart(
             status_code=503, detail=f"Failed to fetch ARIA chart: {exc}"
         ) from exc
 
-    target_date = chart_date or entries[0].chart_date if entries else date.today()
+    target_date = chart_date or (entries[0].chart_date if entries else date.today())
     cache_key = ("ARIA Singles", str(target_date))
+    if len(_chart_cache) >= _MAX_CACHE_ENTRIES:
+        _chart_cache.clear()
     _chart_cache[cache_key] = [
         {
             "position": e.position,
@@ -74,7 +79,7 @@ async def ingest_aria_chart(
         chart_name="ARIA Singles",
         chart_date=str(target_date),
         entry_count=len(entries),
-        fetched_at=datetime.utcnow().isoformat(),
+        fetched_at=datetime.now(UTC).isoformat(),
         entries=[
             ChartEntryResponse(
                 position=e.position,
@@ -110,6 +115,6 @@ async def get_latest_aria_chart() -> ChartResponse:
         chart_name=chart_name,
         chart_date=chart_date_str,
         entry_count=len(entries_data),
-        fetched_at=datetime.utcnow().isoformat(),
+        fetched_at=datetime.now(UTC).isoformat(),
         entries=[ChartEntryResponse(**e) for e in entries_data],
     )
