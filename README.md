@@ -131,6 +131,7 @@ tests/
   integration/          Integration tests against local DB only
 migrations/             Alembic schema migrations (Pass 2+)
 docs/
+  deployment/           Hetzner Cloud runbook and production checklists
   adr/                  Architecture Decision Records
   IMPLEMENTATION_PLAN.md
   VALIDATION_REGISTER.md

@@ -15,6 +15,13 @@ ENV/
 .env
 .env.production
 .env.staging
+.env.local
+.env.*.local
+*.pem
+*.key
+secrets/
+raw_payloads/
+backups/
 
 # Build artifacts
 dist/

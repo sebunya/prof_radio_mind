@@ -1,4 +1,4 @@
-FROM python:3.12-slim
+FROM python:3.12-slim AS production
 
 # Create non-root user early so pip cache is owned correctly
 RUN addgroup --system rmias && adduser --system --ingroup rmias rmias
