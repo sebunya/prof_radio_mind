@@ -6,10 +6,7 @@ import asyncio
 import uuid
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
-
-from app.application.webhooks.service import WebhookStore, fire_event, webhook_store
-
+from app.application.webhooks.service import WebhookStore, fire_event
 
 # --- WebhookStore ---
 
@@ -146,7 +143,10 @@ def test_fire_event_retries_on_non_2xx() -> None:
     async def _run() -> None:
         with patch("app.application.webhooks.service.webhook_store", store):
             with patch("app.infrastructure.http.client.build_client", return_value=mock_client):
-                with patch("app.application.webhooks.service.asyncio.sleep", new_callable=AsyncMock):
+                with patch(
+                    "app.application.webhooks.service.asyncio.sleep",
+                    new_callable=AsyncMock,
+                ):
                     await fire_event("play.detected", {"station_id": "abc"})
 
     asyncio.run(_run())

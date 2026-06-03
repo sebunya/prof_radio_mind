@@ -15,7 +15,7 @@ _VALID_CSV = Path(__file__).parent.parent / "fixtures/csv/capital_fm_valid.csv"
 
 @pytest.fixture
 def client() -> TestClient:
-    from unittest.mock import AsyncMock, MagicMock
+    from unittest.mock import MagicMock
 
     from app.infrastructure.database.session import get_db
     from app.main import app

@@ -6,18 +6,17 @@ import uuid
 
 import pytest
 
-from app.domain.entities.playlist_recommendation import (
-    RecommendationType,
-    RotationTier,
-    classify_tier,
-)
 from app.application.playlist.rotation_engine import (
     SongSpinCount,
     _tier_rank,
     build_recommendations,
     spin_counts_from_plays,
 )
-
+from app.domain.entities.playlist_recommendation import (
+    RecommendationType,
+    RotationTier,
+    classify_tier,
+)
 
 # --- classify_tier ---
 

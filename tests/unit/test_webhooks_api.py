@@ -23,8 +23,9 @@ def fresh_store():
 
 @pytest.fixture
 def client():
-    from app.infrastructure.database.session import get_db
     from unittest.mock import MagicMock
+
+    from app.infrastructure.database.session import get_db
 
     async def fake_db():
         yield MagicMock()

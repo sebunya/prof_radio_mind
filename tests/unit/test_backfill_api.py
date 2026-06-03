@@ -31,7 +31,8 @@ def client():
 
 
 def _db_patches():
-    """Return (mock_play_repo, mock_review_repo, mock_session, factory_patch, play_patch, review_patch).
+    """Return (mock_play_repo, mock_review_repo, mock_session,
+    factory_patch, play_patch, review_patch).
 
     The backfill handler calls: _factory()() where _factory = _get_factory.
     So _get_factory() must return a session-factory callable, and calling that must
@@ -56,8 +57,14 @@ def _db_patches():
         mock_review_repo,
         mock_session,
         patch("app.infrastructure.database.session._get_factory", return_value=session_factory),
-        patch("app.infrastructure.database.repositories.play_event_repo.SQLPlayEventRepository", return_value=mock_play_repo),
-        patch("app.infrastructure.database.repositories.review_item_repo.SQLReviewItemRepository", return_value=mock_review_repo),
+        patch(
+            "app.infrastructure.database.repositories.play_event_repo.SQLPlayEventRepository",
+            return_value=mock_play_repo,
+        ),
+        patch(
+            "app.infrastructure.database.repositories.review_item_repo.SQLReviewItemRepository",
+            return_value=mock_review_repo,
+        ),
     )
 
 
