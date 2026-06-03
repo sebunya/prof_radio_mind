@@ -1,0 +1,59 @@
+name: Semgrep SAST
+
+# Semgrep scans on every PR + weekly Monday 06:00 UTC.
+# Two tiers:
+#   1. Project-specific rules (.semgrep/rules.yml) are a BLOCKING gate — these
+#      are curated and validated to be false-positive-free on this codebase.
+#   2. Curated registry rulesets run ADVISORY — findings upload to
+#      GitHub Security → Code scanning alerts but do not fail the build, so a
+#      noisy upstream rule never blocks an unrelated PR.
+# No Semgrep account required; set SEMGREP_APP_TOKEN to also push results to the
+# Semgrep Cloud Platform dashboard.
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  schedule:
+    - cron: "0 6 * * 1"
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  semgrep:
+    name: Semgrep SAST scan
+    runs-on: ubuntu-latest
+    container:
+      image: semgrep/semgrep:latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # ── Blocking gate: project-specific rules ─────────────────────────────
+      - name: Semgrep — project rules (blocking)
+        run: semgrep --config ".semgrep/rules.yml" --error --quiet app/
+
+      # ── Advisory: curated registry rulesets → SARIF ───────────────────────
+      - name: Semgrep — registry rulesets (advisory)
+        run: |
+          semgrep \
+            --config "p/security-audit" \
+            --config "p/secrets" \
+            --config "p/python" \
+            --sarif \
+            --output semgrep.sarif \
+            --quiet \
+            app/ || true
+        env:
+          SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
+
+      - name: Upload SARIF to GitHub Code Scanning
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        continue-on-error: true
+        with:
+          sarif_file: semgrep.sarif
+          category: semgrep

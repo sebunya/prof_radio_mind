@@ -1,0 +1,22 @@
+# AG-ADOPT-REF0 Task Checklist
+
+- [x] Phase 0: Production Freeze Verification (Scheduler paused, flags false)
+- [x] Phase 1: Fetch and Checkout Claude Branch Locally
+- [x] Phase 2 & 3: File Comparison and Verification of Fix Existence
+- [x] Phase 4: Deep Inspection Checklist
+  - [x] A. Alembic safety (`migrations/env.py`)
+  - [x] B. Rollback correctness (`scripts/rollback-capital.sh`)
+  - [x] C. Dry run module (`app/tools/dry_run_capital.py`)
+  - [x] D. Scheduler safety (`app/infrastructure/scheduler/scheduler.py`)
+  - [x] E. HTTP client neutral language (`app/infrastructure/http/client.py`)
+  - [x] F. Production docs gating (`app/main.py`)
+  - [x] G. Admin auth (`app/core/admin_auth.py`, `app/main.py`)
+  - [x] H. Phase E migration (`c4e2a1f9b8d7_phase_e_play_events_dedup_index.py`)
+  - [x] I. Payload pruning (`app/tools/prune_raw_payloads.py`)
+  - [x] J. Env templates (`.env.production.example`)
+  - [x] K. CI configuration workflows
+- [x] Phase 5: Local Quality Gates (Ruff, Mypy, Pytest)
+- [x] Phase 6: Static Risk Search (greps for secrets, hardcoded URLs, evasion terms)
+- [x] Phase 7: PR #6 Decision and Merge Preparation (PR #6 is Open and Verified)
+- [ ] Phase 8 & 9: Deployment Plan and Post-Deploy Verification (Skipped, waiting for merge approval)
+- [x] Phase 10: Deliverables Creation

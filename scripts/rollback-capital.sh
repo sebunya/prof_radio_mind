@@ -8,9 +8,10 @@ if [ -f "$ENV_FILE" ]; then
     sed -i 's/ENABLE_CAPITAL_COLLECTOR=true/ENABLE_CAPITAL_COLLECTOR=false/g' "$ENV_FILE"
     echo "Disabled Capital FM UK collector in .env.production"
 
-    # Restart the application container to apply changes
-    docker compose -f /opt/rmias/docker-compose.hetzner.yml --env-file "$ENV_FILE" restart app
-    echo "Restarted app container successfully"
+    # Force-recreate app container so the updated env file is re-read.
+    # `restart` does NOT reload env vars — `up --force-recreate` does.
+    docker compose -f /opt/rmias/docker-compose.hetzner.yml --env-file "$ENV_FILE" up -d --force-recreate app
+    echo "App container force-recreated successfully (env vars reloaded)"
 else
     echo "Error: .env.production not found at $ENV_FILE"
     exit 1

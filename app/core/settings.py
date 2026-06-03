@@ -23,6 +23,20 @@ class Settings(BaseSettings):
     rate_limit_rpm: int = 30
     api_key: str = ""  # empty = auth disabled (dev); set in production
 
+    # Interactive API docs — disabled automatically when app_env == "production"
+    # unless explicitly forced on.
+    enable_docs_in_production: bool = False
+
+    # Optional HTTP Basic auth in front of the /admin SPA.
+    # Both must be set to enable; empty (default) leaves /admin open so the
+    # live route is never broken by a partial configuration.
+    admin_basic_auth_user: str = ""
+    admin_basic_auth_password: str = ""
+
+    # Raw payload retention — files older than this many days are pruned by the
+    # retention job/script. 0 (default) disables pruning entirely.
+    raw_payload_retention_days: int = 0
+
     # Proxy rotation — comma-separated list of proxy URLs (http:// or socks5://)
     # Example: http://user:pass@proxy1:8080,socks5://proxy2:1080
     proxy_urls: str = ""

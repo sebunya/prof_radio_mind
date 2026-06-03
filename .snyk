@@ -1,0 +1,15 @@
+# Snyk policy file — https://docs.snyk.io/snyk-cli/snyk-policy-file
+# Add vulnerability ignores here with a reason and expiry date.
+# Example:
+#   ignore:
+#     SNYK-PYTHON-SOMEPACKAGE-12345:
+#       - '*':
+#           reason: No fix available; mitigated by network isolation
+#           expires: 2025-12-31T00:00:00.000Z
+
+version: v1.25.0
+
+# No ignores configured yet — all HIGH/CRITICAL findings must be fixed.
+ignore: {}
+
+patch: {}
