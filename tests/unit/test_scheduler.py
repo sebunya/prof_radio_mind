@@ -161,7 +161,7 @@ async def test_capital_job_invokes_collector() -> None:
 
     _sched = "app.infrastructure.scheduler.scheduler"
     with (
-        patch(f"{_sched}.CapitalIHeartCollector", return_value=mock_collector),
+        patch(f"{_sched}.OnlineRadioBoxCollector", return_value=mock_collector),
         patch(f"{_sched}._persist_result", new_callable=AsyncMock),
     ):
         await job_collect_capital_now_playing()

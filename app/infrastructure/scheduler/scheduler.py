@@ -10,9 +10,9 @@ from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 
 from app.core.settings import settings
-from app.infrastructure.collectors.capital_iheart import CapitalIHeartCollector
 from app.infrastructure.collectors.kiis_iheart import KIISIHeartCollector
 from app.infrastructure.collectors.nova_radiowave import NovaRadiowaveCollector
+from app.infrastructure.collectors.online_radio_box import OnlineRadioBoxCollector
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +23,11 @@ _NOVA_SOURCE_ID = uuid.uuid5(_NS, "source.NOVA969.radiowave")
 _KIIS_STATION_ID = uuid.uuid5(_NS, "station.KIISFM")
 _KIIS_SOURCE_ID = uuid.uuid5(_NS, "source.KIISFM.iheart")
 _CAPITAL_STATION_ID = uuid.uuid5(_NS, "station.CAPITALFM")
-_CAPITAL_SOURCE_ID = uuid.uuid5(_NS, "source.CAPITALFM.iheart")
+_CAPITAL_SOURCE_ID = uuid.uuid5(_NS, "source.CAPITALFM.online_radio_box")
+
+_scheduler: AsyncIOScheduler | None = None
+_CAPITAL_FAILURES = 0
+_FAILURE_THRESHOLD = 5
 
 
 async def _persist_result(result: object) -> None:
@@ -109,20 +113,62 @@ async def job_collect_kiis_now_playing() -> None:
 
 
 async def job_collect_capital_now_playing() -> None:
-    """Poll Capital FM iHeart now-playing endpoint (runs every 5 minutes)."""
-    collector = CapitalIHeartCollector(
+    """Poll Capital FM Online Radio Box page (runs every 15 minutes)."""
+    global _CAPITAL_FAILURES
+
+    collector = OnlineRadioBoxCollector(
         source_id=_CAPITAL_SOURCE_ID,
         station_id=_CAPITAL_STATION_ID,
         storage_root=settings.raw_payload_storage_path,
     )
-    result = await collector.run()
-    logger.debug(
-        "capital_now_playing status=%s plays=%d no_tracks=%d",
-        result.collector_run.status.value,
-        len(result.play_events),
-        len(result.no_track_events),
-    )
-    await _persist_result(result)
+
+    try:
+        result = await collector.run()
+        status_val = result.collector_run.status
+
+        # MONITOR Log for tracking runs
+        logger.info(
+            "[MONITOR] capital_now_playing status=%s plays=%d no_tracks=%d",
+            status_val.value,
+            len(result.play_events),
+            len(result.no_track_events),
+        )
+
+        from app.domain.entities.collector_run import CollectorStatus
+        if status_val == CollectorStatus.FAILED:
+            _CAPITAL_FAILURES += 1
+            logger.warning(
+                "[MONITOR] capital_now_playing_failed consecutive_failures=%d",
+                _CAPITAL_FAILURES,
+            )
+        else:
+            _CAPITAL_FAILURES = 0  # reset consecutive failure count
+
+        await _persist_result(result)
+
+    except Exception as exc:
+        _CAPITAL_FAILURES += 1
+        logger.error(
+            "[MONITOR] capital_now_playing_exception error=%s consecutive_failures=%d",
+            exc,
+            _CAPITAL_FAILURES,
+        )
+
+    if _CAPITAL_FAILURES >= _FAILURE_THRESHOLD:
+        logger.critical(
+            "[MONITOR] capital_now_playing_paused reason=threshold_exceeded threshold=%d",
+            _FAILURE_THRESHOLD,
+        )
+        global _scheduler
+        if _scheduler:
+            try:
+                _scheduler.pause_job("capital_now_playing")
+                logger.critical(
+                    "[MONITOR] capital_now_playing_paused_success "
+                    "job_id=capital_now_playing"
+                )
+            except Exception as e:
+                logger.error("Failed to pause scheduler job: %s", e)
 
 
 async def job_nightly_reconciliation() -> None:
@@ -199,7 +245,9 @@ async def job_nightly_reconciliation() -> None:
 
 def build_scheduler() -> AsyncIOScheduler:
     """Create and configure the APScheduler instance with all registered jobs."""
+    global _scheduler
     sched = AsyncIOScheduler(timezone="UTC")
+    _scheduler = sched
 
     # Nova Radiowave diary — 16:00 UTC daily (02:00 AEST)
     if settings.enable_nova_collector:
@@ -229,19 +277,22 @@ def build_scheduler() -> AsyncIOScheduler:
     else:
         logger.info("Scheduler skipped job: KIIS-FM iHeart now-playing poll (disabled)")
 
-    # Capital FM iHeart now-playing — every 5 minutes
+    # Capital FM Online Radio Box now-playing — every 15 minutes (low frequency)
     if settings.enable_capital_collector:
         sched.add_job(
             job_collect_capital_now_playing,
-            IntervalTrigger(minutes=5),
+            IntervalTrigger(minutes=15),
             id="capital_now_playing",
-            name="Capital FM iHeart now-playing poll",
+            name="Capital FM Online Radio Box now-playing poll",
             replace_existing=True,
             misfire_grace_time=60,
         )
-        logger.info("Scheduler registered job: Capital FM iHeart now-playing poll")
+        logger.info("Scheduler registered job: Capital FM Online Radio Box now-playing poll")
     else:
-        logger.info("Scheduler skipped job: Capital FM iHeart now-playing poll (disabled)")
+        logger.info(
+            "Scheduler skipped job: Capital FM Online Radio Box "
+            "now-playing poll (disabled)"
+        )
 
     # Nightly reconciliation — 17:00 UTC daily (03:00 AEST)
     if settings.enable_nightly_reconciliation:
