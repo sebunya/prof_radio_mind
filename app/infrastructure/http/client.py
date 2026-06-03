@@ -23,7 +23,7 @@ import httpx
 
 from app.core.settings import settings
 
-# Realistic browser User-Agent pool — rotate to avoid trivial bot detection
+# Browser User-Agent pool — rotate so requests vary the User-Agent header
 _USER_AGENTS: list[str] = [
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",

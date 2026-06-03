@@ -67,6 +67,23 @@ async def _persist_result(result: object) -> None:
                     play_event.fingerprint = compute_fingerprint(
                         clean_artist, play_event.raw_title
                     )
+
+                # Skip if this now-playing event is a duplicate of a recent save.
+                # Use a 1 800-second (30-minute) window — 2× the Capital FM poll
+                # interval — so a song still playing on consecutive polls is stored
+                # once, while a legitimate replay hours later is captured.
+                if play_event.fingerprint and await play_repo.exists_by_fingerprint(
+                    play_event.station_id,
+                    play_event.fingerprint,
+                    within_seconds=1800,
+                ):
+                    logger.debug(
+                        "persist_result_skip_duplicate station_id=%s fingerprint=%s",
+                        play_event.station_id,
+                        play_event.fingerprint,
+                    )
+                    continue
+
                 await play_repo.save(play_event)
 
             no_track_repo = SQLNoTrackEventRepository(session)
