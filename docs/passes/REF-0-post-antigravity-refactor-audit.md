@@ -321,6 +321,73 @@ ssh root@178.105.238.18 'cd /opt/rmias && git reset --hard HEAD~1 && docker comp
 
 ## Next Recommended Pass
 
-- **REF-1** — Add DB-level unique constraint on `play_events` (requires migration design + approval)  
-- **CAP-4 resume** — Resume Capital FM canary with fixed rollback script and dedup protection now in place  
-- **SEC-1** — Disable `/docs` in production and protect `/admin/` via Cloudflare Access
+- **CAP-4 resume** — Resume Capital FM canary with fixed rollback script and dedup protection now in place
+
+---
+
+## Follow-up — Open Risks Resolved (approved 2026-06-03)
+
+After the initial audit the four open risks were approved for remediation. All
+fixes are env-gated and default to the existing behaviour so nothing breaks on
+deploy without explicit configuration.
+
+### Resolved #6 + #7 — `/docs` and `/admin/` exposure
+
+- **`/docs`, `/redoc`, `/openapi.json` are now hidden when `APP_ENV=production`**
+  unless `ENABLE_DOCS_IN_PRODUCTION=true`. Verified: in production env
+  `/openapi.json` returns 404 and the root route no longer advertises `/docs`.
+  `/health` and `/` remain 200.
+- **Optional HTTP Basic auth in front of `/admin`** via new
+  `AdminBasicAuthMiddleware`. Disabled unless BOTH `ADMIN_BASIC_AUTH_USER` and
+  `ADMIN_BASIC_AUTH_PASSWORD` are set, so the live `/admin/` SPA is never broken
+  by a partial config. Only `/admin*` paths are gated; root/health/API are
+  unaffected. Constant-time credential comparison.
+
+### Resolved #8 — DB-level duplicate guard on `play_events`
+
+New migration `c4e2a1f9b8d7_phase_e_play_events_dedup_index`:
+
+- **Non-destructive.** Existing exact duplicates (same `station_id` +
+  `fingerprint` + `played_at`) are flagged `is_duplicate = true` (earliest row
+  per group kept), preserving the full audit trail. No rows deleted.
+- Adds a **partial unique index** `uq_play_events_station_fp_playedat` on
+  `(station_id, fingerprint, played_at)` `WHERE is_duplicate = false AND
+  fingerprint IS NOT NULL`.
+- Plain columns only → immutable & indexable on the timestamptz column.
+- This is a **backstop** to the application-level 30-minute fingerprint window
+  added in REF-0. It catches exact double-inserts (retries/double-commits)
+  without rejecting legitimate replays, which always have a different
+  `played_at`.
+- **Not yet applied to a live DB.** Apply with `alembic upgrade head` as part of
+  deployment. Live apply could not be executed in the audit sandbox (no running
+  Postgres / Docker daemon available, and Postgres refuses to run as root). The
+  revision chain validates to a single linear head and the SQL was reviewed.
+
+### Resolved #9 — Raw payload retention
+
+New tool `app/tools/prune_raw_payloads.py`:
+
+- Deletes on-disk payloads older than `RAW_PAYLOAD_RETENTION_DAYS` and removes
+  empty date directories. **No-op when the value is 0 (default).**
+- Never touches the database — `raw_payloads` rows are kept as an audit trail.
+- Run inside the container:
+  `docker exec rmias-app-1 python -m app.tools.prune_raw_payloads`
+- Recommended host cron once retention is set:
+  `0 4 * * * docker exec rmias-app-1 python -m app.tools.prune_raw_payloads`
+
+### Still open
+
+- **Risk #10 (Docker runs as root on host)** — infrastructure-level; not a code
+  change. Migrate to rootless Docker / dedicated deploy user post-stabilisation.
+- **Risk #11 (CAP-4 canary completion)** — verify production flags manually
+  before resuming.
+
+### Follow-up tests
+
+| File | Tests |
+|------|-------|
+| `tests/unit/test_admin_auth.py` | 5 — open-by-default, auth required when set, correct/wrong creds, non-admin paths unaffected |
+| `tests/unit/test_docs_gating.py` | 5 — gating expression + live app docs availability |
+| `tests/unit/test_prune_raw_payloads.py` | 5 — disabled no-op, missing root, prune old/keep recent, empty-dir cleanup, boundary |
+
+**Test total after follow-up: 348 passed, 0 failed. Ruff clean. Mypy clean.**

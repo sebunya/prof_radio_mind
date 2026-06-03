@@ -18,6 +18,7 @@ from app.api.routes.review import router as review_router
 from app.api.routes.sources import router as sources_router
 from app.api.routes.stations import router as stations_router
 from app.api.routes.webhooks import router as webhooks_router
+from app.core.admin_auth import AdminBasicAuthMiddleware
 from app.core.logging_config import configure_logging
 from app.core.settings import settings
 from app.infrastructure.database.session import dispose_engine
@@ -58,11 +59,23 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         await dispose_engine()
 
 
+# Hide interactive API docs in production unless explicitly forced on.
+_docs_enabled = settings.app_env != "production" or settings.enable_docs_in_production
+_docs_url = "/docs" if _docs_enabled else None
+_redoc_url = "/redoc" if _docs_enabled else None
+_openapi_url = "/openapi.json" if _docs_enabled else None
+
 app = FastAPI(
     title="Radio Music Intelligence & Automation System",
     version="0.1.0",
     lifespan=lifespan,
+    docs_url=_docs_url,
+    redoc_url=_redoc_url,
+    openapi_url=_openapi_url,
 )
+
+# Optional HTTP Basic auth in front of /admin (no-op unless credentials set).
+app.add_middleware(AdminBasicAuthMiddleware)
 
 app.include_router(health_router)
 app.include_router(stations_router)
@@ -79,16 +92,18 @@ app.include_router(backfill_router)
 
 @app.get("/", include_in_schema=False)
 async def root() -> dict[str, object]:
+    endpoints: dict[str, str] = {
+        "health": "/health",
+        "admin": "/admin",
+    }
+    if _docs_enabled:
+        endpoints["api_docs"] = "/docs"
     return {
         "status": "ok",
         "service": "TenX Radar",
         "description": "Radio Music Intelligence & Automation System",
         "version": "0.1.0",
-        "endpoints": {
-            "health": "/health",
-            "admin": "/admin",
-            "api_docs": "/docs",
-        },
+        "endpoints": endpoints,
         "components": {
             "scheduler": "stopped",
             "collectors": "disabled",
