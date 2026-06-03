@@ -1,18 +1,23 @@
 FROM python:3.12-slim AS production
 
-# Create non-root user early so pip cache is owned correctly
+# Create non-root user early
 RUN addgroup --system rmias && adduser --system --ingroup rmias rmias
 
 WORKDIR /app
 
-# Install dependencies first (cache layer — only invalidated when pyproject.toml changes)
-COPY pyproject.toml ./
-RUN pip install --no-cache-dir . && pip install --no-cache-dir ".[dev]"
-
-# Copy application source
+# Copy package metadata and application code before installing the package.
+# pyproject.toml references README.md and packages = ["app"], so these must exist at install time.
+COPY pyproject.toml README.md ./
 COPY app ./app
 
-# Raw payload storage — mounted as a volume in production
+# Copy migration files so `alembic upgrade head` works inside the app container.
+COPY alembic.ini ./
+COPY migrations ./migrations
+
+# Install runtime dependencies only.
+RUN pip install --no-cache-dir .
+
+# Raw payload storage — mounted as a volume in production.
 RUN mkdir -p /data/raw_payloads && chown -R rmias:rmias /data
 
 USER rmias
