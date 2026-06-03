@@ -25,9 +25,12 @@ def test_station_seeds_call_signs() -> None:
     assert call_signs == {"NOVA969", "KIISFM", "CAPITALFM"}
 
 
-def test_station_seeds_are_au() -> None:
+def test_station_seeds_countries() -> None:
     for seed in STATION_SEEDS:
-        assert seed.country_code == "AU"
+        if seed.call_sign == "CAPITALFM":
+            assert seed.country_code == "GB"
+        else:
+            assert seed.country_code == "AU"
 
 
 def test_nova_has_radiowave_source() -> None:

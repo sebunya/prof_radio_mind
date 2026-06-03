@@ -202,43 +202,59 @@ def build_scheduler() -> AsyncIOScheduler:
     sched = AsyncIOScheduler(timezone="UTC")
 
     # Nova Radiowave diary — 16:00 UTC daily (02:00 AEST)
-    sched.add_job(
-        job_collect_nova_diary,
-        CronTrigger(hour=16, minute=0, timezone="UTC"),
-        id="nova_daily_diary",
-        name="Nova 96.9 Radiowave diary",
-        replace_existing=True,
-        misfire_grace_time=3600,
-    )
+    if settings.enable_nova_collector:
+        sched.add_job(
+            job_collect_nova_diary,
+            CronTrigger(hour=16, minute=0, timezone="UTC"),
+            id="nova_daily_diary",
+            name="Nova 96.9 Radiowave diary",
+            replace_existing=True,
+            misfire_grace_time=3600,
+        )
+        logger.info("Scheduler registered job: Nova 96.9 Radiowave diary")
+    else:
+        logger.info("Scheduler skipped job: Nova 96.9 Radiowave diary (disabled)")
 
     # KIIS iHeart now-playing — every 5 minutes
-    sched.add_job(
-        job_collect_kiis_now_playing,
-        IntervalTrigger(minutes=5),
-        id="kiis_now_playing",
-        name="KIIS-FM iHeart now-playing poll",
-        replace_existing=True,
-        misfire_grace_time=60,
-    )
+    if settings.enable_kiis_collector:
+        sched.add_job(
+            job_collect_kiis_now_playing,
+            IntervalTrigger(minutes=5),
+            id="kiis_now_playing",
+            name="KIIS-FM iHeart now-playing poll",
+            replace_existing=True,
+            misfire_grace_time=60,
+        )
+        logger.info("Scheduler registered job: KIIS-FM iHeart now-playing poll")
+    else:
+        logger.info("Scheduler skipped job: KIIS-FM iHeart now-playing poll (disabled)")
 
     # Capital FM iHeart now-playing — every 5 minutes
-    sched.add_job(
-        job_collect_capital_now_playing,
-        IntervalTrigger(minutes=5),
-        id="capital_now_playing",
-        name="Capital FM iHeart now-playing poll",
-        replace_existing=True,
-        misfire_grace_time=60,
-    )
+    if settings.enable_capital_collector:
+        sched.add_job(
+            job_collect_capital_now_playing,
+            IntervalTrigger(minutes=5),
+            id="capital_now_playing",
+            name="Capital FM iHeart now-playing poll",
+            replace_existing=True,
+            misfire_grace_time=60,
+        )
+        logger.info("Scheduler registered job: Capital FM iHeart now-playing poll")
+    else:
+        logger.info("Scheduler skipped job: Capital FM iHeart now-playing poll (disabled)")
 
     # Nightly reconciliation — 17:00 UTC daily (03:00 AEST)
-    sched.add_job(
-        job_nightly_reconciliation,
-        CronTrigger(hour=17, minute=0, timezone="UTC"),
-        id="nightly_reconciliation",
-        name="Nightly deduplication & normalization reconciliation",
-        replace_existing=True,
-        misfire_grace_time=3600,
-    )
+    if settings.enable_nightly_reconciliation:
+        sched.add_job(
+            job_nightly_reconciliation,
+            CronTrigger(hour=17, minute=0, timezone="UTC"),
+            id="nightly_reconciliation",
+            name="Nightly deduplication & normalization reconciliation",
+            replace_existing=True,
+            misfire_grace_time=3600,
+        )
+        logger.info("Scheduler registered job: Nightly reconciliation")
+    else:
+        logger.info("Scheduler skipped job: Nightly reconciliation (disabled)")
 
     return sched

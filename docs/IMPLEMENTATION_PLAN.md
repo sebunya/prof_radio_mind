@@ -173,7 +173,7 @@ Final stack per cross-model audit (DeepSeek backbone, Qwen engineering detail, G
 - Raw payload storage with SHA-256 hashing
 - Radiowave parser and Nova collector
 - KIIS/iHeart validator and collector
-- Capital validation adapter
+- Capital validation adapter (Online Radio Box candidate)
 - Manual CSV import fallback
 - Play events and no-track events
 - Normalization, matching, deduplication
@@ -263,16 +263,17 @@ To change any protected decision, create a new ADR in `docs/adr/` before impleme
 | Emergency | Manual CSV |
 | MVP status | Committed with validation checkpoint |
 
-### Capital FM London
+### Capital FM UK
 
 | Item | Value |
 |---|---|
-| Primary source | First validated stable route |
-| Routes to validate | Public last-played page, Global Player API, third-party diary, licensed/partner data |
-| MVP status | Conditional — validation-gated |
-| Automation launch blocker | No |
-| Fallback | Manual CSV (always required regardless of automation) |
-| Playwright | Not the default; only if httpx routes fail and reason is documented |
+| call_sign | CAPITALFM (stable internal key) |
+| Identity | London, GB, 95.8 FM |
+| Primary source | Online Radio Box Candidate (`https://onlineradiobox.com/uk/capitalfmuk/`) |
+| MVP status | Conditional — validation-gated. Disabled by default. |
+| Automation launch blocker | No (manual CSV fallback remains primary until automated candidate passes validation) |
+| Fallback | Manual CSV (always required regardless of automation status) |
+| Database migration risk | Existing seeded DB deployments containing Capital Sydney/iHeart require controlled data correction before production. |
 
 ---
 
@@ -388,7 +389,7 @@ Docker Compose on a single VPS or cloud VM.
 | Radiowave DOM selectors may have changed | High | Unvalidated — must fixture-test against a real snapshot |
 | KIIS station ID 2501 is unconfirmed | High | Must validate before production use |
 | KIIS iHeart endpoint stability | Medium | Unknown — must validate |
-| Capital automated route | High | Completely unvalidated — gated |
+| Capital automated route | High | Online Radio Box candidate is completely unvalidated — gated by default |
 | Capital public page may require JS rendering | Medium | Will determine during validation pass |
 | Radiowave IDDS=5080 for KIIS | Medium | Not yet validated |
 | Nova StreamTheWorld ICY | Low | Deferred, not MVP |

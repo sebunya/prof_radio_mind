@@ -281,7 +281,7 @@ Before declaring any pass complete, the following must pass (or the reason for s
 
 - [ ] Source config loader
 - [ ] Station seeds (Nova, KIIS, Capital)
-- [ ] Source seeds (Radiowave IDDS=11129, iHeart 2501 unconfirmed, Capital unvalidated)
+- [ ] Source seeds (Radiowave IDDS=11129, KIIS iHeart 2501 unconfirmed, Capital UK Online Radio Box candidate unvalidated)
 - [ ] Source route priority records
 - [ ] SourceValidationAdapter abstract base
 - [ ] Source validation command (run validation against a fixture or live and store result)
@@ -432,4 +432,4 @@ After every pass, provide:
 |---|---|---|---|
 | Nova 96.9 | Radiowave IDDS=11129 | (none in MVP) | Manual CSV |
 | KIIS-FM | iHeart endpoint (val. req.) | Radiowave IDDS=5080 (val. req.) | Manual CSV |
-| Capital FM | First validated route | (none confirmed) | Manual CSV |
+| Capital FM UK | Online Radio Box Candidate | (none in MVP) | Manual CSV |

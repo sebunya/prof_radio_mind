@@ -30,10 +30,13 @@ STATION_SEEDS: tuple[StationSeed, ...] = (
         frequency="106.5 FM",
         city="Sydney",
     ),
+    # CAPITALFM is retained as the stable internal key for deterministic UUID compatibility.
+    # It represents Capital FM UK / London. Do not rename without a migration.
     StationSeed(
         call_sign="CAPITALFM",
-        name="Capital FM",
-        frequency="96.1 FM",
-        city="Sydney",
+        name="Capital FM UK",
+        frequency="95.8 FM",
+        city="London",
+        country_code="GB",
     ),
 )

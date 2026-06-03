@@ -8,6 +8,7 @@ from enum import StrEnum
 class SourceType(StrEnum):
     RADIOWAVE = "radiowave"
     IHEART = "iheart"
+    ONLINE_RADIO_BOX = "online_radio_box"
     MANUAL_CSV = "manual_csv"
     UNKNOWN = "unknown"
 

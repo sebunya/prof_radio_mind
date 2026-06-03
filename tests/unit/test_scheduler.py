@@ -18,48 +18,71 @@ from app.infrastructure.scheduler.scheduler import (
 
 # --- Job registration ---
 
-def test_scheduler_has_four_jobs() -> None:
-    sched = build_scheduler()
-    assert len(sched.get_jobs()) == 4
+def test_scheduler_default_no_jobs() -> None:
+    from app.core.settings import settings
+    with (
+        patch.object(settings, "enable_nova_collector", False),
+        patch.object(settings, "enable_kiis_collector", False),
+        patch.object(settings, "enable_capital_collector", False),
+        patch.object(settings, "enable_nightly_reconciliation", False),
+    ):
+        sched = build_scheduler()
+        assert len(sched.get_jobs()) == 0
 
 
-def test_scheduler_job_ids() -> None:
-    sched = build_scheduler()
-    ids = {j.id for j in sched.get_jobs()}
-    assert ids == {
-        "nova_daily_diary",
-        "kiis_now_playing",
-        "capital_now_playing",
-        "nightly_reconciliation",
-    }
+def test_scheduler_all_enabled_has_four_jobs() -> None:
+    from app.core.settings import settings
+    with (
+        patch.object(settings, "enable_nova_collector", True),
+        patch.object(settings, "enable_kiis_collector", True),
+        patch.object(settings, "enable_capital_collector", True),
+        patch.object(settings, "enable_nightly_reconciliation", True),
+    ):
+        sched = build_scheduler()
+        assert len(sched.get_jobs()) == 4
+        ids = {j.id for j in sched.get_jobs()}
+        assert ids == {
+            "nova_daily_diary",
+            "kiis_now_playing",
+            "capital_now_playing",
+            "nightly_reconciliation",
+        }
 
 
 def test_nova_job_uses_cron_trigger() -> None:
-    sched = build_scheduler()
-    job = sched.get_job("nova_daily_diary")
-    assert job is not None
-    assert isinstance(job.trigger, CronTrigger)
+    from app.core.settings import settings
+    with patch.object(settings, "enable_nova_collector", True):
+        sched = build_scheduler()
+        job = sched.get_job("nova_daily_diary")
+        assert job is not None
+        assert isinstance(job.trigger, CronTrigger)
 
 
 def test_kiis_job_uses_interval_trigger() -> None:
-    sched = build_scheduler()
-    job = sched.get_job("kiis_now_playing")
-    assert job is not None
-    assert isinstance(job.trigger, IntervalTrigger)
+    from app.core.settings import settings
+    with patch.object(settings, "enable_kiis_collector", True):
+        sched = build_scheduler()
+        job = sched.get_job("kiis_now_playing")
+        assert job is not None
+        assert isinstance(job.trigger, IntervalTrigger)
 
 
 def test_capital_job_uses_interval_trigger() -> None:
-    sched = build_scheduler()
-    job = sched.get_job("capital_now_playing")
-    assert job is not None
-    assert isinstance(job.trigger, IntervalTrigger)
+    from app.core.settings import settings
+    with patch.object(settings, "enable_capital_collector", True):
+        sched = build_scheduler()
+        job = sched.get_job("capital_now_playing")
+        assert job is not None
+        assert isinstance(job.trigger, IntervalTrigger)
 
 
 def test_reconciliation_job_uses_cron_trigger() -> None:
-    sched = build_scheduler()
-    job = sched.get_job("nightly_reconciliation")
-    assert job is not None
-    assert isinstance(job.trigger, CronTrigger)
+    from app.core.settings import settings
+    with patch.object(settings, "enable_nightly_reconciliation", True):
+        sched = build_scheduler()
+        job = sched.get_job("nightly_reconciliation")
+        assert job is not None
+        assert isinstance(job.trigger, CronTrigger)
 
 
 def test_build_scheduler_returns_asyncio_scheduler() -> None:

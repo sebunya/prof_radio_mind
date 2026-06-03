@@ -7,6 +7,7 @@ A resilient radio music intelligence platform for automated airplay extraction, 
 ## Project Status
 
 **Pass 1 complete** — project skeleton, health endpoint, Docker Compose.
+*The repo contains additional implementation beyond the original Pass 1 skeleton; documentation is being reconciled through pass-based updates.*
 
 See [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md) for the full pass plan.
 

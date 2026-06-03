@@ -152,3 +152,43 @@ class CapitalWebsiteValidationAdapter(SourceValidationAdapter):
             notes=f"Endpoint reachable, HTTP {response.status_code}",
             response_status_code=response.status_code,
         )
+
+
+class CapitalOnlineRadioBoxValidationAdapter(SourceValidationAdapter):
+    """Validates the Capital FM UK Online Radio Box candidate source.
+
+    VAL-CAPUK-ORB-001: Online Radio Box page reachability — UNVALIDATED
+    """
+
+    validation_code = "VAL-CAPUK-ORB-001"
+
+    async def validate(self, source_id: uuid.UUID, config: dict | None) -> ValidationResult:
+        url = (config or {}).get("base_url") or "https://onlineradiobox.com/uk/capitalfmuk/"
+
+        try:
+            async with httpx.AsyncClient(timeout=_REQUEST_TIMEOUT) as client:
+                response = await client.get(url)
+        except Exception as exc:
+            return ValidationResult(
+                source_id=source_id,
+                validation_code=self.validation_code,
+                status=ValidationStatus.FAILED,
+                notes=f"Network error: {exc}",
+            )
+
+        if response.status_code != 200:
+            return ValidationResult(
+                source_id=source_id,
+                validation_code=self.validation_code,
+                status=ValidationStatus.FAILED,
+                notes=f"Unexpected HTTP status: {response.status_code}",
+                response_status_code=response.status_code,
+            )
+
+        return ValidationResult(
+            source_id=source_id,
+            validation_code=self.validation_code,
+            status=ValidationStatus.VALIDATED,
+            notes="Online Radio Box station page is reachable and returns HTTP 200",
+            response_status_code=200,
+        )
