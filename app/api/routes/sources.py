@@ -42,7 +42,11 @@ async def validate_source(
     session: AsyncSession = Depends(get_db),
 ) -> ValidationResultResponse:
     """Run the appropriate validation adapter for a source and persist the result."""
-    from app.application.validation.adapters.capital import CapitalIHeartValidationAdapter
+    from app.application.validation.adapters.capital import (
+        CapitalIHeartValidationAdapter,
+        CapitalOnlineRadioBoxValidationAdapter,
+    )
+    from app.application.validation.base import SourceValidationAdapter
     from app.infrastructure.database.repositories.source_repo import SQLSourceRepository
     from app.infrastructure.database.repositories.source_validation_repo import (
         SQLSourceValidationRepository,
@@ -56,8 +60,11 @@ async def validate_source(
     st = source.source_type
     source_type = st.value if hasattr(st, "value") else str(st)
 
+    adapter: SourceValidationAdapter
     if source_type == "iheart":
         adapter = CapitalIHeartValidationAdapter()
+    elif source_type == "online_radio_box":
+        adapter = CapitalOnlineRadioBoxValidationAdapter()
     else:
         raise HTTPException(
             status_code=422,

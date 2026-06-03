@@ -118,9 +118,26 @@ def test_health_components_has_review_queue_pending(client: TestClient) -> None:
 
 
 def test_health_scheduler_running_with_lifespan() -> None:
+    from unittest.mock import patch
+
+    from app.core.settings import settings
     from app.main import app
 
-    with TestClient(app, raise_server_exceptions=True) as lifespan_client:
-        r = lifespan_client.get("/health")
-        assert r.status_code == 200
-        assert r.json()["components"]["scheduler"] == "running"
+    with patch.object(settings, "scheduler_enabled", True):
+        with TestClient(app, raise_server_exceptions=True) as lifespan_client:
+            r = lifespan_client.get("/health")
+            assert r.status_code == 200
+            assert r.json()["components"]["scheduler"] == "running"
+
+
+def test_health_scheduler_stopped_when_disabled() -> None:
+    from unittest.mock import patch
+
+    from app.core.settings import settings
+    from app.main import app
+
+    with patch.object(settings, "scheduler_enabled", False):
+        with TestClient(app, raise_server_exceptions=True) as lifespan_client:
+            r = lifespan_client.get("/health")
+            assert r.status_code == 200
+            assert r.json()["components"]["scheduler"] == "stopped"

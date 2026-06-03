@@ -67,23 +67,38 @@ SOURCE_SEEDS: tuple[SourceSeed, ...] = (
         validation_note="Always available — manual fallback",
     ),
     # --- Capital FM ---
-    # VAL-CAP-001: iHeart station ID is UNVALIDATED — placeholder used until confirmed
+    # VAL-CAPUK-ORB-001: Online Radio Box candidate source is UNVALIDATED
     SourceSeed(
         station_call_sign="CAPITALFM",
-        source_type=SourceType.IHEART,
-        name="Capital FM iHeart Now Playing",
-        base_url="https://api.iheart.com/api/v3/live-meta/stream",
-        config={"station_id": "capitalfm"},
+        source_type=SourceType.ONLINE_RADIO_BOX,
+        name="Capital FM UK Online Radio Box Candidate",
+        base_url="https://onlineradiobox.com/uk/capitalfmuk/",
+        config={
+            "station_slug": "capitalfmuk",
+            "market": "uk",
+            "city": "London",
+            "country_code": "GB",
+            "validation_status": "UNVALIDATED",
+            "parser_status": "NOT_BUILT",
+            "source_page_type": "online_radio_box_station_page",
+        },
         priority=1,
-        validation_note="UNVALIDATED — VAL-CAP-001 must confirm iHeart station_id before enable",
+        validation_note=(
+            "UNVALIDATED — Capital FM UK Online Radio Box candidate source. "
+            "Parser, fixture extraction, polling cadence and source behavior "
+            "must be validated before enabling automated collection."
+        ),
     ),
     SourceSeed(
         station_call_sign="CAPITALFM",
         source_type=SourceType.MANUAL_CSV,
-        name="Capital FM Manual CSV Fallback",
+        name="Capital FM UK Manual CSV Fallback",
         base_url=None,
         config=None,
         priority=99,
-        validation_note="Always available — manual fallback",
+        validation_note=(
+            "Always available — manual fallback. "
+            "Import schema must still be tested before client-facing reporting."
+        ),
     ),
 )

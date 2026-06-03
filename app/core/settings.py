@@ -11,6 +11,13 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+asyncpg://rmias:rmias@db:5432/rmias"
     raw_payload_storage_path: str = "/data/raw_payloads"
 
+    # Scheduler gating
+    scheduler_enabled: bool = False
+    enable_nova_collector: bool = False
+    enable_kiis_collector: bool = False
+    enable_capital_collector: bool = False
+    enable_nightly_reconciliation: bool = False
+
     # Security
     max_upload_bytes: int = 10 * 1024 * 1024  # 10 MB
     rate_limit_rpm: int = 30

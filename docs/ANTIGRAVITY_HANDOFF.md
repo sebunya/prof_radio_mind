@@ -1,151 +1,87 @@
 # Radio Music Intelligence & Automation System
 # AntiGravity Handoff Note
-# Pass 1 — Project Skeleton
-# Last updated: 2026-05-24
+# Pass CAP-UK-0 — Capital FM UK Identity, Source Candidate & Scheduler Safety Pass
+# Last updated: 2026-06-03
 
 ---
 
 ## What This Pass Did
 
-Pass 1 created the minimal production-quality project skeleton.
+Pass CAP-UK-0 successfully audited the repository workspace, aligned the third MVP station to **Capital FM UK** (London, GB, 95.8 FM), candidate its automated source to Online Radio Box, and established robust safety gates for the background scheduler.
 
-A Python 3.12 virtual environment was created, all dependencies installed, all tests passed (4/4), ruff passed, mypy passed on all 5 source files. Docker daemon was not running in the remote execution environment (no /var/run/docker.sock), so docker build and docker compose up were skipped as environment constraints — not code failures. The Dockerfile and docker-compose.yml are present and syntactically correct.
+Key achievements:
+1. **Workspace Verification**: Restored the Git tracking configuration in the empty MacBook folder `/Users/robertsebunya/Documents/Prof_Mind` and integrated the downloaded zip files to form a clean workspace tracking origin/main.
+2. **Business Correction**: Corrected Capital FM's public identity from Sydney/Australia/96.1 FM to Capital FM UK (London, GB, 95.8 FM). Kept call sign `CAPITALFM` internally to preserve deterministic UUID5 IDs and avoid database orphans.
+3. **Candidate Source Correction**: Changed the primary automated candidate for Capital FM UK from the unvalidated iHeart placeholder to the Online Radio Box candidate (`https://onlineradiobox.com/uk/capitalfmuk/`). Added `ONLINE_RADIO_BOX` to the `SourceType` StrEnum.
+4. **Scheduler Gating**: Implemented settings flags (`SCHEDULER_ENABLED`, `ENABLE_NOVA_COLLECTOR`, `ENABLE_KIIS_COLLECTOR`, `ENABLE_CAPITAL_COLLECTOR`, `ENABLE_NIGHTLY_RECONCILIATION`) in `Settings` and `.env.example`.
+5. **Lifespan Context & Job Registration Protection**: Updated `main.py` lifespan and `scheduler.py` job registration to respect these switches. By default, the scheduler is disabled and registers zero jobs, preventing unauthorized or accidental live scraping.
+6. **Validation Adaptation**: Created the `CapitalOnlineRadioBoxValidationAdapter` to validate reachability for the candidate page and registered it in the sources route.
+7. **Quality Gates & Tests**: Added and updated unit tests (e.g. source seeds country test, scheduler gating, validation adapter tests) and updated a failing lifespan health test to match the disabled-by-default scheduler. All 307 unit tests, ruff check, and mypy check pass cleanly.
 
 ---
 
 ## Exact Files Changed
 
 ### Created
-
-- `pyproject.toml` — project metadata, dependencies, ruff/mypy/pytest config
-- `app/__init__.py`
-- `app/main.py` — FastAPI app instance, health router included
-- `app/api/__init__.py`
-- `app/api/routes/__init__.py`
-- `app/api/routes/health.py` — GET /health endpoint, HealthResponse Pydantic model
-- `tests/__init__.py`
-- `tests/conftest.py` — pytest `client` fixture (TestClient)
-- `tests/unit/__init__.py`
-- `tests/unit/test_health.py` — 4 health endpoint tests
-- `Dockerfile` — python:3.12-slim, uvicorn entrypoint
-- `docker-compose.yml` — app + PostgreSQL 16 services
-- `.env.example` — all required env vars, no secrets
-- `.gitignore` — standard Python + data + .env exclusions
-- `tests/fixtures/html/.gitkeep`
-- `tests/fixtures/json/.gitkeep`
-- `tests/fixtures/csv/.gitkeep`
-- `tests/fixtures/golden/.gitkeep`
-- `tests/integration/.gitkeep`
-- `migrations/.gitkeep`
-- `scripts/.gitkeep`
+- `docs/passes/CAP-UK-0-capital-fm-uk-amendment-plan.md` — Technical plan and risk assessment
+- `docs/passes/CAP-UK-0-task.md` — Tasks progress checklist
 
 ### Modified
+- `app/domain/entities/source.py` — Added `ONLINE_RADIO_BOX` enum value
+- `app/application/source_config/station_seeds.py` — Updated Capital FM UK station seed metadata and added UUID compatibility comment
+- `app/application/source_config/source_seeds.py` — Updated Capital automated and manual CSV source seeds and wrapped validation notes strings
+- `app/core/settings.py` — Added scheduler master switch and per-collector gating flags
+- `app/main.py` — Gated scheduler startup/shutdown in lifespan context manager
+- `app/infrastructure/scheduler/scheduler.py` — Gated individual job registrations in `build_scheduler()` and added logging
+- `app/application/validation/adapters/capital.py` — Added `CapitalOnlineRadioBoxValidationAdapter` for reachability tests
+- `app/api/routes/sources.py` — Registered the new validation adapter and annotated type variable
+- `.env.example` — Added and documented new scheduler environment variables
+- `README.md` — Added note clarifying project implementation status
+- `docs/IMPLEMENTATION_PLAN.md` — Corrected station identity, candidate source type, scheduler safety, and database migration risks
+- `docs/VALIDATION_REGISTER.md` — Rewrote Capital validation checks (VAL-CAPUK-ORB-001 to VAL-CAPUK-ORB-008) and updated validation progress summary table
+- `docs/AGENT_TASKS.md` — Updated Capital seeds and source strategy checklist items
+- `tests/unit/application/test_source_config.py` — Updated station seeds unit test to check GB country code
+- `tests/unit/application/test_capital_validation.py` — Imported and tested the new validation adapter
+- `tests/unit/test_scheduler.py` — Updated tests to verify default and conditional job registration
+- `tests/unit/test_observability.py` — Updated lifespan test to check health status under enabled/disabled scheduler configurations
 
-- `README.md` — full local setup, test, Docker instructions
-- `docs/AGENT_TASKS.md` — Pass 1 checklist completed
-- `docs/ANTIGRAVITY_HANDOFF.md` — this file
-
-### Intentionally Not Touched
-
-- `docs/IMPLEMENTATION_PLAN.md` — no structural changes required; structure note captured in AGENT_TASKS.md
-- `docs/VALIDATION_REGISTER.md` — no validation changes in Pass 1
-- `docs/adr/0001-mvp-architecture.md` — no decisions changed
+### Intentionally Not Touched (Protected)
+- `app/infrastructure/collectors/kiis_iheart.py` (KIIS collector)
+- `app/infrastructure/collectors/nova_radiowave.py` (Nova collector)
+- `app/infrastructure/collectors/base.py` (Base collector lifecycle)
+- `app/api/routes/reports.py` (Reports routes)
+- `app/api/routes/playlist.py` (Playlist routes)
+- `app/api/routes/review.py` (Review queue routes)
+- `app/api/routes/charts.py` (Charts routes)
+- `app/api/routes/webhooks.py` (Webhooks routes)
+- `app/api/routes/proof_of_play.py` (Proof-of-play routes)
+- `app/api/routes/backfill.py` (Backfill routes)
 
 ---
 
-## Quality Gates After Pass 1
+## Quality Gates Results
 
 | Gate | Status | Detail |
 |---|---|---|
-| pytest | PASSED | 4/4 tests |
-| ruff check . | PASSED | No issues |
-| mypy app/ | PASSED | 5 files, no issues |
-| docker build | SKIPPED | Docker daemon not running in remote env |
-| docker compose up | SKIPPED | Docker daemon not running in remote env |
-| GET /health in container | SKIPPED | Docker daemon not running in remote env |
-| Live-network calls in tests | CLEAN | TestClient only, no external calls |
+| pytest | PASSED | 307 unit tests passed, 2 skipped (database integration tests) |
+| ruff check app/ | PASSED | No errors found |
+| mypy app/ | PASSED | Success: no issues found in 109 source files |
+| Live-network calls in tests | CLEAN | TestClient and mocks only, no external calls |
 
 ---
 
-## Structure Note
+## Risks Remaining & Next Steps
 
-The IMPLEMENTATION_PLAN.md (Pass 0) specified `app/` (singular), while the Pass 1 brief suggested `apps/api/`. Used `app/` as per IMPLEMENTATION_PLAN.md. The `app/main.py` + `app/api/routes/` pattern is cleaner and consistent with the layered architecture plan where `app/domain/`, `app/application/`, and `app/infrastructure/` will be added in later passes.
+1. **Parser Implementation**: The Online Radio Box HTML parser for Capital FM UK has not been built yet. Automated polling remains disabled until the parser is implemented.
+2. **Database Migration**: The DB seeder only inserts missing rows. Deployed databases that already seeded the old Capital Sydney station require controlled database update/data correction.
+3. **Source Validation**: The source page and playlist HTML structures must be validated against real saved HTML fixtures.
+4. **Polling Cadence & IP Safety**: Capital automated collection must observe conservative polling limits to prevent IP blocking.
 
----
+## Next Recommended Pass
+**CAP-UK-1 — Capital FM UK Online Radio Box Fixture and Parser Validation Pass**
 
-## Key Decisions Preserved
-
-All ADR-0001 protected decisions remain intact:
-- Python 3.12 / FastAPI / Pydantic v2 — confirmed in pyproject.toml
-- httpx in dev deps (will move to runtime deps in Pass 4/5 when collectors are built)
-- No Celery, Redis, Playwright, Kubernetes — none added
-- No collectors, no migrations — correctly deferred
-- No live-network calls in tests — confirmed
-
----
-
-## Risks Remaining
-
-| Risk | Severity | Status |
-|---|---|---|
-| Docker build/compose not tested in this env | Low | Non-blocking; test locally with `docker compose up --build` |
-| All 19 source validations still UNVALIDATED | High | Must be addressed before Pass 6-8 |
-| KIIS station ID 2501 unconfirmed | High | Must validate before Pass 7 |
-| KIIS HTTP 204 behavior unconfirmed | Critical | Guard will be implemented in Pass 7 regardless |
-| Capital all routes unvalidated | High | Not a blocker until Pass 8 |
-| Broadcast day definition not confirmed with client | Medium | Must confirm before Pass 13 |
-| .env not in repo (gitignored) | Note | Operator must create `.env` from `.env.example` on each deployment |
-
----
-
-## Recommended AntiGravity Next Prompt
-
-When ready to proceed to Pass 2, use this prompt:
-
----
-
-**Pass 2 prompt:**
-
-```
-We have completed Pass 1 (project skeleton) for the Radio Music Intelligence &
-Automation System on branch claude/sweet-archimedes-DFSWo.
-
-Pass 1 delivered: pyproject.toml, FastAPI app, GET /health, 4 passing tests,
-ruff/mypy clean, Dockerfile, docker-compose.yml, .gitignore, .env.example,
-README update.
-
-Please proceed with Pass 2: Core Schema Phase A.
-
-Pass 2 scope:
-- Initialize Alembic in the migrations/ directory
-- Create Phase A migrations only (do not create Phase B, C, or D tables):
-  users, roles, stations, station_markets, station_broadcast_days,
-  sources, source_validations, source_route_priorities,
-  collector_runs, raw_payloads,
-  errors, alerts, audit_logs, system_settings
-- Create SQLAlchemy models for all Phase A tables in app/infrastructure/database/models/
-- All timestamps must be stored in UTC (use TIMESTAMP WITH TIME ZONE)
-- Add asyncpg and alembic to pyproject.toml dependencies
-- `alembic upgrade head` must apply cleanly against a fresh PostgreSQL 16 database
-- `alembic downgrade base` must work cleanly
-- pytest, ruff, and mypy must still pass after Pass 2
-
-Pass 2 must NOT:
-- Create Phase B, C, or D tables
-- Implement collectors or parsers
-- Change protected architecture decisions
-- Run git add .
-
-Quality gates: pytest, ruff, mypy, alembic upgrade head.
-```
-
----
-
-## Areas That Must Not Be Rewritten
-
-- `app/main.py` — do not change the FastAPI app setup without reason
-- `app/api/routes/health.py` — health endpoint is working; do not change
-- `tests/unit/test_health.py` — passing tests; do not break
-- `pyproject.toml` — add deps as needed per pass; do not remove existing ones
-- `docs/adr/0001-mvp-architecture.md` — ADR is locked; create a new ADR to change it
-- `docs/IMPLEMENTATION_PLAN.md` — pass sequence is fixed; do not reorder
+Scope:
+- Save real Online Radio Box HTML page as a test fixture.
+- Implement HTML parser to extract current track, artist, title, and playlist history.
+- Write unit tests using the HTML fixture to confirm parser correctness.
+- Add drift detection and review item creation.

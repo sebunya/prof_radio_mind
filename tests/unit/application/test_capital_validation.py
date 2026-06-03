@@ -16,6 +16,7 @@ from app.application.imports.manual_csv import (
 )
 from app.application.validation.adapters.capital import (
     CapitalIHeartValidationAdapter,
+    CapitalOnlineRadioBoxValidationAdapter,
     CapitalWebsiteValidationAdapter,
 )
 from app.application.validation.base import ValidationStatus
@@ -29,6 +30,19 @@ def test_capital_iheart_adapter_validation_code() -> None:
 def test_capital_website_adapter_validation_code() -> None:
     adapter = CapitalWebsiteValidationAdapter()
     assert adapter.validation_code == "VAL-CAP-002"
+
+
+def test_capital_online_radio_box_adapter_validation_code() -> None:
+    adapter = CapitalOnlineRadioBoxValidationAdapter()
+    assert adapter.validation_code == "VAL-CAPUK-ORB-001"
+
+
+@pytest.mark.anyio
+async def test_capital_online_radio_box_validation_network_failure() -> None:
+    adapter = CapitalOnlineRadioBoxValidationAdapter()
+    result = await adapter.validate(uuid.uuid4(), config={"base_url": "http://invalid-domain-that-does-not-exist.xyz"})
+    assert result.status == ValidationStatus.FAILED
+    assert "Network error" in result.notes
 
 
 @pytest.mark.anyio

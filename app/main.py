@@ -19,6 +19,7 @@ from app.api.routes.sources import router as sources_router
 from app.api.routes.stations import router as stations_router
 from app.api.routes.webhooks import router as webhooks_router
 from app.core.logging_config import configure_logging
+from app.core.settings import settings
 from app.infrastructure.database.session import dispose_engine
 from app.infrastructure.scheduler.scheduler import build_scheduler
 
@@ -39,14 +40,21 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     except Exception as exc:
         logger.warning("db_seed_failed error=%s (continuing without DB)", exc)
 
-    scheduler = build_scheduler()
-    scheduler.start()
-    app.state.scheduler = scheduler
+    app.state.scheduler = None
+    if settings.scheduler_enabled:
+        scheduler = build_scheduler()
+        scheduler.start()
+        app.state.scheduler = scheduler
+        logger.info("Scheduler started successfully")
+    else:
+        logger.info("Scheduler is disabled by configuration (SCHEDULER_ENABLED=false)")
 
     try:
         yield
     finally:
-        scheduler.shutdown(wait=False)
+        if app.state.scheduler:
+            app.state.scheduler.shutdown(wait=False)
+            logger.info("Scheduler shut down successfully")
         await dispose_engine()
 
 

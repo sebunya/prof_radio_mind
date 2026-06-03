@@ -189,71 +189,119 @@ Validation must be performed by a human or a dedicated validation command. Resul
 
 ---
 
-## 6. Capital FM London — Automated Routes
+## 6. Capital FM UK — Online Radio Box Candidate Source
 
-### 6.1 Capital FM Public Last-Played Page
-
-| Field | Value |
-|---|---|
-| ID | VAL-CAP-001 |
-| Description | Check whether the Capital FM official website exposes a publicly accessible last-played page. Attempt to fetch with httpx (no JS). Confirm if HTML structure is parseable. |
-| Status | UNVALIDATED |
-| Validated by | — |
-| Validated at | — |
-| Notes | Do NOT assume this works. Do NOT make this a launch blocker. |
-| Risk if fails | Must escalate to manual CSV fallback |
-
-### 6.2 Capital Global Player / API Metadata Route
+### 6.1 Online Radio Box Reachability
 
 | Field | Value |
 |---|---|
-| ID | VAL-CAP-002 |
-| Description | Investigate whether the Global Player (or underlying Global Radio API) exposes a metadata endpoint for Capital FM that returns current or recently played track data |
+| ID | VAL-CAPUK-ORB-001 |
+| Description | Confirm Online Radio Box Capital FM UK page is reachable and returns expected station page HTML |
 | Status | UNVALIDATED |
 | Validated by | — |
 | Validated at | — |
-| Notes | Do NOT hardcode any unverified endpoint IDs. Validate before production use. |
-| Risk if fails | Must escalate to third-party diary or manual CSV |
+| Notes | Test reachability using validation adapter |
+| Risk if fails | Capital automated collection blocked; manual CSV fallback required |
 
-### 6.3 Capital Third-Party Diary Route
+### 6.2 Now-Playing Section Parseability
 
 | Field | Value |
 |---|---|
-| ID | VAL-CAP-003 |
-| Description | Investigate whether any third-party diary service (such as Radiowave or equivalent) maintains a Capital FM London diary accessible via URL |
+| ID | VAL-CAPUK-ORB-002 |
+| Description | Confirm the page exposes a parseable “On the air” or now-playing section from saved HTML fixture |
 | Status | UNVALIDATED |
 | Validated by | — |
 | Validated at | — |
-| Notes | Low probability but worth checking during validation pass |
-| Risk if fails | No impact on MVP if manual CSV fallback is working |
+| Notes | Save real HTML fixture from the page. Test parser against it. |
+| Risk if fails | No live current-track signal |
 
-### 6.4 Capital Playwright Requirement Assessment
+### 6.3 History Playlist Parseability
 
 | Field | Value |
 |---|---|
-| ID | VAL-CAP-004 |
-| Description | If httpx-based routes for Capital all fail, document why they fail and assess whether Playwright would succeed. Playwright must NOT be the default or first attempt. |
+| ID | VAL-CAPUK-ORB-003 |
+| Description | Confirm the page exposes playlist/history records that can be parsed from saved fixture |
 | Status | UNVALIDATED |
 | Validated by | — |
 | Validated at | — |
-| Notes | Only create an ADR for Playwright if all non-JS routes are documented as failed |
-| Risk if fails | Playwright adds complexity; only accept if justified |
+| Notes | Important for backfill or drift recovery |
+| Risk if fails | Historical play recovery unavailable or incomplete |
+
+### 6.4 Artist and Title Reliability
+
+| Field | Value |
+|---|---|
+| ID | VAL-CAPUK-ORB-004 |
+| Description | Confirm parser can extract artist and title reliably from saved fixture |
+| Status | UNVALIDATED |
+| Validated by | — |
+| Validated at | — |
+| Notes | Clean any label suffixes or extra text |
+| Risk if fails | False plays or unusable reporting |
+
+### 6.5 Time Extraction or observed_at Derivation
+
+| Field | Value |
+|---|---|
+| ID | VAL-CAPUK-ORB-005 |
+| Description | Confirm parser can extract event time or derive observed_at safely when source time is unavailable |
+| Status | UNVALIDATED |
+| Validated by | — |
+| Validated at | — |
+| Notes | Handle timezone offsets carefully |
+| Risk if fails | Incorrect broadcast-day grouping |
+
+### 6.6 No Visible Track / Commercial Break Stability
+
+| Field | Value |
+|---|---|
+| ID | VAL-CAPUK-ORB-006 |
+| Description | Confirm missing/no visible track creates no_track_event, not collector failure |
+| Status | UNVALIDATED |
+| Validated by | — |
+| Validated at | — |
+| Notes | Required to ensure continuous loop execution |
+| Risk if fails | False error spikes and unstable collector behavior |
+
+### 6.7 Polling Cadence and Source Limits
+
+| Field | Value |
+|---|---|
+| ID | VAL-CAPUK-ORB-007 |
+| Description | Confirm conservative polling cadence and source limitation policy |
+| Status | UNVALIDATED |
+| Validated by | — |
+| Validated at | — |
+| Notes | Avoid aggressive polling to prevent IP blocks |
+| Risk if fails | Over-polling, IP blocking, unreliable data |
+
+### 6.8 Disabled by Default Gate
+
+| Field | Value |
+|---|---|
+| ID | VAL-CAPUK-ORB-008 |
+| Description | Confirm Capital collector remains disabled by default until validation passes |
+| Status | UNVALIDATED |
+| Validated by | — |
+| Validated at | — |
+| Notes | Enforced by scheduler settings flags |
+| Risk if fails | Unvalidated production collection |
 
 ---
 
-## 7. Capital FM London — Manual CSV Fallback
+## 7. Capital FM UK — Manual CSV Fallback
 
 ### 7.1 Capital Manual CSV Fallback
 
 | Field | Value |
 |---|---|
-| ID | VAL-CAP-MANUAL-001 |
-| Description | Confirm the manual CSV import schema is agreed with the client or operator for Capital FM data. Confirm that the import pipeline accepts Capital data and attributes it to the correct station and source. |
+| ID | VAL-CAPUK-MANUAL-001 |
+| Description | Confirm manual CSV import accepts Capital FM UK rows and attributes them to the correct station/source |
 | Status | UNVALIDATED |
 | Validated by | — |
 | Validated at | — |
-| Notes | Manual CSV fallback is mandatory for Capital regardless of automation status. Must be tested and working before Capital is included in any client-facing report. |
-| Risk if fails | Capital cannot participate in any report |
+| Notes | Manual CSV fallback is mandatory. Must be tested before Capital is included in reporting. |
+| Risk if fails | Capital cannot appear in client-facing reports if automation is not ready |
 
 ---
 
@@ -332,10 +380,10 @@ Validation must be performed by a human or a dedicated validation command. Resul
 | KIIS iHeart | 5 | 0 | 0 | 0 | 0 | 5 |
 | KIIS Radiowave fallback | 1 | 0 | 0 | 0 | 0 | 1 |
 | KIIS HTML fallback | 1 | 0 | 0 | 0 | 0 | 1 |
-| Capital automated | 4 | 0 | 0 | 0 | 0 | 4 |
+| Capital FM UK Online Radio Box | 8 | 0 | 0 | 0 | 0 | 8 |
 | Capital manual | 1 | 0 | 0 | 0 | 0 | 1 |
 | Deferred | 2 | 0 | 0 | 0 | 2 | 0 |
 | Operational contracts | 3 | 0 | 0 | 0 | 0 | 3 |
-| **Total** | **22** | **0** | **0** | **0** | **3** | **19** |
+| **Total** | **26** | **0** | **0** | **0** | **3** | **23** |
 
-All 19 non-deferred validations must be addressed before their dependent passes can be declared complete.
+All 23 non-deferred validations must be addressed before their dependent passes can be declared complete.
