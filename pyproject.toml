@@ -19,6 +19,7 @@ dependencies = [
     "python-multipart>=0.0.9",
     "apscheduler>=3.10.0",
     "aioboto3>=13.0.0",
+    "psycopg2-binary>=2.9.9",
 ]
 
 [project.optional-dependencies]

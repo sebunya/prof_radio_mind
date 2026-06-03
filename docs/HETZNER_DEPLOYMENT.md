@@ -52,7 +52,7 @@ git clone https://github.com/sebunya/prof_radio_mind.git rmias
 cd rmias
 
 # Create production env file from template
-cp .env.hetzner .env.production
+cp .env.production.example .env.production
 nano .env.production   # fill in all CHANGE_ME values
 ```
 

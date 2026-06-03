@@ -8,11 +8,8 @@ URL="${BASE_URL:-http://localhost:8000}"
 
 echo "Running smoke test against $URL..."
 
-RESPONSE=$(curl -sf "$URL/health")
-STATUS_CODE=$?
-
-if [ $STATUS_CODE -ne 0 ]; then
-  echo "ERROR: Health check failed to respond (exit code: $STATUS_CODE)"
+if ! RESPONSE=$(curl -sf "$URL/health"); then
+  echo "ERROR: Health check failed to respond"
   exit 1
 fi
 

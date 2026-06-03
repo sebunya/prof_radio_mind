@@ -138,10 +138,14 @@ ssl_certificate_key /etc/letsencrypt/live/radio.yourdomain.com/privkey.pem;
    docker compose -f docker-compose.hetzner.yml --env-file .env.production config
    ```
 
-2. Generate the SSL certificate using Let's Encrypt / Certbot outside Docker or temporarily exposing port 80:
+2. Generate the SSL certificate using Let's Encrypt / Certbot inside Docker by running a one-shot container before starting the main stack:
    ```bash
-   # Temporarily stop any port 80 processes and request cert:
-   certbot certonly --standalone -d radio.yourdomain.com --agree-tos --email admin@yourdomain.com
+   # Request certificate via standalone Certbot image mapping port 80:
+   docker run -it --rm -p 80:80 \
+     -v /etc/letsencrypt:/etc/letsencrypt \
+     -v /var/www/certbot:/var/www/certbot \
+     certbot/certbot certonly --standalone \
+     -d radio.yourdomain.com --agree-tos --email admin@yourdomain.com
    ```
 
 3. Launch the RMIAS stack in daemon mode:
@@ -193,9 +197,10 @@ docker compose -f docker-compose.hetzner.yml --env-file .env.production \
 ```
 
 ### Raw Payload Storage Backups
-Compress raw payload files (which serve as compliance audit evidence):
+Compress raw payload files (which serve as compliance audit evidence) from the named Docker volume:
 ```bash
-tar -czf /home/deploy/backups/payloads/raw-payloads-$(date +%F).tar.gz /data/raw_payloads
+docker run --rm -v rmias_raw_payloads:/volume -v /home/deploy/backups/payloads:/backup alpine \
+  tar -czf /backup/raw-payloads-$(date +%F).tar.gz -C /volume .
 ```
 
 ### Database Restore Procedure
