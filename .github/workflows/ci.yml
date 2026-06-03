@@ -1,0 +1,37 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master, "claude/**", "feature/**", "chore/**", "fix/**"]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  test:
+    name: Tests · Lint · Types
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies (app + dev extras)
+        run: pip install ".[dev]"
+
+      - name: Lint — ruff
+        run: ruff check app/ tests/
+
+      - name: Type-check — mypy
+        run: mypy app/ --ignore-missing-imports
+
+      - name: Run test suite
+        run: pytest tests/ -x -q
+        env:
+          # Integration tests auto-skip unless RMIAS_INTEGRATION_TESTS=1 and a
+          # live DB is reachable, so no Postgres service is required here.
+          DATABASE_URL: "postgresql+asyncpg://rmias:rmias@localhost:5432/rmias"
