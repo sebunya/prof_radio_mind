@@ -76,4 +76,24 @@ app.include_router(charts_router)
 app.include_router(webhooks_router)
 app.include_router(backfill_router)
 
+
+@app.get("/", include_in_schema=False)
+async def root() -> dict[str, object]:
+    return {
+        "status": "ok",
+        "service": "TenX Radar",
+        "description": "Radio Music Intelligence & Automation System",
+        "version": "0.1.0",
+        "endpoints": {
+            "health": "/health",
+            "admin": "/admin",
+            "api_docs": "/docs",
+        },
+        "components": {
+            "scheduler": "stopped",
+            "collectors": "disabled",
+        },
+    }
+
+
 app.mount("/admin", StaticFiles(directory="app/static", html=True), name="admin")

@@ -19,6 +19,19 @@ def client() -> TestClient:
     return TestClient(app)
 
 
+# --- GET / ---
+
+def test_root_landing_200(client: TestClient) -> None:
+    r = client.get("/")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["status"] == "ok"
+    assert body["service"] == "TenX Radar"
+    assert body["endpoints"]["health"] == "/health"
+    assert body["endpoints"]["admin"] == "/admin"
+    assert body["endpoints"]["api_docs"] == "/docs"
+
+
 # --- GET /health ---
 
 def test_health_200(client: TestClient) -> None:
