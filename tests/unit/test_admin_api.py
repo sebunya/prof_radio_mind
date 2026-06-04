@@ -202,6 +202,48 @@ def test_spotify_readiness_200(client_with_db, monkeypatch) -> None:
     assert "super-secret-key" not in str(body)
 
 
+# --- GET /api/admin/metadata-readiness ---
+
+def test_metadata_readiness_200(client_with_db, monkeypatch) -> None:
+    client, _ = client_with_db
+
+    # Override settings for testing
+    monkeypatch.setattr(settings, "spotify_client_id", "my-client-id")
+    monkeypatch.setattr(settings, "spotify_client_secret", "super-secret-key-do-not-reveal")
+    monkeypatch.setattr(settings, "musicbrainz_api_base_url", "https://musicbrainz.org/ws/2")
+    monkeypatch.setattr(settings, "musicbrainz_user_agent", "TenXRadar/1.0")
+
+    r = client.get("/api/admin/metadata-readiness")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["status"] == "disabled"
+    assert body["mode"] == "readiness_only"
+    
+    # MusicBrainz verification
+    assert body["providers"]["musicbrainz"]["role"] == "open_canonical_identity"
+    assert body["providers"]["musicbrainz"]["configured"] is True
+    assert body["providers"]["musicbrainz"]["enabled"] is False
+    assert body["providers"]["musicbrainz"]["live_calls_enabled"] is False
+    
+    # Spotify verification
+    assert body["providers"]["spotify"]["role"] == "commercial_catalogue_context"
+    assert body["providers"]["spotify"]["configured"] is True
+    assert body["providers"]["spotify"]["enabled"] is False
+    assert body["providers"]["spotify"]["live_calls_enabled"] is False
+    
+    # Cover Art Archive verification
+    assert body["providers"]["cover_art_archive"]["role"] == "cover_art_fallback"
+    assert body["providers"]["cover_art_archive"]["configured"] is True
+    assert body["providers"]["cover_art_archive"]["enabled"] is False
+    assert body["providers"]["cover_art_archive"]["live_calls_enabled"] is False
+    
+    # Compliance Boundary checks
+    assert body["compliance_boundary"]["no_streaming"] is True
+    assert body["compliance_boundary"]["no_playback"] is True
+    assert "super-secret-key" not in str(body)
+
+
+
 # --- GET /api/admin/collector-runs ---
 
 def test_collector_runs_200(client_with_db) -> None:

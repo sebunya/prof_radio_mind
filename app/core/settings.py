@@ -60,5 +60,13 @@ class Settings(BaseSettings):
     spotify_max_retries: int = 2
     spotify_token_cache_seconds: int = 3300
 
+    # MusicBrainz & Cover Art Archive Integration
+    musicbrainz_api_base_url: str = "https://musicbrainz.org/ws/2"
+    musicbrainz_user_agent: str = "TenXRadar/1.0 (https://tenxradar.com/contact)"
+    musicbrainz_rate_limit_per_second: int = 1
+    musicbrainz_default_format: str = "json"
+    cover_art_archive_base_url: str = "https://coverartarchive.org"
+    musicbrainz_metadata_enrichment_enabled: bool = False
+
 
 settings = Settings()

@@ -1,13 +1,13 @@
-# UIUX-SPOTIFY-AG1 — API Architecture Plan
+# UIUX-METADATA-AG1C — API Architecture Plan
 
-To support a premium admin dashboard while maintaining strict production safety, this pass designs an API-first approach with clear boundaries between read-only monitoring and future operations.
+To support a premium admin dashboard while maintaining strict production safety, this pass designs an API-first approach with clear boundaries between read-only monitoring and future operations, reflecting a multi-provider metadata model.
 
 ## 1. Existing APIs to Reuse
 - **`GET /health`**: Liveness check, returns scheduler execution status.
 - **`GET /review-items`**: Fetches the list of all review queue entries.
 - **`GET /webhooks`**: Lists active push webhook subscriptions.
 
-## 2. New Safe, Read-Only Admin APIs (Add Now)
+## 2. New Safe, Read-Only Admin APIs (Added)
 These endpoints are placed under a new `admin` tags router (`app/api/routes/admin.py`) mounted under `/api/admin`. They do not mutate database state, execute external network requests, or expose server secrets.
 
 ### `GET /api/admin/overview`
@@ -33,91 +33,58 @@ These endpoints are placed under a new `admin` tags router (`app/api/routes/admi
   }
   ```
 
-### `GET /api/admin/sources`
-- **Purpose**: Provides detailed configurations, priority mappings, and latest validation results for all active station sources.
-- **Response Schema**:
-  ```json
-  [
-    {
-      "id": "uuid-string",
-      "station_id": "uuid-string",
-      "station_call_sign": "CAPITALFM",
-      "source_type": "online_radio_box",
-      "name": "Capital FM UK Online Radio Box Candidate",
-      "base_url": "https://onlineradiobox.com/uk/capitalfmuk/",
-      "is_active": true,
-      "priority": 1,
-      "latest_validation": {
-        "status": "validated",
-        "validated_at": "2026-06-04T12:00:00Z",
-        "validation_code": "VAL-CAPUK-ORB-001",
-        "response_status_code": 200
-      }
-    }
-  ]
-  ```
-
-### `GET /api/admin/recent-events`
-- **Purpose**: Provides a stream of the 10 most recently captured raw play events to demonstrate live capture verification.
-- **Response Schema**:
-  ```json
-  [
-    {
-      "id": "uuid-string",
-      "station_name": "Capital FM UK",
-      "station_call_sign": "CAPITALFM",
-      "raw_artist": "Sabrina Carpenter",
-      "raw_title": "Espresso",
-      "played_at": "2026-06-04T18:45:00Z",
-      "is_duplicate": false,
-      "fingerprint": "a9b8c7d6..."
-    }
-  ]
-  ```
-
-### `GET /api/admin/collector-runs`
-- **Purpose**: Exposes the execution history of station collectors (success rate, durations, failures) for operations monitoring.
-- **Response Schema**:
-  ```json
-  [
-    {
-      "id": "uuid-string",
-      "collector_name": "online_radio_box",
-      "station_call_sign": "CAPITALFM",
-      "status": "completed",
-      "duration_seconds": 1.45,
-      "error_count": 0,
-      "started_at": "2026-06-04T18:30:00Z"
-    }
-  ]
-  ```
-
-### `GET /api/admin/spotify-readiness`
-- **Purpose**: Checks configuration parameters and presence of Spotify credentials without revealing them.
+### `GET /api/admin/metadata-readiness` [NEW]
+- **Purpose**: Returns configuration checks and readiness state for all external music metadata providers (MusicBrainz, Spotify, and Cover Art Archive) alongside the compliance boundaries.
 - **Response Schema**:
   ```json
   {
-    "client_id_configured": true,
-    "client_secret_configured": true,
-    "redirect_uri": "https://tenxradar.com/api/auth/spotify/callback",
-    "api_base_url": "https://api.spotify.com/v1",
-    "token_url": "https://accounts.spotify.com/api/token",
-    "enrichment_enabled_flag": false,
-    "match_confidence_threshold": 0.80,
-    "request_timeout_seconds": 10,
-    "max_retries": 2,
-    "token_cache_seconds": 3300
+    "status": "disabled",
+    "mode": "readiness_only",
+    "providers": {
+      "musicbrainz": {
+        "role": "open_canonical_identity",
+        "configured": true,
+        "enabled": false,
+        "base_url_configured": true,
+        "user_agent_configured": true,
+        "rate_limit_per_second": 1,
+        "default_format": "json",
+        "live_calls_enabled": false
+      },
+      "spotify": {
+        "role": "commercial_catalogue_context",
+        "configured": false,
+        "enabled": false,
+        "client_id_configured": false,
+        "client_secret_configured": false,
+        "redirect_uri_configured": true,
+        "live_calls_enabled": false
+      },
+      "cover_art_archive": {
+        "role": "cover_art_fallback",
+        "configured": true,
+        "enabled": false,
+        "base_url_configured": true,
+        "requires_musicbrainz_release_mbid": true,
+        "live_calls_enabled": false
+      }
+    },
+    "compliance_boundary": {
+      "radio_capture_source": "TenX Radar monitored station sources",
+      "musicbrainz": "canonical music identity and disambiguation only",
+      "spotify": "catalogue metadata and platform reference only",
+      "cover_art_archive": "release artwork reference only",
+      "no_streaming": true,
+      "no_downloads": true,
+      "no_playlist_scraping": true,
+      "no_playback": true
+    }
   }
   ```
 
+### `GET /api/admin/spotify-readiness` (Backward Compatible)
+- **Purpose**: Checks configuration parameters and presence of Spotify credentials without revealing them.
+
 ## 3. Operations Gating & Restrictions
-
-### Strict Prohibitions (Do Not Implement Now)
-- **No toggle API routes**: No `POST /api/admin/scheduler/toggle` or similar mutations.
-- **No trigger buttons/endpoints**: No endpoints to manually trigger pruning, dry-runs, or databases rollbacks.
-- **Secret mask rules**: `client_secret_configured` returns a Boolean check (`bool(settings.spotify_client_secret)`). The raw client secret string is **never** returned to the client.
-
-## 4. Future Spotify Enrichment APIs (Next Passes)
-When live enrichment is enabled, the API structure will expand to support:
-- `POST /api/admin/spotify/enrich`: Manually trigger metadata enrichment for a specific `play_event` id.
-- `POST /api/admin/spotify/callback`: Spotify OAuth callback for playlist sync operations requiring user auth (Authorization Code flow).
+- **No toggle API routes**: No scheduler/collector mutation APIs.
+- **Secret mask rules**: Secret config flags are returned as simple Booleans. Raw credential secrets are **never** returned to client-side code.

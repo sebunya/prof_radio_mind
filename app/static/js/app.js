@@ -26,7 +26,7 @@ const TITLES = {
   stations:  'Stations & Sources Health',
   'play-events': 'Play Events Stream',
   review:    'Review Queue',
-  'spotify-metadata': 'Spotify Metadata Readiness',
+  'spotify-metadata': 'Metadata Enrichment',
   reports:   'Reports',
   playlist:  'Playlist Automation',
   charts:    'ARIA Charts',

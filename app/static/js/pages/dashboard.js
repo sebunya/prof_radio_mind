@@ -4,13 +4,14 @@ import { fmtRelative, badge, esc } from '../ui.js';
 export async function init(container) {
   container.innerHTML = '<div class="loader-center"><div class="loader"></div></div>';
 
-  const [overview, events, reviewItems] = await Promise.allSettled([
-    API.adminOverview(), API.adminRecentEvents(), API.reviewItems()
+  const [overview, events, reviewItems, metadata] = await Promise.allSettled([
+    API.adminOverview(), API.adminRecentEvents(), API.reviewItems(), API.adminMetadataReadiness()
   ]);
 
   const ov = overview.status === 'fulfilled' ? overview.value : {};
   const ev = events.status === 'fulfilled' ? events.value : [];
   const il = reviewItems.status === 'fulfilled' ? reviewItems.value : [];
+  const meta = metadata.status === 'fulfilled' ? metadata.value : {};
 
   const pending = ov.stats ? ov.stats.pending_reviews : il.filter(i => i.status === 'pending').length;
   const activeStationsCount = ov.stats ? ov.stats.active_stations : 0;
@@ -70,6 +71,56 @@ export async function init(container) {
           Auth: ${ov.admin_basic_auth_configured ? '🔒 Secure' : '🔓 Public'}
           &nbsp;·&nbsp;
           Retention: ${ov.raw_payload_retention_days > 0 ? `${ov.raw_payload_retention_days}d` : 'Off'}
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Metadata Enrichment Overview ── -->
+    <div class="card mb-5">
+      <div class="card-header">
+        <span class="card-title">Metadata Enrichment Readiness</span>
+        <span class="badge badge-muted">Status: ${esc(meta.status || 'disabled')} (${esc(meta.mode || 'readiness_only')})</span>
+      </div>
+      <div style="font-size:13px;line-height:1.5;padding:12px 0 0 0">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;margin-bottom:12px">
+          <div style="background:var(--bg3);border-radius:6px;padding:12px;border:1px solid var(--border2)">
+            <div style="font-weight:600;margin-bottom:6px;color:var(--text);display:flex;justify-content:space-between;font-size:12px">
+              <span>MusicBrainz</span>
+              <span class="badge badge-muted">Readiness Only</span>
+            </div>
+            <div style="font-size:11px;color:var(--text2)">
+              Status: <strong>${meta.providers?.musicbrainz?.configured ? 'Configured' : 'Not Configured'}</strong><br>
+              Enrichment: <strong>Disabled</strong><br>
+              Role: Open Canonical Identity
+            </div>
+          </div>
+
+          <div style="background:var(--bg3);border-radius:6px;padding:12px;border:1px solid var(--border2)">
+            <div style="font-weight:600;margin-bottom:6px;color:var(--text);display:flex;justify-content:space-between;font-size:12px">
+              <span>Spotify</span>
+              <span class="badge badge-muted">Readiness Only</span>
+            </div>
+            <div style="font-size:11px;color:var(--text2)">
+              Status: <strong>${meta.providers?.spotify?.configured ? 'Configured' : 'Not Configured'}</strong><br>
+              Enrichment: <strong>Disabled</strong><br>
+              Role: Catalogue Context
+            </div>
+          </div>
+
+          <div style="background:var(--bg3);border-radius:6px;padding:12px;border:1px solid var(--border2)">
+            <div style="font-weight:600;margin-bottom:6px;color:var(--text);display:flex;justify-content:space-between;font-size:12px">
+              <span>Cover Art Archive</span>
+              <span class="badge badge-muted">Readiness Only</span>
+            </div>
+            <div style="font-size:11px;color:var(--text2)">
+              Status: <strong>${meta.providers?.cover_art_archive?.configured ? 'Configured' : 'Not Configured'}</strong><br>
+              Enrichment: <strong>Disabled</strong><br>
+              Role: Artwork Fallback
+            </div>
+          </div>
+        </div>
+        <div style="font-size:11px;color:var(--text3);padding-top:10px;border-top:1px solid var(--border2)">
+          ℹ <strong>Resolved Metadata DB:</strong> No resolved metadata table has been implemented yet. Provider readiness is available for future enrichment passes.
         </div>
       </div>
     </div>

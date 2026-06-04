@@ -1,33 +1,28 @@
-# Task Checklist — UIUX-SPOTIFY-AG1
+# Task Checklist — UIUX-METADATA-AG1C
 
-- [x] Phase 0: Audit Base & Production Safe Status
+- [x] Phase 0: Reframe Strategy & Provider Audit
 - [x] Phase A: Design & Documentation (Approval Gated)
-  - [x] Audit codebase and production server environment
-  - [x] Draft `docs/passes/UIUX-SPOTIFY-AG1-audit.md`
-  - [x] Draft `docs/passes/UIUX-SPOTIFY-AG1-api-architecture.md`
-  - [x] Draft `docs/passes/UIUX-SPOTIFY-AG1-information-architecture.md`
+  - [x] Audit codebase for Spotify-only narrow framing
+  - [x] Reframe UI, API, and settings design
   - [x] Draft `implementation_plan.md` and `task.md`
-- [x] Phase B: Backend Implementation (Approved)
-  - [x] Implement `app/api/routes/admin.py` router
-  - [x] Modify `app/api/routes/stations.py` to use `SQLStationRepository`
-  - [x] Register new routes in `app/main.py`
-  - [x] Add unit tests in `tests/unit/test_admin_api.py`
-  - [x] Update `.env.production.example` with safe `SPOTIFY_*` environment variables template
-- [x] Phase C: Frontend UI/UX Upgrades (Approved)
-  - [x] Revamp `app/static/index.html` navigation sidebar and title tags
-  - [x] Add new CSS styles and dark mode color scheme variables in `app/static/css/app.css`
-  - [x] Add admin endpoints methods in `app/static/js/api.js`
-  - [x] Update `app/static/js/app.js` with new client routes
-  - [x] Enhance dashboard and station tables in `dashboard.js` and `stations.js`
-  - [x] Implement new views:
-    - [x] `play-events.js`
-    - [x] `spotify-metadata.js`
-    - [x] `operations-guardrails.js`
+- [x] Phase B: Backend Enhancements
+  - [x] Define `musicbrainz` and `cover_art_archive` settings in `app/core/settings.py`
+  - [x] Add placeholders to `.env.production.example`
+  - [x] Create Pydantic schema models for Metadata Readiness in `app/api/routes/admin.py`
+  - [x] Implement `/api/admin/metadata-readiness` endpoint in `app/api/routes/admin.py`
+  - [x] Add API client wrapper for `/metadata-readiness` in `app/static/js/api.js`
+- [x] Phase C: Frontend UI/UX Alignment
+  - [x] Rename "Spotify Metadata" navigation title to "Metadata Enrichment" in `index.html` and `app.js`
+  - [x] Reframe the enrichment panel layout in `spotify-metadata.js` with MusicBrainz, Spotify, and Cover Art Archive provider cards
+  - [x] Outline the TenX Radar resolved matching layer and future states
+  - [x] Integrate enrichment readiness indicators into the main dashboard overview in `dashboard.js`
+  - [x] Add provider-level operations guardrails and rules to `operations-guardrails.js`
 - [x] Phase D: Verification & Quality Gates
+  - [x] Add unit tests for `/metadata-readiness` in `tests/unit/test_admin_api.py`
   - [x] Run linter: `ruff check app/ tests/`
   - [x] Run type checker: `mypy app/ --ignore-missing-imports`
   - [x] Run tests: `pytest tests/`
-  - [x] Execute static safety searches (credentials, enabled flags, git add dot)
+  - [x] Execute static safety checks (no secrets, no live calls, no DB migrations)
 - [x] Phase E: Wrap-Up & Commit
-  - [x] Create `walkthrough.md` and `docs/passes/UIUX-SPOTIFY-AG1-implementation.md`
-  - [x] Commit exact files and push branch
+  - [x] Update implementation reports and walkthroughs
+  - [x] Stage exact files and push branch

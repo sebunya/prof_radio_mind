@@ -112,6 +112,45 @@ class SpotifyReadinessResponse(BaseModel):
     token_cache_seconds: int
 
 
+class ProviderDetail(BaseModel):
+    role: str
+    configured: bool
+    enabled: bool
+    base_url_configured: bool | None = None
+    user_agent_configured: bool | None = None
+    rate_limit_per_second: int | None = None
+    default_format: str | None = None
+    client_id_configured: bool | None = None
+    client_secret_configured: bool | None = None
+    redirect_uri_configured: bool | None = None
+    requires_musicbrainz_release_mbid: bool | None = None
+    live_calls_enabled: bool
+
+
+class ProvidersMap(BaseModel):
+    musicbrainz: ProviderDetail
+    spotify: ProviderDetail
+    cover_art_archive: ProviderDetail
+
+
+class ComplianceBoundary(BaseModel):
+    radio_capture_source: str
+    musicbrainz: str
+    spotify: str
+    cover_art_archive: str
+    no_streaming: bool
+    no_downloads: bool
+    no_playlist_scraping: bool
+    no_playback: bool
+
+
+class MetadataReadinessResponse(BaseModel):
+    status: str
+    mode: str
+    providers: ProvidersMap
+    compliance_boundary: ComplianceBoundary
+
+
 class CollectorRunResponse(BaseModel):
     id: str
     collector_name: str
@@ -361,6 +400,57 @@ async def get_spotify_readiness() -> SpotifyReadinessResponse:
         request_timeout_seconds=settings.spotify_request_timeout_seconds,
         max_retries=settings.spotify_max_retries,
         token_cache_seconds=settings.spotify_token_cache_seconds,
+    )
+
+
+@router.get("/metadata-readiness", response_model=MetadataReadinessResponse)
+async def get_metadata_readiness() -> MetadataReadinessResponse:
+    mb_configured = bool(settings.musicbrainz_api_base_url and settings.musicbrainz_user_agent)
+    sp_configured = bool(settings.spotify_client_id and settings.spotify_client_secret)
+    caa_configured = bool(settings.cover_art_archive_base_url)
+    
+    return MetadataReadinessResponse(
+        status="disabled",
+        mode="readiness_only",
+        providers=ProvidersMap(
+            musicbrainz=ProviderDetail(
+                role="open_canonical_identity",
+                configured=mb_configured,
+                enabled=settings.musicbrainz_metadata_enrichment_enabled,
+                base_url_configured=bool(settings.musicbrainz_api_base_url),
+                user_agent_configured=bool(settings.musicbrainz_user_agent),
+                rate_limit_per_second=settings.musicbrainz_rate_limit_per_second,
+                default_format=settings.musicbrainz_default_format,
+                live_calls_enabled=False
+            ),
+            spotify=ProviderDetail(
+                role="commercial_catalogue_context",
+                configured=sp_configured,
+                enabled=settings.spotify_metadata_enrichment_enabled,
+                client_id_configured=bool(settings.spotify_client_id),
+                client_secret_configured=bool(settings.spotify_client_secret),
+                redirect_uri_configured=bool(settings.spotify_redirect_uri),
+                live_calls_enabled=False
+            ),
+            cover_art_archive=ProviderDetail(
+                role="cover_art_fallback",
+                configured=caa_configured,
+                enabled=False,
+                base_url_configured=bool(settings.cover_art_archive_base_url),
+                requires_musicbrainz_release_mbid=True,
+                live_calls_enabled=False
+            )
+        ),
+        compliance_boundary=ComplianceBoundary(
+            radio_capture_source="TenX Radar monitored station sources",
+            musicbrainz="canonical music identity and disambiguation only",
+            spotify="catalogue metadata and platform reference only",
+            cover_art_archive="release artwork reference only",
+            no_streaming=True,
+            no_downloads=True,
+            no_playlist_scraping=True,
+            no_playback=True
+        )
     )
 
 

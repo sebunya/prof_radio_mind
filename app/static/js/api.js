@@ -83,6 +83,6 @@ export const API = {
   adminReviewSummary: () => apiCall('GET', '/api/admin/review-summary'),
   adminEnrichmentStatus: () => apiCall('GET', '/api/admin/enrichment-status'),
   adminSpotifyReadiness: () => apiCall('GET', '/api/admin/spotify-readiness'),
+  adminMetadataReadiness: () => apiCall('GET', '/api/admin/metadata-readiness'),
   adminCollectorRuns: () => apiCall('GET', '/api/admin/collector-runs'),
 };
-
