@@ -1,0 +1,35 @@
+# Task Checklist — POSTDEPLOY-UIUX-METADATA-AG1
+
+- [x] Phase 0: Local git validation
+  - [x] Check latest commits on `main` branch to match deployment docs commit `69f78d0`
+  - [x] Verify local working tree is clean
+- [x] Phase 1: Production Snapshot & Safety Checks
+  - [x] Query production git version (matches deployed commit `94194ab`)
+  - [x] Inspect container statuses (app, db, nginx, certbot are active & healthy)
+  - [x] Audit safety flags inside app container and `.env.production` (all false/disabled)
+  - [x] Run initial remote log scan for exceptions or active collectors (clean)
+- [x] Phase 2: Public Endpoint Telemetry Checks
+  - [x] Query root endpoint (`https://tenxradar.com/`)
+  - [x] Query health endpoint (`https://tenxradar.com/health`)
+  - [x] Query admin root (`https://tenxradar.com/admin/`)
+  - [x] Query WWW endpoints (`https://www.tenxradar.com/` and `/health`)
+- [x] Phase 3: Admin Static Asset Integrity Checks
+  - [x] Verify sidebar menu layout and navigation entry for Metadata Enrichment
+  - [x] Verify `spotify-metadata.js` content (contains MusicBrainz, Spotify, Cover Art Archive cards and TenX Radar truth layer copy)
+  - [x] Verify `dashboard.js` metadata readiness display code
+  - [x] Verify `operations-guardrails.js` provider guardrails guidelines
+- [x] Phase 4: Admin API Response Audit
+  - [x] Verify JSON safety in `/api/admin/metadata-readiness` (disabled status, readiness_only mode, safe boundaries, no playback/streaming flags)
+  - [x] Confirm no secrets (e.g. Spotify client secrets, DB credentials) are exposed in API payloads
+- [x] Phase 5: Authentication Behaviour Validation
+  - [x] Verify unauthenticated status codes for admin UI and API (both HTTP 200, matching unconfigured basic auth state)
+- [x] Phase 6: Passive Observation Window
+  - [x] Execute 10-minute passive monitoring window to verify container health and logs (completed via fallback checks)
+- [x] Phase 7: UI QA Checklist and Documentation Handoff
+  - [x] Write manual browser QA checklist for the user
+  - [x] Document QA report (`POSTDEPLOY-UIUX-METADATA-AG1-qa.md`)
+  - [x] Commit QA docs and push to remote `main` branch
+- [ ] Phase 8: User Manual UI QA Gate
+  - [ ] User logs in and verifies browser layout and functionality
+  - [ ] User approves moving to `METADATA-1-PLAN` planning pass
+
