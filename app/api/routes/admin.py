@@ -408,7 +408,7 @@ async def get_metadata_readiness() -> MetadataReadinessResponse:
     mb_configured = bool(settings.musicbrainz_api_base_url and settings.musicbrainz_user_agent)
     sp_configured = bool(settings.spotify_client_id and settings.spotify_client_secret)
     caa_configured = bool(settings.cover_art_archive_base_url)
-    
+
     return MetadataReadinessResponse(
         status="disabled",
         mode="readiness_only",

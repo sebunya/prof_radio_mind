@@ -218,25 +218,25 @@ def test_metadata_readiness_200(client_with_db, monkeypatch) -> None:
     body = r.json()
     assert body["status"] == "disabled"
     assert body["mode"] == "readiness_only"
-    
+
     # MusicBrainz verification
     assert body["providers"]["musicbrainz"]["role"] == "open_canonical_identity"
     assert body["providers"]["musicbrainz"]["configured"] is True
     assert body["providers"]["musicbrainz"]["enabled"] is False
     assert body["providers"]["musicbrainz"]["live_calls_enabled"] is False
-    
+
     # Spotify verification
     assert body["providers"]["spotify"]["role"] == "commercial_catalogue_context"
     assert body["providers"]["spotify"]["configured"] is True
     assert body["providers"]["spotify"]["enabled"] is False
     assert body["providers"]["spotify"]["live_calls_enabled"] is False
-    
+
     # Cover Art Archive verification
     assert body["providers"]["cover_art_archive"]["role"] == "cover_art_fallback"
     assert body["providers"]["cover_art_archive"]["configured"] is True
     assert body["providers"]["cover_art_archive"]["enabled"] is False
     assert body["providers"]["cover_art_archive"]["live_calls_enabled"] is False
-    
+
     # Compliance Boundary checks
     assert body["compliance_boundary"]["no_streaming"] is True
     assert body["compliance_boundary"]["no_playback"] is True
