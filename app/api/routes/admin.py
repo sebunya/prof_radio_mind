@@ -326,12 +326,31 @@ async def get_review_summary(
 async def get_enrichment_status(
     session: AsyncSession = Depends(get_db),
 ) -> EnrichmentSummaryResponse:
-    total_plays = 0
+    from app.infrastructure.database.models.events import Song as SongModel
+
+    matched = 0
+    failed = 0
+    pending = 0
     try:
-        # Since there are no Spotify columns in the database yet, we report counts
-        # under the 'disabled' or 'pending' state strictly representing the DB.
-        total_q = select(func.count()).select_from(PlayEventDB)
-        total_plays = (await session.execute(total_q)).scalar() or 0
+        # Count matched songs
+        matched_q = select(func.count()).select_from(SongModel).where(
+            SongModel.spotify_enriched_at.isnot(None),
+            SongModel.spotify_track_id.isnot(None)
+        )
+        matched = (await session.execute(matched_q)).scalar() or 0
+
+        # Count failed songs (enriched but no Spotify match found)
+        failed_q = select(func.count()).select_from(SongModel).where(
+            SongModel.spotify_enriched_at.isnot(None),
+            SongModel.spotify_track_id.is_(None)
+        )
+        failed = (await session.execute(failed_q)).scalar() or 0
+
+        # Count pending songs (not yet enriched)
+        pending_q = select(func.count()).select_from(SongModel).where(
+            SongModel.spotify_enriched_at.is_(None)
+        )
+        pending = (await session.execute(pending_q)).scalar() or 0
     except Exception as e:
         import logging
         logging.getLogger(__name__).warning("admin_enrichment_status_db_error: %s", e)
@@ -339,11 +358,11 @@ async def get_enrichment_status(
     return EnrichmentSummaryResponse(
         spotify_metadata_enrichment_enabled=settings.spotify_metadata_enrichment_enabled,
         counts={
-            "not_configured": total_plays,
+            "not_configured": 0,
             "disabled": 0,
-            "pending": 0,
-            "matched": 0,
-            "failed": 0
+            "pending": pending,
+            "matched": matched,
+            "failed": failed
         }
     )
 

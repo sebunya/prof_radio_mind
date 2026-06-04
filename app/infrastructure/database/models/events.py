@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, func
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -38,6 +38,19 @@ class Song(Base):
     label: Mapped[str | None] = mapped_column(String(255), nullable=True)
     isrc: Mapped[str | None] = mapped_column(String(12), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+
+    # Spotify Metadata Enrichment Fields
+    spotify_track_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    spotify_album_name: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    spotify_artist_name: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    spotify_popularity: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    spotify_thumbnail_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    spotify_match_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
+    spotify_isrc: Mapped[str | None] = mapped_column(String(12), nullable=True)
+    spotify_enriched_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )

@@ -180,7 +180,10 @@ def test_enrichment_status_200(client_with_db) -> None:
     body = r.json()
     expected_enabled = settings.spotify_metadata_enrichment_enabled
     assert body["spotify_metadata_enrichment_enabled"] == expected_enabled
-    assert body["counts"]["not_configured"] == 42
+    assert body["counts"]["not_configured"] == 0
+    assert body["counts"]["pending"] == 42
+    assert body["counts"]["matched"] == 42
+    assert body["counts"]["failed"] == 42
 
 
 # --- GET /api/admin/spotify-readiness ---
