@@ -26,17 +26,22 @@ async def list_stations(
 ) -> list[StationResponse]:
     from app.infrastructure.database.repositories.station_repo import SQLStationRepository
 
-    repo = SQLStationRepository(session)
-    stations = await repo.list_active()
-    return [
-        StationResponse(
-            id=str(s.id),
-            call_sign=s.call_sign,
-            name=s.name,
-            frequency=s.frequency,
-            city=s.city,
-            country_code=s.country_code,
-        )
-        for s in stations
-    ]
+    try:
+        repo = SQLStationRepository(session)
+        stations = await repo.list_active()
+        return [
+            StationResponse(
+                id=str(s.id),
+                call_sign=s.call_sign,
+                name=s.name,
+                frequency=s.frequency,
+                city=s.city,
+                country_code=s.country_code,
+            )
+            for s in stations
+        ]
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning("stations_list_db_error: %s", e)
+        return []
 

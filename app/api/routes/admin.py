@@ -126,29 +126,36 @@ class CollectorRunResponse(BaseModel):
 
 @router.get("/overview", response_model=OverviewResponse)
 async def get_overview(session: AsyncSession = Depends(get_db)) -> OverviewResponse:
-    # 1. Count active stations
-    stations_q = (
-        select(func.count())
-        .select_from(StationModel)
-        .where(StationModel.is_active.is_(True))
-    )
-    active_stations = (await session.execute(stations_q)).scalar() or 0
+    active_stations = 0
+    total_sources = 0
+    pending_reviews = 0
+    try:
+        # 1. Count active stations
+        stations_q = (
+            select(func.count())
+            .select_from(StationModel)
+            .where(StationModel.is_active.is_(True))
+        )
+        active_stations = (await session.execute(stations_q)).scalar() or 0
 
-    # 2. Count active sources
-    sources_q = (
-        select(func.count())
-        .select_from(SourceModel)
-        .where(SourceModel.is_active.is_(True))
-    )
-    total_sources = (await session.execute(sources_q)).scalar() or 0
+        # 2. Count active sources
+        sources_q = (
+            select(func.count())
+            .select_from(SourceModel)
+            .where(SourceModel.is_active.is_(True))
+        )
+        total_sources = (await session.execute(sources_q)).scalar() or 0
 
-    # 3. Count pending reviews
-    reviews_q = (
-        select(func.count())
-        .select_from(ReviewItemModel)
-        .where(ReviewItemModel.status == "pending")
-    )
-    pending_reviews = (await session.execute(reviews_q)).scalar() or 0
+        # 3. Count pending reviews
+        reviews_q = (
+            select(func.count())
+            .select_from(ReviewItemModel)
+            .where(ReviewItemModel.status == "pending")
+        )
+        pending_reviews = (await session.execute(reviews_q)).scalar() or 0
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning("admin_overview_db_error: %s", e)
 
     # 4. Count active webhooks from the Webhook Store (in-memory subscription cache)
     active_webhooks = 0
@@ -203,105 +210,131 @@ async def get_operations() -> OperationsResponse:
 
 
 @router.get("/recent-events", response_model=list[RecentEventResponse])
-async def get_recent_events(session: AsyncSession = Depends(get_db)) -> list[RecentEventResponse]:
-    stmt = (
-        select(PlayEventDB, StationModel)
-        .join(StationModel, PlayEventDB.station_id == StationModel.id)
-        .order_by(PlayEventDB.played_at.desc())
-        .limit(10)
-    )
-    result = await session.execute(stmt)
-    rows = result.all()
-
-    return [
-        RecentEventResponse(
-            id=str(event.id),
-            station_name=station.name,
-            station_call_sign=station.call_sign,
-            raw_artist=event.raw_artist,
-            raw_title=event.raw_title,
-            played_at=event.played_at,
-            is_duplicate=event.is_duplicate,
-            fingerprint=event.fingerprint,
+async def get_recent_events(
+    session: AsyncSession = Depends(get_db),
+) -> list[RecentEventResponse]:
+    try:
+        stmt = (
+            select(PlayEventDB, StationModel)
+            .join(StationModel, PlayEventDB.station_id == StationModel.id)
+            .order_by(PlayEventDB.played_at.desc())
+            .limit(10)
         )
-        for event, station in rows
-    ]
+        result = await session.execute(stmt)
+        rows = result.all()
+
+        return [
+            RecentEventResponse(
+                id=str(event.id),
+                station_name=station.name,
+                station_call_sign=station.call_sign,
+                raw_artist=event.raw_artist,
+                raw_title=event.raw_title,
+                played_at=event.played_at,
+                is_duplicate=event.is_duplicate,
+                fingerprint=event.fingerprint,
+            )
+            for event, station in rows
+        ]
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning("admin_recent_events_db_error: %s", e)
+        return []
 
 
 @router.get("/source-health", response_model=list[SourceHealthResponse])
-async def get_source_health(session: AsyncSession = Depends(get_db)) -> list[SourceHealthResponse]:
-    # Query all active sources
-    stmt = (
-        select(SourceModel, StationModel)
-        .join(StationModel, SourceModel.station_id == StationModel.id)
-        .order_by(StationModel.call_sign, SourceModel.source_type)
-    )
-    result = await session.execute(stmt)
-    rows = result.all()
-
-    health_list = []
-    for source, station in rows:
-        # Load priority
-        p_stmt = select(SourceRoutePriority.priority).where(
-            SourceRoutePriority.source_id == source.id,
-            SourceRoutePriority.is_active.is_(True)
-        ).limit(1)
-        priority = (await session.execute(p_stmt)).scalar() or 99
-
-        # Load latest validation run
-        val_stmt = (
-            select(SourceValidation)
-            .where(SourceValidation.source_id == source.id)
-            .order_by(SourceValidation.validated_at.desc())
-            .limit(1)
+async def get_source_health(
+    session: AsyncSession = Depends(get_db),
+) -> list[SourceHealthResponse]:
+    try:
+        # Query all active sources
+        stmt = (
+            select(SourceModel, StationModel)
+            .join(StationModel, SourceModel.station_id == StationModel.id)
+            .order_by(StationModel.call_sign, SourceModel.source_type)
         )
-        val = (await session.execute(val_stmt)).scalar_one_or_none()
+        result = await session.execute(stmt)
+        rows = result.all()
 
-        st = source.source_type
-        src_type = st if isinstance(st, str) else st.value
+        health_list = []
+        for source, station in rows:
+            # Load priority
+            p_stmt = select(SourceRoutePriority.priority).where(
+                SourceRoutePriority.source_id == source.id,
+                SourceRoutePriority.is_active.is_(True)
+            ).limit(1)
+            priority = (await session.execute(p_stmt)).scalar() or 99
 
-        health_list.append(
-            SourceHealthResponse(
-                id=str(source.id),
-                station_id=str(source.station_id),
-                station_call_sign=station.call_sign,
-                source_type=src_type,
-                name=source.name,
-                base_url=source.base_url,
-                is_active=source.is_active,
-                priority=priority,
-                latest_validation_status=val.status if val else None,
-                latest_validation_code=val.validation_code if val else None,
-                latest_validated_at=val.validated_at if val else None,
-                latest_response_status_code=val.response_status_code if val else None,
+            # Load latest validation run
+            val_stmt = (
+                select(SourceValidation)
+                .where(SourceValidation.source_id == source.id)
+                .order_by(SourceValidation.validated_at.desc())
+                .limit(1)
             )
-        )
+            val = (await session.execute(val_stmt)).scalar_one_or_none()
 
-    return health_list
+            st = source.source_type
+            src_type = st if isinstance(st, str) else st.value
+
+            health_list.append(
+                SourceHealthResponse(
+                    id=str(source.id),
+                    station_id=str(source.station_id),
+                    station_call_sign=station.call_sign,
+                    source_type=src_type,
+                    name=source.name,
+                    base_url=source.base_url,
+                    is_active=source.is_active,
+                    priority=priority,
+                    latest_validation_status=val.status if val else None,
+                    latest_validation_code=val.validation_code if val else None,
+                    latest_validated_at=val.validated_at if val else None,
+                    latest_response_status_code=val.response_status_code if val else None,
+                )
+            )
+
+        return health_list
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning("admin_source_health_db_error: %s", e)
+        return []
 
 
 @router.get("/review-summary", response_model=ReviewSummaryResponse)
-async def get_review_summary(session: AsyncSession = Depends(get_db)) -> ReviewSummaryResponse:
-    stmt = select(ReviewItemModel.status, func.count()).group_by(ReviewItemModel.status)
-    rows = (await session.execute(stmt)).all()
-    counts: dict[str, int] = {str(status): int(count) for status, count in rows}
+async def get_review_summary(
+    session: AsyncSession = Depends(get_db),
+) -> ReviewSummaryResponse:
+    try:
+        stmt = select(ReviewItemModel.status, func.count()).group_by(ReviewItemModel.status)
+        rows = (await session.execute(stmt)).all()
+        counts: dict[str, int] = {str(status): int(count) for status, count in rows}
 
-    return ReviewSummaryResponse(
-        pending=counts.get("pending", 0),
-        reviewed=counts.get("reviewed", 0),
-        dismissed=counts.get("dismissed", 0),
-        escalated=counts.get("escalated", 0),
-    )
+        return ReviewSummaryResponse(
+            pending=counts.get("pending", 0),
+            reviewed=counts.get("reviewed", 0),
+            dismissed=counts.get("dismissed", 0),
+            escalated=counts.get("escalated", 0),
+        )
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning("admin_review_summary_db_error: %s", e)
+        return ReviewSummaryResponse(pending=0, reviewed=0, dismissed=0, escalated=0)
 
 
 @router.get("/enrichment-status", response_model=EnrichmentSummaryResponse)
 async def get_enrichment_status(
     session: AsyncSession = Depends(get_db),
 ) -> EnrichmentSummaryResponse:
-    # Since there are no Spotify columns in the database yet, we report counts
-    # under the 'disabled' or 'pending' state strictly representing the DB.
-    total_q = select(func.count()).select_from(PlayEventDB)
-    total_plays = (await session.execute(total_q)).scalar() or 0
+    total_plays = 0
+    try:
+        # Since there are no Spotify columns in the database yet, we report counts
+        # under the 'disabled' or 'pending' state strictly representing the DB.
+        total_q = select(func.count()).select_from(PlayEventDB)
+        total_plays = (await session.execute(total_q)).scalar() or 0
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning("admin_enrichment_status_db_error: %s", e)
 
     return EnrichmentSummaryResponse(
         spotify_metadata_enrichment_enabled=settings.spotify_metadata_enrichment_enabled,
@@ -332,25 +365,33 @@ async def get_spotify_readiness() -> SpotifyReadinessResponse:
 
 
 @router.get("/collector-runs", response_model=list[CollectorRunResponse])
-async def get_collector_runs(session: AsyncSession = Depends(get_db)) -> list[CollectorRunResponse]:
-    stmt = (
-        select(CollectorRun, StationModel)
-        .join(StationModel, CollectorRun.station_id == StationModel.id)
-        .order_by(CollectorRun.created_at.desc())
-        .limit(10)
-    )
-    result = await session.execute(stmt)
-    rows = result.all()
-
-    return [
-        CollectorRunResponse(
-            id=str(run.id),
-            collector_name=run.status, # represents status or custom collector name if saved in meta
-            station_call_sign=station.call_sign,
-            status=run.status,
-            error_message=run.error_message,
-            started_at=run.started_at,
-            completed_at=run.completed_at,
+async def get_collector_runs(
+    session: AsyncSession = Depends(get_db),
+) -> list[CollectorRunResponse]:
+    try:
+        stmt = (
+            select(CollectorRun, StationModel)
+            .join(StationModel, CollectorRun.station_id == StationModel.id)
+            .order_by(CollectorRun.created_at.desc())
+            .limit(10)
         )
-        for run, station in rows
-    ]
+        result = await session.execute(stmt)
+        rows = result.all()
+
+        return [
+            CollectorRunResponse(
+                id=str(run.id),
+                # Status represents name if custom metadata is absent
+                collector_name=run.status,
+                station_call_sign=station.call_sign,
+                status=run.status,
+                error_message=run.error_message,
+                started_at=run.started_at,
+                completed_at=run.completed_at,
+            )
+            for run, station in rows
+        ]
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning("admin_collector_runs_db_error: %s", e)
+        return []
