@@ -260,6 +260,19 @@ async def job_nightly_reconciliation() -> None:
     logger.info("nightly_reconciliation completed total_dupes=%d", total_dupes)
 
 
+async def job_spotify_metadata_enrichment() -> None:
+    """Scheduled background job to enrich pending catalog songs with Spotify metadata."""
+    from app.application.spotify.enricher import enrich_songs_batch
+    from app.infrastructure.database.session import _get_factory as _factory
+
+    try:
+        async with _factory()() as session:
+            count = await enrich_songs_batch(session, batch_size=20)
+            logger.info("spotify_metadata_enrichment_run completed enriched=%d", count)
+    except Exception as exc:
+        logger.error("spotify_metadata_enrichment_run_failed error=%s", exc)
+
+
 def build_scheduler() -> AsyncIOScheduler:
     """Create and configure the APScheduler instance with all registered jobs."""
     global _scheduler
@@ -324,5 +337,21 @@ def build_scheduler() -> AsyncIOScheduler:
         logger.info("Scheduler registered job: Nightly reconciliation")
     else:
         logger.info("Scheduler skipped job: Nightly reconciliation (disabled)")
+
+    # Spotify Metadata Enrichment Job — runs hourly
+    if settings.spotify_metadata_enrichment_enabled:
+        sched.add_job(
+            job_spotify_metadata_enrichment,
+            IntervalTrigger(hours=1),
+            id="spotify_metadata_enrichment",
+            name="Spotify catalog metadata enrichment job",
+            replace_existing=True,
+            misfire_grace_time=120,
+        )
+        logger.info("Scheduler registered job: Spotify catalog metadata enrichment")
+    else:
+        logger.info(
+            "Scheduler skipped job: Spotify catalog metadata enrichment (disabled)"
+        )
 
     return sched
