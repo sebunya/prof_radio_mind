@@ -1,0 +1,28 @@
+# Task Checklist — UIUX-METADATA-AG1C
+
+- [x] Phase 0: Reframe Strategy & Provider Audit
+- [x] Phase A: Design & Documentation (Approval Gated)
+  - [x] Audit codebase for Spotify-only narrow framing
+  - [x] Reframe UI, API, and settings design
+  - [x] Draft `implementation_plan.md` and `task.md`
+- [x] Phase B: Backend Enhancements
+  - [x] Define `musicbrainz` and `cover_art_archive` settings in `app/core/settings.py`
+  - [x] Add placeholders to `.env.production.example`
+  - [x] Create Pydantic schema models for Metadata Readiness in `app/api/routes/admin.py`
+  - [x] Implement `/api/admin/metadata-readiness` endpoint in `app/api/routes/admin.py`
+  - [x] Add API client wrapper for `/metadata-readiness` in `app/static/js/api.js`
+- [x] Phase C: Frontend UI/UX Alignment
+  - [x] Rename "Spotify Metadata" navigation title to "Metadata Enrichment" in `index.html` and `app.js`
+  - [x] Reframe the enrichment panel layout in `spotify-metadata.js` with MusicBrainz, Spotify, and Cover Art Archive provider cards
+  - [x] Outline the TenX Radar resolved matching layer and future states
+  - [x] Integrate enrichment readiness indicators into the main dashboard overview in `dashboard.js`
+  - [x] Add provider-level operations guardrails and rules to `operations-guardrails.js`
+- [x] Phase D: Verification & Quality Gates
+  - [x] Add unit tests for `/metadata-readiness` in `tests/unit/test_admin_api.py`
+  - [x] Run linter: `ruff check app/ tests/`
+  - [x] Run type checker: `mypy app/ --ignore-missing-imports`
+  - [x] Run tests: `pytest tests/`
+  - [x] Execute static safety checks (no secrets, no live calls, no DB migrations)
+- [x] Phase E: Wrap-Up & Commit
+  - [x] Update implementation reports and walkthroughs
+  - [x] Stage exact files and push branch
