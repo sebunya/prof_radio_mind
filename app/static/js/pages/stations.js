@@ -3,7 +3,7 @@ import { esc, badge, fmtDateTime } from '../ui.js';
 
 export async function init(container, actions) {
   actions.innerHTML = '';
-  container.innerHTML = '<div class="loader-center"><div class="loader"></div></div>';
+  container.innerHTML = '<div class="loader-center"><div class="loader" role="status" aria-label="Loading"></div></div>';
 
   let stations = [];
   let sources = [];
@@ -21,7 +21,7 @@ export async function init(container, actions) {
     container.innerHTML = `<div class="empty-state">
       <div class="empty-icon">📡</div>
       <div class="empty-title">No stations found</div>
-      <div class="empty-desc">Station seeds may not have run yet. Check the API logs.</div>
+      <div class="empty-desc">Station seeds may not have run yet. Check application startup logs.</div>
     </div>`;
     return;
   }
@@ -75,7 +75,7 @@ export async function init(container, actions) {
                 <div style="font-weight:600;font-size:14px;color:var(--text)">${esc(s.name)} (${esc(s.call_sign)})</div>
                 <div class="text-3 text-xs">Sources linked: ${stationSources.length}</div>
               </div>
-              
+
               ${stationSources.length > 0 ? `
                 <div class="table-wrap">
                   <table style="font-size:12px">
@@ -97,7 +97,7 @@ export async function init(container, actions) {
                         else if (src.latest_validation_status === 'failed') statusClass = 'badge-danger';
                         else if (src.latest_validation_status === 'unvalidated') statusClass = 'badge-warning';
 
-                        const formattedConfig = src.base_url 
+                        const formattedConfig = src.base_url
                           ? `<a href="${esc(src.base_url)}" target="_blank" class="text-2" style="text-decoration:none">${esc(src.base_url.slice(0, 45))}... ↗</a>`
                           : '<span class="text-3">Manual Upload</span>';
 

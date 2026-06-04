@@ -2,7 +2,7 @@ import { API } from '../api.js';
 import { fmtRelative, badge, esc } from '../ui.js';
 
 export async function init(container) {
-  container.innerHTML = '<div class="loader-center"><div class="loader"></div></div>';
+  container.innerHTML = '<div class="loader-center"><div class="loader" role="status" aria-label="Loading"></div></div>';
 
   const [overview, events, reviewItems, metadata] = await Promise.allSettled([
     API.adminOverview(), API.adminRecentEvents(), API.reviewItems(), API.adminMetadataReadiness()
@@ -125,6 +125,9 @@ export async function init(container) {
       </div>
     </div>
 
+    <!-- ── System state strip ── -->
+    ${ov ? systemStatusStrip(ov) : ''}
+
     <!-- ── Charts ── -->
     <div class="charts-grid mb-5">
       <div class="card">
@@ -194,6 +197,50 @@ export async function init(container) {
     renderStatusChart(byStatus);
     renderTypeChart(byType);
   });
+}
+
+function systemStatusStrip(ov) {
+  function chip(label, value, cls) {
+    const dotCls = {
+      'chip-ok': 'dot-green',
+      'chip-warn': 'dot-yellow',
+      'chip-muted': 'dot-grey',
+      'chip-info': 'dot-blue',
+      'chip-danger': 'dot-red',
+    }[cls] || 'dot-grey';
+    return `<span class="status-chip ${cls}">
+      <span class="status-dot ${dotCls}"></span>
+      ${esc(label)}: ${esc(value)}
+    </span>`;
+  }
+
+  const schedulerChip = ov.scheduler_enabled
+    ? chip('Scheduler', 'Enabled', 'chip-warn')
+    : chip('Scheduler', 'Disabled', 'chip-muted');
+
+  const isProd = ov.app_env === 'production';
+  const docsExposed = isProd ? ov.enable_docs_in_production : true;
+  const docsChip = docsExposed
+    ? chip('API Docs', 'Exposed', isProd ? 'chip-warn' : 'chip-info')
+    : chip('API Docs', 'Hidden', 'chip-ok');
+
+  const authChip = ov.admin_basic_auth_configured
+    ? chip('Admin Auth', 'Protected', 'chip-ok')
+    : chip('Admin Auth', 'Public', 'chip-info');
+
+  const dedupChip = chip('Deduplication', 'Active', 'chip-ok');
+
+  const retentionEnabled = ov.raw_payload_retention_days > 0;
+  const retChip = retentionEnabled
+    ? chip('Retention', `${ov.raw_payload_retention_days}d`, 'chip-info')
+    : chip('Retention', 'Off', 'chip-muted');
+
+  return `<div class="system-status-strip mb-5">
+    ${schedulerChip}${docsChip}${authChip}${dedupChip}${retChip}
+    <a href="#/operations" class="btn btn-ghost btn-xs" style="margin-left:auto">
+      View Operations →
+    </a>
+  </div>`;
 }
 
 function renderStatusChart(d) {
