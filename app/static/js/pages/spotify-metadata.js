@@ -127,50 +127,65 @@ export async function init(container, actions) {
       </div>
     </div>
 
-    <!-- ── Target Spotify Data Model Schema ── -->
+    <!-- ── Spotify Metadata Enrichment Telemetry ── -->
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:20px">
+      <div style="background:var(--bg3);border-radius:6px;padding:16px;display:flex;flex-direction:column;align-items:center;justify-content:center;border:1px solid var(--border2)">
+        <div style="font-size:11px;color:var(--text3);font-weight:600;text-transform:uppercase;margin-bottom:4px">Matched Tracks</div>
+        <div style="font-size:28px;font-weight:700;color:var(--success)">${status.counts?.matched ?? 0}</div>
+      </div>
+      <div style="background:var(--bg3);border-radius:6px;padding:16px;display:flex;flex-direction:column;align-items:center;justify-content:center;border:1px solid var(--border2)">
+        <div style="font-size:11px;color:var(--text3);font-weight:600;text-transform:uppercase;margin-bottom:4px">Failed Matches</div>
+        <div style="font-size:28px;font-weight:700;color:var(--danger)">${status.counts?.failed ?? 0}</div>
+      </div>
+      <div style="background:var(--bg3);border-radius:6px;padding:16px;display:flex;flex-direction:column;align-items:center;justify-content:center;border:1px solid var(--border2)">
+        <div style="font-size:11px;color:var(--text3);font-weight:600;text-transform:uppercase;margin-bottom:4px">Pending Enrichment</div>
+        <div style="font-size:28px;font-weight:700;color:var(--warning)">${status.counts?.pending ?? 0}</div>
+      </div>
+    </div>
+
+    <!-- ── Active Database Integration Schema & CLI ── -->
     <div class="card">
       <div class="card-header">
-        <span class="card-title">Future Spotify Database Integration Schema</span>
-        <span class="badge badge-info">Next Pass: SPOTIFY-1</span>
+        <span class="card-title">Database Schema & Execution Commands</span>
+        <span class="badge badge-success">Active Schema</span>
       </div>
       <div style="font-size:13px;line-height:1.5">
         <p class="text-2 mb-4">
-          To prepare for backend lookups, database migrations will introduce the following columns in a future pass. This dashboard maps these fields in read-only states:
+          The Spotify enrichment schema is fully active inside the <code>songs</code> database table. The following metadata fields are tracked:
         </p>
 
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
           
           <div>
-            <div style="font-weight:600;margin-bottom:8px;color:var(--text)">1. Target Schema Fields</div>
-            <ul style="padding-left:16px;color:var(--text2);display:flex;flex-direction:column;gap:3px;font-size:12px">
-              <li><code class="mono">spotify_track_id</code> (String)</li>
-              <li><code class="mono">spotify_artist_id</code> (String)</li>
-              <li><code class="mono">spotify_album_id</code> (String)</li>
-              <li><code class="mono">spotify_uri</code> (String)</li>
-              <li><code class="mono">spotify_external_url</code> (Text)</li>
-              <li><code class="mono">spotify_isrc</code> (String)</li>
-              <li><code class="mono">spotify_artwork_url</code> (Text)</li>
-              <li><code class="mono">spotify_popularity_score</code> (Integer)</li>
-              <li><code class="mono">match_confidence_score</code> (Float)</li>
+            <div style="font-weight:600;margin-bottom:8px;color:var(--text)">Tracked Database Fields</div>
+            <ul style="padding-left:16px;color:var(--text2);display:flex;flex-direction:column;gap:4px;font-size:12px">
+              <li><code class="mono">spotify_track_id</code> (String) - Spotify unique ID for the track</li>
+              <li><code class="mono">spotify_artist_id</code> (String) - Spotify ID for the main artist</li>
+              <li><code class="mono">spotify_album_id</code> (String) - Spotify ID for the album</li>
+              <li><code class="mono">spotify_uri</code> (String) - Spotify standard URI</li>
+              <li><code class="mono">spotify_external_url</code> (Text) - Spotify URL for Web App link</li>
+              <li><code class="mono">spotify_isrc</code> (String) - International Standard Recording Code</li>
+              <li><code class="mono">spotify_artwork_url</code> (Text) - High-resolution artwork URL</li>
+              <li><code class="mono">spotify_popularity_score</code> (Integer) - Score from 0 to 100</li>
+              <li><code class="mono">match_confidence_score</code> (Float) - Match confidence ratio</li>
+              <li><code class="mono">spotify_enriched_at</code> (DateTime) - Timestamp of last enrichment attempt</li>
             </ul>
           </div>
 
           <div>
-            <div style="font-weight:600;margin-bottom:8px;color:var(--text)">2. Enrichment Status States</div>
-            <div style="display:flex;flex-wrap:wrap;gap:6px">
-              <span class="badge badge-muted">not_configured</span>
-              <span class="badge badge-muted">disabled</span>
-              <span class="badge badge-warning">pending</span>
-              <span class="badge badge-success">matched</span>
-              <span class="badge badge-warning">low_confidence</span>
-              <span class="badge badge-danger">unmatched</span>
-              <span class="badge badge-danger">failed</span>
-              <span class="badge badge-muted">skipped</span>
-              <span class="badge badge-warning">rate_limited</span>
+            <div style="font-weight:600;margin-bottom:8px;color:var(--text)">Run Manual Catalog Enrichment</div>
+            <p class="text-2 mb-3" style="font-size:12px">
+              Developers can execute manual, rate-limited batch enrichment tasks against the database using the command line utility:
+            </p>
+            <div style="background:var(--bg3);border-radius:6px;padding:12px;font-family:var(--mono);font-size:11px;color:var(--text2);position:relative;border:1px solid var(--border2);margin-bottom:12px">
+              <span style="position:absolute;top:6px;right:10px;font-size:9px;color:var(--text3);font-family:sans-serif;text-transform:uppercase;font-weight:bold">Command</span>
+              python -m scripts.enrich_catalog --limit 100 --delay 0.5
             </div>
-            <div class="text-3 text-xs mt-4">
-              <strong>Database Table Strategy Recommendation</strong>:<br>
-              We recommend creating a separate <code class="mono">track_identities</code> or <code class="mono">metadata_matches</code> table to decouple enrichment results from the core high-frequency <code class="mono">play_events</code> table.
+            <div class="text-3 text-xs">
+              <strong>Usage Parameters:</strong><br>
+              • <code>--limit N</code>: Maximum number of songs to attempt to enrich.<br>
+              • <code>--delay S</code>: Cool-down delay in seconds between queries to prevent API rate-limiting.<br>
+              • <code>--batch-size B</code>: Database query size limit per loop check.
             </div>
           </div>
 
