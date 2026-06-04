@@ -17,7 +17,7 @@ import pytest
 
 from app.domain.entities.collector_run import CollectorStatus
 from app.domain.entities.no_track_event import NoTrackReason
-from app.infrastructure.collectors.kiis_iheart import KIISIHeartCollector
+from app.infrastructure.collectors.iheart_now_playing import IHeartNowPlayingCollector
 from app.infrastructure.parsers.iheart import parse_iheart_now_playing
 
 _FIXTURE_200 = Path(__file__).parent.parent.parent / "fixtures/json/iheart_kiis_200.json"
@@ -69,13 +69,14 @@ def test_parse_missing_current_track_raises() -> None:
         parse_iheart_now_playing(b'{"stationId": "2501"}', http_status=200)
 
 
-class _FixtureKIISCollector(KIISIHeartCollector):
+class _FixtureKIISCollector(IHeartNowPlayingCollector):
     """KIIS collector stub that returns a pre-loaded fixture instead of making HTTP calls."""
 
     def __init__(self, raw_bytes: bytes, http_status: int, tmp_path_str: str) -> None:
         super().__init__(
             uuid.uuid4(),
             uuid.uuid4(),
+            iheart_station_id="2501",
             storage_root=tmp_path_str,
         )
         self._raw = raw_bytes

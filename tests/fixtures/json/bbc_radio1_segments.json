@@ -1,0 +1,80 @@
+{
+  "data": [
+    {
+      "id": "bbc-r1-p0seg001",
+      "type": "music",
+      "offset": {
+        "start": 1748044860,
+        "end": 1748045060,
+        "label": "track",
+        "now_playing": true
+      },
+      "titles": {
+        "primary": "Espresso"
+      },
+      "primary_contributors": [
+        {
+          "id": "bbc-artist-001",
+          "name": "Sabrina Carpenter",
+          "role": "Performer"
+        }
+      ],
+      "image_url": "https://ichef.bbci.co.uk/images/ic/640x640/p0example1.jpg"
+    },
+    {
+      "id": "bbc-r1-p0seg002",
+      "type": "music",
+      "offset": {
+        "start": 1748044600,
+        "end": 1748044860,
+        "label": "track",
+        "now_playing": false
+      },
+      "titles": {
+        "primary": "Beautiful Things"
+      },
+      "primary_contributors": [
+        {
+          "id": "bbc-artist-002",
+          "name": "Benson Boone",
+          "role": "Performer"
+        }
+      ],
+      "image_url": "https://ichef.bbci.co.uk/images/ic/640x640/p0example2.jpg"
+    },
+    {
+      "id": "bbc-r1-p0seg003",
+      "type": "speech",
+      "offset": {
+        "start": 1748044450,
+        "end": 1748044600,
+        "label": "speech",
+        "now_playing": false
+      },
+      "titles": {
+        "primary": "Radio 1 Breakfast with Greg James"
+      },
+      "primary_contributors": []
+    },
+    {
+      "id": "bbc-r1-p0seg004",
+      "type": "music",
+      "offset": {
+        "start": 1748044200,
+        "end": 1748044450,
+        "label": "track",
+        "now_playing": false
+      },
+      "titles": {
+        "primary": "Paint The Town Red"
+      },
+      "primary_contributors": [
+        {
+          "id": "bbc-artist-003",
+          "name": "Doja Cat",
+          "role": "Performer"
+        }
+      ]
+    }
+  ]
+}

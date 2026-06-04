@@ -1,0 +1,41 @@
+{
+  "topSongs": [
+    {
+      "id": "top-821-rank1-20260604",
+      "title": "Anti-Hero",
+      "artist": "Taylor Swift",
+      "rank": 1,
+      "playCount": 55
+    },
+    {
+      "id": "top-821-rank2-20260604",
+      "title": "As It Was",
+      "artist": "Harry Styles",
+      "rank": 2,
+      "playCount": 50
+    },
+    {
+      "id": "top-821-rank3-20260604",
+      "title": "good 4 u",
+      "artist": "Olivia Rodrigo",
+      "rank": 3,
+      "playCount": 46
+    },
+    {
+      "id": "top-821-rank4-20260604",
+      "title": "Levitating",
+      "artist": "Dua Lipa",
+      "rank": 4,
+      "playCount": 43
+    },
+    {
+      "id": "top-821-rank5-20260604",
+      "title": "Blinding Lights",
+      "artist": "The Weeknd",
+      "rank": 5,
+      "playCount": 40
+    }
+  ],
+  "stationId": "821",
+  "period": "weekly"
+}
