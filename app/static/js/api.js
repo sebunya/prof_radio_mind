@@ -36,6 +36,9 @@ export const API = {
   // ── Health ──────────────────────────────────────────────────
   health: () => apiCall('GET', '/health'),
 
+  // ── Admin overview (read-only operational state) ─────────────
+  adminOverview: () => apiCall('GET', '/api/admin/overview'),
+
   // ── Stations ────────────────────────────────────────────────
   stations: () => apiCall('GET', '/stations'),
 

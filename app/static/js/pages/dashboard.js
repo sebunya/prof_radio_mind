@@ -2,19 +2,21 @@ import { API } from '../api.js';
 import { fmtRelative, badge, esc } from '../ui.js';
 
 export async function init(container) {
-  container.innerHTML = '<div class="loader-center"><div class="loader"></div></div>';
+  container.innerHTML = '<div class="loader-center"><div class="loader" role="status" aria-label="Loading"></div></div>';
 
-  const [health, stations, items, hooks] = await Promise.allSettled([
-    API.health(), API.stations(), API.reviewItems(), API.webhooks(),
+  const [health, stations, items, hooks, overview] = await Promise.allSettled([
+    API.health(), API.stations(), API.reviewItems(), API.webhooks(), API.adminOverview(),
   ]);
 
-  const h  = health.status    === 'fulfilled' ? health.value    : {};
-  const sl = stations.status  === 'fulfilled' ? stations.value  : [];
-  const il = items.status     === 'fulfilled' ? items.value     : [];
-  const hl = hooks.status     === 'fulfilled' ? hooks.value     : [];
+  const h   = health.status    === 'fulfilled' ? health.value    : {};
+  const sl  = stations.status  === 'fulfilled' ? stations.value  : [];
+  const il  = items.status     === 'fulfilled' ? items.value     : [];
+  const hl  = hooks.status     === 'fulfilled' ? hooks.value     : [];
+  const ov  = overview.status  === 'fulfilled' ? overview.value  : null;
 
   const pending = il.filter(i => i.status === 'pending').length;
   const apiOk   = h.status === 'ok';
+  const schedulerRunning = h.components?.scheduler === 'running';
 
   // Aggregate counts
   const byStatus = { pending: 0, reviewed: 0, dismissed: 0, escalated: 0 };
@@ -49,11 +51,14 @@ export async function init(container) {
           ${apiOk ? 'Operational' : 'Degraded'}
         </div>
         <div class="stat-meta">
-          Scheduler: ${h.scheduler_running ? '▶ Running' : '■ Stopped'}
+          Scheduler: ${schedulerRunning ? '▶ Running' : '■ Stopped'}
           &nbsp;·&nbsp; v${h.version || '?'}
         </div>
       </div>
     </div>
+
+    <!-- ── System state strip ── -->
+    ${ov ? systemStatusStrip(ov) : ''}
 
     <!-- ── Charts ── -->
     <div class="charts-grid mb-5">
@@ -89,7 +94,7 @@ export async function init(container) {
               <td>${esc(s.name)}</td>
               <td>${esc(s.frequency || '—')}</td>
               <td class="text-2">${esc(s.city || '—')}</td>
-            </tr>`).join('') || `<tr><td colspan="4" class="td-empty">No stations</td></tr>`}
+            </tr>`).join('') || `<tr><td colspan="4" class="td-empty">No stations found</td></tr>`}
           </tbody>
         </table>
       </div>
@@ -121,6 +126,47 @@ export async function init(container) {
     renderStatusChart(byStatus);
     renderTypeChart(byType);
   });
+}
+
+function systemStatusStrip(ov) {
+  function chip(label, value, cls) {
+    const dotCls = {
+      'chip-ok': 'dot-green',
+      'chip-warn': 'dot-yellow',
+      'chip-muted': 'dot-grey',
+      'chip-info': 'dot-blue',
+      'chip-danger': 'dot-red',
+    }[cls] || 'dot-grey';
+    return `<span class="status-chip ${cls}">
+      <span class="status-dot ${dotCls}"></span>
+      ${esc(label)}: ${esc(value)}
+    </span>`;
+  }
+
+  const schedulerChip = ov.scheduler_enabled
+    ? chip('Scheduler', 'Enabled', 'chip-warn')
+    : chip('Scheduler', 'Disabled', 'chip-muted');
+
+  const docsChip = ov.docs_exposed
+    ? chip('API Docs', 'Exposed', ov.is_production ? 'chip-warn' : 'chip-info')
+    : chip('API Docs', 'Hidden', 'chip-ok');
+
+  const authChip = ov.admin_auth_enabled
+    ? chip('Admin Auth', 'Protected', 'chip-ok')
+    : chip('Admin Auth', 'Public', 'chip-info');
+
+  const dedupChip = chip('Deduplication', 'Active', 'chip-ok');
+
+  const retChip = ov.retention_enabled
+    ? chip('Retention', `${ov.raw_payload_retention_days}d`, 'chip-info')
+    : chip('Retention', 'Off', 'chip-muted');
+
+  return `<div class="system-status-strip mb-5">
+    ${schedulerChip}${docsChip}${authChip}${dedupChip}${retChip}
+    <a href="#/operations" class="btn btn-ghost btn-xs" style="margin-left:auto">
+      View Operations →
+    </a>
+  </div>`;
 }
 
 function renderStatusChart(d) {

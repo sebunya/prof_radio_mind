@@ -115,6 +115,16 @@ body {
   text-align: center;
 }
 
+/* ── Sidebar section label ──────────────────────────────────── */
+.nav-section-label {
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--text3);
+  text-transform: uppercase;
+  letter-spacing: .12em;
+  padding: 14px 16px 4px;
+}
+
 .sidebar-footer {
   padding: 12px 16px;
   border-top: 1px solid var(--border);
@@ -131,6 +141,43 @@ body {
 .api-status.ok      { color: var(--success); }
 .api-status.error   { color: var(--danger); }
 .api-status.checking{ color: var(--text3); }
+
+/* ── Env badge ──────────────────────────────────────────────── */
+.env-badge {
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: 3px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.env-prod    { background: rgba(239,68,68,.2);  color: #fca5a5; border: 1px solid rgba(239,68,68,.35); }
+.env-staging { background: rgba(245,158,11,.15); color: #fcd34d; border: 1px solid rgba(245,158,11,.3); }
+.env-dev     { background: rgba(100,116,139,.2); color: var(--text3); border: 1px solid var(--border); }
+
+/* ── Sidebar toggle (mobile) ────────────────────────────────── */
+.sidebar-toggle {
+  display: none;
+  background: none;
+  border: none;
+  color: var(--text2);
+  cursor: pointer;
+  padding: 6px;
+  border-radius: var(--r-sm);
+  margin-right: 8px;
+  flex-shrink: 0;
+}
+.sidebar-toggle:hover { color: var(--text); background: var(--bg3); }
+
+/* ── Sidebar scrim (mobile overlay) ────────────────────────── */
+.sidebar-scrim {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.5);
+  z-index: 199;
+}
 
 /* ── Main area ──────────────────────────────────────────────── */
 #main { flex: 1; display: flex; flex-direction: column; height: 100vh; overflow: hidden; min-width: 0; }
@@ -522,7 +569,8 @@ input[type=checkbox] { accent-color: var(--accent); width: 14px; height: 14px; c
 }
 .modal-overlay.hidden { display: none; }
 
-.modal-box {
+/* .modal and .modal-box are equivalent — support both for compatibility */
+.modal, .modal-box {
   background: var(--bg2);
   border: 1px solid var(--border);
   border-radius: var(--r);
@@ -674,6 +722,126 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
 .w-full   { width: 100%; }
 .text-right { text-align: right; }
 
+/* ── System status strip ─────────────────────────────────────── */
+.system-status-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 12px 16px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  margin-bottom: 20px;
+  align-items: center;
+}
+
+.status-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.chip-ok       { background: rgba(16,185,129,.12); color: var(--success); border: 1px solid rgba(16,185,129,.25); }
+.chip-warn     { background: rgba(245,158,11,.12);  color: var(--warning); border: 1px solid rgba(245,158,11,.25); }
+.chip-muted    { background: rgba(100,116,139,.12); color: var(--text3);   border: 1px solid var(--border); }
+.chip-info     { background: rgba(14,165,233,.12);  color: var(--accent);  border: 1px solid rgba(14,165,233,.25); }
+.chip-danger   { background: rgba(239,68,68,.12);   color: var(--danger);  border: 1px solid rgba(239,68,68,.25); }
+
+.status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.dot-green  { background: var(--success); }
+.dot-yellow { background: var(--warning); }
+.dot-grey   { background: var(--text3); }
+.dot-blue   { background: var(--accent); }
+.dot-red    { background: var(--danger); }
+
+/* ── Operations page ─────────────────────────────────────────── */
+.ops-section { margin-bottom: 24px; }
+
+.ops-section-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text3);
+  text-transform: uppercase;
+  letter-spacing: .07em;
+  margin-bottom: 12px;
+}
+
+.ops-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+}
+
+.ops-card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 16px;
+}
+
+.ops-card-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text3);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  margin-bottom: 8px;
+}
+
+.ops-card-value {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.ops-card-desc {
+  font-size: 11px;
+  color: var(--text3);
+  line-height: 1.45;
+}
+
+/* Flag table (collector status) */
+.flag-table { width: 100%; border-collapse: collapse; }
+.flag-table td { padding: 7px 0; border-bottom: 1px solid var(--border2); vertical-align: middle; }
+.flag-table tr:last-child td { border-bottom: none; }
+.flag-label { font-size: 13px; color: var(--text); font-weight: 500; }
+.flag-note  { font-size: 11px; color: var(--text3); }
+
+/* Guardrail box */
+.guardrail-box {
+  background: rgba(245,158,11,.07);
+  border: 1px solid rgba(245,158,11,.2);
+  border-radius: var(--r);
+  padding: 16px;
+  margin-bottom: 12px;
+}
+.guardrail-box-icon { font-size: 14px; margin-right: 6px; }
+.guardrail-box p { font-size: 12px; color: var(--text2); line-height: 1.5; }
+.guardrail-box strong { color: var(--warning); font-weight: 600; }
+
+/* Info box */
+.info-box {
+  background: var(--accent-muted);
+  border: 1px solid rgba(14,165,233,.2);
+  border-radius: var(--r);
+  padding: 14px 16px;
+  margin-bottom: 12px;
+}
+.info-box p { font-size: 12px; color: #7dd3fc; line-height: 1.5; }
+
 /* ── Scrollbar ───────────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
@@ -689,6 +857,9 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
   :root { --sidebar-w: 0px; }
   .sidebar { position: fixed; left: -250px; top: 0; z-index: 200; width: 250px; transition: left .2s; }
   .sidebar.open { left: 0; }
+  .sidebar-toggle { display: flex; }
   .stats-grid { grid-template-columns: 1fr 1fr; }
   .charts-grid { grid-template-columns: 1fr; }
+  .ops-grid { grid-template-columns: 1fr; }
+  .system-status-strip { gap: 6px; }
 }

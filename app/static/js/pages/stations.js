@@ -1,9 +1,9 @@
 import { API } from '../api.js';
-import { esc, badge } from '../ui.js';
+import { esc } from '../ui.js';
 
 export async function init(container, actions) {
   actions.innerHTML = '';
-  container.innerHTML = '<div class="loader-center"><div class="loader"></div></div>';
+  container.innerHTML = '<div class="loader-center"><div class="loader" role="status" aria-label="Loading"></div></div>';
 
   let stations;
   try {
@@ -17,16 +17,16 @@ export async function init(container, actions) {
     container.innerHTML = `<div class="empty-state">
       <div class="empty-icon">📡</div>
       <div class="empty-title">No stations found</div>
-      <div class="empty-desc">Station seeds may not have run yet. Check the API logs.</div>
+      <div class="empty-desc">Station seeds may not have run yet. Check application startup logs.</div>
     </div>`;
     return;
   }
 
   container.innerHTML = `
-    <div class="card">
+    <div class="card mb-5">
       <div class="card-header">
         <span class="card-title">${stations.length} Station${stations.length !== 1 ? 's' : ''}</span>
-        <span class="text-3 text-sm">Auto-collected every 3 minutes</span>
+        <span class="text-3 text-sm">Configured sources vary per station</span>
       </div>
       <div class="table-wrap">
         <table>
@@ -36,7 +36,6 @@ export async function init(container, actions) {
             <th>Frequency</th>
             <th>City</th>
             <th>Country</th>
-            <th>Station ID</th>
           </tr></thead>
           <tbody>
             ${stations.map(s => `
@@ -45,31 +44,26 @@ export async function init(container, actions) {
                 <td style="font-weight:500">${esc(s.name)}</td>
                 <td class="text-2">${esc(s.frequency || '—')}</td>
                 <td class="text-2">${esc(s.city || '—')}</td>
-                <td>
-                  <span class="badge badge-muted">${esc(s.country_code || 'AU')}</span>
-                </td>
-                <td><code class="mono">${s.id ? s.id.slice(0,8) + '…' : '—'}</code></td>
+                <td><span class="badge badge-muted">${esc(s.country_code || '—')}</span></td>
               </tr>`).join('')}
           </tbody>
         </table>
       </div>
     </div>
 
-    <div class="card mt-4">
+    <div class="card">
       <div class="card-header">
-        <span class="card-title">Collection Coverage</span>
+        <span class="card-title">About Station Data Collection</span>
       </div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px">
-        ${stations.map(s => `
-          <div style="background:var(--bg3);border-radius:6px;padding:14px">
-            <div style="font-weight:600;margin-bottom:6px">${esc(s.call_sign)}</div>
-            <div class="text-3 text-xs" style="margin-bottom:8px">${esc(s.name)}</div>
-            <div style="display:flex;gap:6px;flex-wrap:wrap">
-              <span class="badge badge-info">Radiowave</span>
-              <span class="badge badge-accent">iHeart</span>
-              <span class="badge badge-muted">Manual CSV</span>
-            </div>
-          </div>`).join('')}
+      <div class="info-box" style="margin-bottom:0">
+        <p>
+          Each station may have one or more configured data sources (iHeart now-playing,
+          recently-played, Online Radio Box, Radiowave Monitor, BBC Sounds, or Manual CSV import).
+          Source configuration and collector enablement is managed via environment variables and
+          operations passes — not from this console.
+          See <code style="font-family:var(--mono);font-size:11px;background:rgba(14,165,233,.15);padding:1px 4px;border-radius:3px">docs/NEXT_STEPS.md</code>
+          and the validation register for collector readiness status.
+        </p>
       </div>
     </div>`;
 }

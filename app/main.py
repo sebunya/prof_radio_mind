@@ -7,6 +7,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
+from app.api.routes.admin_overview import router as admin_overview_router
 from app.api.routes.backfill import router as backfill_router
 from app.api.routes.charts import router as charts_router
 from app.api.routes.health import router as health_router
@@ -77,6 +78,7 @@ app = FastAPI(
 # Optional HTTP Basic auth in front of /admin (no-op unless credentials set).
 app.add_middleware(AdminBasicAuthMiddleware)
 
+app.include_router(admin_overview_router)
 app.include_router(health_router)
 app.include_router(stations_router)
 app.include_router(imports_router)
