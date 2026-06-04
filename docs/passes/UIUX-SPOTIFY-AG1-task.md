@@ -1,0 +1,33 @@
+# Task Checklist — UIUX-SPOTIFY-AG1
+
+- [x] Phase 0: Audit Base & Production Safe Status
+- [/] Phase A: Design & Documentation (Approval Gated)
+  - [x] Audit codebase and production server environment
+  - [x] Draft `docs/passes/UIUX-SPOTIFY-AG1-audit.md`
+  - [x] Draft `docs/passes/UIUX-SPOTIFY-AG1-api-architecture.md`
+  - [x] Draft `docs/passes/UIUX-SPOTIFY-AG1-information-architecture.md`
+  - [x] Draft `implementation_plan.md` and `task.md`
+- [ ] Phase B: Backend Implementation (Pending Approval)
+  - [ ] Implement `app/api/routes/admin.py` router
+  - [ ] Modify `app/api/routes/stations.py` to use `SQLStationRepository`
+  - [ ] Register new routes in `app/main.py`
+  - [ ] Add unit tests in `tests/unit/api/test_admin.py`
+  - [ ] Update `.env.production.example` with safe `SPOTIFY_*` environment variables template
+- [ ] Phase C: Frontend UI/UX Upgrades (Pending Approval)
+  - [ ] Revamp `app/static/index.html` navigation sidebar and title tags
+  - [ ] Add new CSS styles and dark mode color scheme variables in `app/static/css/app.css`
+  - [ ] Add admin endpoints methods in `app/static/js/api.js`
+  - [ ] Update `app/static/js/app.js` with new client routes
+  - [ ] Enhance dashboard and station tables in `dashboard.js` and `stations.js`
+  - [ ] Implement new views:
+    - [ ] `play-events.js`
+    - [ ] `spotify-metadata.js`
+    - [ ] `operations-guardrails.js`
+- [ ] Phase D: Verification & Quality Gates
+  - [ ] Run linter: `ruff check app/ tests/`
+  - [ ] Run type checker: `mypy app/ --ignore-missing-imports`
+  - [ ] Run tests: `pytest tests/`
+  - [ ] Execute static safety searches (credentials, enabled flags, git add dot)
+- [ ] Phase E: Wrap-Up & Commit
+  - [ ] Create `walkthrough.md` and `docs/passes/UIUX-SPOTIFY-AG1-implementation.md`
+  - [ ] Commit exact files and push branch
