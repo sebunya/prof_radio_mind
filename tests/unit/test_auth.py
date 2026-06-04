@@ -14,10 +14,61 @@ def reset_rate_limiter() -> None:
 
 
 @pytest.fixture
-def client() -> TestClient:
+def client():
+    import uuid
+    from unittest.mock import AsyncMock, MagicMock, patch
+
+    from app.domain.entities.station import Station
+    from app.infrastructure.database.session import get_db
     from app.main import app
 
-    return TestClient(app)
+    async def fake_db():
+        yield MagicMock()
+
+    app.dependency_overrides[get_db] = fake_db
+
+    mock_stations = [
+        Station(
+            id=uuid.uuid4(),
+            name="Nova 96.9",
+            call_sign="NOVA969",
+            frequency="96.9 FM",
+            city="Sydney",
+            country_code="AU",
+            is_active=True,
+        ),
+        Station(
+            id=uuid.uuid4(),
+            name="KIIS-FM",
+            call_sign="KIISFM",
+            frequency="106.5 FM",
+            city="Sydney",
+            country_code="AU",
+            is_active=True,
+        ),
+        Station(
+            id=uuid.uuid4(),
+            name="Capital FM UK",
+            call_sign="CAPITALFM",
+            frequency="95.8 FM",
+            city="London",
+            country_code="GB",
+            is_active=True,
+        ),
+    ]
+    mock_repo = AsyncMock()
+    mock_repo.list_active.return_value = mock_stations
+
+    patcher = patch(
+        "app.infrastructure.database.repositories.station_repo.SQLStationRepository",
+        return_value=mock_repo,
+    )
+    patcher.start()
+
+    yield TestClient(app)
+
+    patcher.stop()
+    app.dependency_overrides.clear()
 
 
 def test_auth_disabled_when_api_key_empty(

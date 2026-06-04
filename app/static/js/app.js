@@ -10,23 +10,29 @@ import { toast, closeModal } from './ui.js';
 const PAGES = {
   dashboard: () => import('./pages/dashboard.js'),
   stations:  () => import('./pages/stations.js'),
+  'play-events': () => import('./pages/play-events.js'),
   review:    () => import('./pages/review.js'),
+  'spotify-metadata': () => import('./pages/spotify-metadata.js'),
   reports:   () => import('./pages/reports.js'),
   playlist:  () => import('./pages/playlist.js'),
   charts:    () => import('./pages/aria-charts.js'),
   webhooks:  () => import('./pages/webhooks.js'),
   backfill:  () => import('./pages/backfill.js'),
+  'operations-guardrails': () => import('./pages/operations-guardrails.js'),
 };
 
 const TITLES = {
   dashboard: 'Dashboard',
-  stations:  'Radio Stations',
+  stations:  'Stations & Sources Health',
+  'play-events': 'Play Events Stream',
   review:    'Review Queue',
+  'spotify-metadata': 'Spotify Metadata Readiness',
   reports:   'Reports',
   playlist:  'Playlist Automation',
   charts:    'ARIA Charts',
   webhooks:  'Webhooks',
   backfill:  'Historical Backfill',
+  'operations-guardrails': 'Operations & Safety Guardrails',
 };
 
 // ── Router ───────────────────────────────────────────────────────

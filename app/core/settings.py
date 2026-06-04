@@ -48,5 +48,17 @@ class Settings(BaseSettings):
     s3_bucket_name: str = "rmias-raw-payloads"
     s3_region: str = "eu-central-1"
 
+    # Spotify Integration
+    spotify_client_id: str = ""
+    spotify_client_secret: str = ""
+    spotify_redirect_uri: str = "https://tenxradar.com/api/auth/spotify/callback"
+    spotify_api_base_url: str = "https://api.spotify.com/v1"
+    spotify_token_url: str = "https://accounts.spotify.com/api/token"
+    spotify_metadata_enrichment_enabled: bool = False
+    spotify_match_confidence_threshold: float = 0.80
+    spotify_request_timeout_seconds: int = 10
+    spotify_max_retries: int = 2
+    spotify_token_cache_seconds: int = 3300
+
 
 settings = Settings()

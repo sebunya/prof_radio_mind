@@ -74,4 +74,15 @@ export const API = {
   // ── Backfill ─────────────────────────────────────────────────
   backfill: (stationId, date, formData) =>
     apiCall('POST', `/backfill/${stationId}?broadcast_date=${date}`, formData, true),
+
+  // ── Admin Telemetry ──────────────────────────────────────────
+  adminOverview: () => apiCall('GET', '/api/admin/overview'),
+  adminOperations: () => apiCall('GET', '/api/admin/operations'),
+  adminRecentEvents: () => apiCall('GET', '/api/admin/recent-events'),
+  adminSourceHealth: () => apiCall('GET', '/api/admin/source-health'),
+  adminReviewSummary: () => apiCall('GET', '/api/admin/review-summary'),
+  adminEnrichmentStatus: () => apiCall('GET', '/api/admin/enrichment-status'),
+  adminSpotifyReadiness: () => apiCall('GET', '/api/admin/spotify-readiness'),
+  adminCollectorRuns: () => apiCall('GET', '/api/admin/collector-runs'),
 };
+
