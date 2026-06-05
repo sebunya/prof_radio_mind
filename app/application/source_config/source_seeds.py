@@ -145,15 +145,16 @@ SOURCE_SEEDS: tuple[SourceSeed, ...] = (
         validation_note="Always available — manual fallback",
     ),
     # --- Z100 New York (WHTZ) --- (EXTRACT-2)
-    # VAL-Z100-001: iHeart station_id=614 confirmed in fixture; not validated against live API
+    # VAL-Z100-001: station_id corrected to 1469 per live iHeart v2 station search 2026-06-05.
+    # Original seeded value 614 was unverified. v3 API unavailable (404 all paths).
     SourceSeed(
         station_call_sign="WHTZ",
         source_type=SourceType.IHEART,
         name="Z100 iHeart Now Playing",
         base_url="https://api.iheart.com/api/v3/live-meta/stream",
-        config={"station_id": "614"},
+        config={"station_id": "1469"},
         priority=1,
-        validation_note="UNVALIDATED — VAL-Z100-001 (live station_id=614) required before enable",
+        validation_note="ID corrected 614→1469 (live v2 search). v3 API unavailable; FAILED.",
     ),
     SourceSeed(
         station_call_sign="WHTZ",
@@ -165,15 +166,16 @@ SOURCE_SEEDS: tuple[SourceSeed, ...] = (
         validation_note="Always available — manual fallback",
     ),
     # --- WKSC 103.5 Chicago --- (EXTRACT-2)
-    # VAL-WKSC-001: iHeart station_id=821 confirmed in fixture; not validated against live API
+    # VAL-WKSC-001: station_id corrected to 849 per live iHeart v2 station search 2026-06-05.
+    # Original seeded value 821 was unverified. v3 API unavailable (404 all paths).
     SourceSeed(
         station_call_sign="WKSC",
         source_type=SourceType.IHEART,
         name="WKSC 103.5 iHeart Now Playing",
         base_url="https://api.iheart.com/api/v3/live-meta/stream",
-        config={"station_id": "821"},
+        config={"station_id": "849"},
         priority=1,
-        validation_note="UNVALIDATED — VAL-WKSC-001 (live station_id=821) required before enable",
+        validation_note="ID corrected 821→849 (live v2 search). v3 API unavailable; FAILED.",
     ),
     SourceSeed(
         station_call_sign="WKSC",

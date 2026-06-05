@@ -141,7 +141,7 @@ def test_z100_iheart_station_id_config() -> None:
         if s.station_call_sign == "WHTZ" and s.source_type == SourceType.IHEART
     )
     assert seed.config is not None
-    assert seed.config.get("station_id") == "614"
+    assert seed.config.get("station_id") == "1469"  # corrected from 614 per live v2 search
 
 
 def test_wksc_iheart_station_id_config() -> None:
@@ -150,7 +150,7 @@ def test_wksc_iheart_station_id_config() -> None:
         if s.station_call_sign == "WKSC" and s.source_type == SourceType.IHEART
     )
     assert seed.config is not None
-    assert seed.config.get("station_id") == "821"
+    assert seed.config.get("station_id") == "849"  # corrected from 821 per live v2 search
 
 
 # --- EXTRACT-2: UUID match — seeder derivation must match scheduler constants ---

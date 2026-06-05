@@ -406,34 +406,34 @@ Validation must be performed by a human or a dedicated validation command. Resul
 
 ## 10. Z100 New York (WHTZ) — iHeart Now-Playing (EXTRACT-2)
 
-### 10.1 iHeart Station ID 614 — Live Validation (VAL-Z100-001)
+### 10.1 iHeart Station ID — Live Validation (VAL-Z100-001)
 
 | Field | Value |
 |---|---|
 | ID | VAL-Z100-001 |
-| Description | Confirm that iHeart station_id=614 is the correct station ID for Z100 New York (WHTZ 100.3 FM). Fetch `https://api.iheart.com/api/v3/live-meta/stream/614/currentTrack` from the production server. Confirm HTTP 200 or 204, and that a 200 response contains `currentTrack` with `artist` and `title`. |
+| Description | Confirm correct iHeart station ID for Z100 New York (WHTZ 100.3 FM) and that the v3 live-meta API is reachable. |
 | Status | **FAILED — iHeart v3 live-meta API unavailable** |
 | Validated by | val-live-endpoints.sh automated run |
 | Validated at | 2026-06-05 |
 | Script | `docs/passes/val-live-endpoints.sh --z100` |
-| Notes | **HTTP 404. All `/api/v3/live-meta/stream/{id}` sub-paths return 404 including the base path. v2 station discovery returns id=1469 for WHTZ (not 614), but correcting the ID alone is insufficient while the API endpoint itself is unavailable. Do not enable `ENABLE_Z100_COLLECTOR`. Stream metadata (ICY) is the next path — see STREAM-METADATA-DISCOVERY-1.** |
+| Notes | **HTTP 404. All `/api/v3/live-meta/stream/{id}` sub-paths return 404. Station ID corrected: 614 → 1469 per live iHeart v2 station search (2026-06-05). Scheduler and source seeds updated. API endpoint unavailability makes station ID correction moot until endpoint is restored. Do not enable `ENABLE_Z100_COLLECTOR`. ICY stream is the next path — see STREAM-METADATA-DISCOVERY-1.** |
 | Risk if fails | Collector cannot operate; no automated Z100 data until a valid endpoint is found |
 
 ---
 
 ## 11. WKSC 103.5 Chicago — iHeart Now-Playing (EXTRACT-2)
 
-### 11.1 iHeart Station ID 821 — Live Validation (VAL-WKSC-001)
+### 11.1 iHeart Station ID — Live Validation (VAL-WKSC-001)
 
 | Field | Value |
 |---|---|
 | ID | VAL-WKSC-001 |
-| Description | Confirm that iHeart station_id=821 is the correct station ID for WKSC 103.5 Chicago. Fetch `https://api.iheart.com/api/v3/live-meta/stream/821/currentTrack` from the production server. Confirm HTTP 200 or 204, and that a 200 response contains `currentTrack` with `artist` and `title`. |
+| Description | Confirm correct iHeart station ID for WKSC 103.5 Chicago and that the v3 live-meta API is reachable. |
 | Status | **FAILED — iHeart v3 live-meta API unavailable** |
 | Validated by | val-live-endpoints.sh automated run |
 | Validated at | 2026-06-05 |
 | Script | `docs/passes/val-live-endpoints.sh --wksc` |
-| Notes | **HTTP 404. Same failure mode as VAL-Z100-001. v2 station discovery returns id=849 for WKSC (not 821), but API endpoint unavailability makes station ID correction moot. Do not enable `ENABLE_WKSC_COLLECTOR`. See STREAM-METADATA-DISCOVERY-1.** |
+| Notes | **HTTP 404. Same failure mode as VAL-Z100-001. Station ID corrected: 821 → 849 per live iHeart v2 station search (2026-06-05). Scheduler and source seeds updated. Do not enable `ENABLE_WKSC_COLLECTOR`. ICY stream is the next path — see STREAM-METADATA-DISCOVERY-1.** |
 | Risk if fails | Collector cannot operate; no automated WKSC data until a valid endpoint is found |
 
 ---
