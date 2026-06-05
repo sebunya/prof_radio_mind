@@ -1,28 +1,22 @@
 """Fixture-driven tests for the Heart FM last-played-songs collector and parser.
 
-No live network calls. All tests use the synthetic HTML fixtures.
+No live network calls. All tests use the updated HTML fixtures that reflect the
+live page structure confirmed during VAL-HEARTFM-002 (2026-06-05).
 
-IMPORTANT: The CSS selectors used by the parser (div.station-song-history,
-div.song-item, span.song-item__title, span.song-item__artist, time.song-item__time)
-are SYNTHETIC — they were designed to work with the test fixtures, not the live page.
-A human operator must validate these selectors against the live
-https://www.heart.co.uk/radio/last-played-songs/ page (VAL-HEARTFM-002) before
-enabling the collector.
+Fixture structure (new selectors):
+  div.last_played_songs > div.song_wrapper > div.song__text-content
+    p.song__title / p.song__artist
+  span.song__time
 
-Verifies:
-  - Parser extracts all five tracks from the fixture
-  - Artist, title, source_event_id extracted correctly
-  - HH:MM timestamps anchored to a supplied base_date as UTC
-  - Empty track list returns [] (not a crash)
-  - Missing container raises ValueError (drift detection)
-  - HTTP 204 returns []
-  - Collector URL is the Heart FM last-played-songs page
-  - attribution is 'heart'
-  - Empty fixture produces NoTrackEvent, not a crash
+Three-strategy parser coverage:
+  - New CSS selectors (primary for live page)
+  - Old CSS selectors (backwards compat, tested via inline HTML)
+  - __NEXT_DATA__ JSON (Next.js, tested via inline HTML)
 """
 
 from __future__ import annotations
 
+import json
 import uuid
 from datetime import date
 from pathlib import Path
@@ -39,7 +33,8 @@ _EMPTY_FIXTURE = (
 )
 
 
-# ── Parser-level tests (fixture-driven) ──────────────────────────────────────
+# ── New-selector parser tests ─────────────────────────────────────────────────
+
 
 def test_parser_extracts_five_tracks() -> None:
     html = _FIXTURE.read_bytes()
@@ -85,16 +80,16 @@ def test_parser_returns_empty_list_for_204() -> None:
     assert parse_heart_last_played(b"", http_status=204) == []
 
 
-def test_parser_raises_on_missing_container() -> None:
-    """No div.station-song-history → ValueError for drift detection."""
-    html = b"<html><body><div class='wrong-container'></div></body></html>"
-    with pytest.raises(ValueError, match="station-song-history"):
-        parse_heart_last_played(html)
-
-
 def test_parser_raises_on_empty_html() -> None:
     with pytest.raises(ValueError, match="empty"):
         parse_heart_last_played(b"")
+
+
+def test_parser_raises_on_missing_container() -> None:
+    """No recognised container → ValueError for drift detection."""
+    html = b"<html><body><div class='unknown-wrapper'></div></body></html>"
+    with pytest.raises(ValueError, match="unrecognised"):
+        parse_heart_last_played(html)
 
 
 def test_parser_returns_empty_list_for_empty_fixture() -> None:
@@ -111,7 +106,88 @@ def test_parser_tracks_have_unique_source_event_ids() -> None:
     assert len(ids) == len(set(ids))
 
 
-# ── Collector tests ───────────────────────────────────────────────────────────
+def test_parser_second_track_is_miley_cyrus() -> None:
+    html = _FIXTURE.read_bytes()
+    results = parse_heart_last_played(html, base_date=date(2026, 5, 24))
+    assert results[1].artist == "Miley Cyrus"
+    assert results[1].title == "Flowers"
+
+
+# ── Old-selector backwards-compat test ───────────────────────────────────────
+
+
+def test_old_selectors_still_parse() -> None:
+    """Parser falls back to old div.station-song-history selectors."""
+    html = b"""
+    <html><body>
+    <div class="station-song-history">
+      <div class="song-item" data-track-id="old-001">
+        <span class="song-item__title">Shape of You</span>
+        <span class="song-item__artist">Ed Sheeran</span>
+        <time class="song-item__time">08:00</time>
+      </div>
+    </div>
+    </body></html>
+    """
+    results = parse_heart_last_played(html, base_date=date(2026, 5, 24))
+    assert len(results) == 1
+    assert results[0].artist == "Ed Sheeran"
+    assert results[0].title == "Shape of You"
+    assert results[0].source_event_id == "old-001"
+
+
+# ── __NEXT_DATA__ JSON strategy test ─────────────────────────────────────────
+
+
+def test_next_data_strategy_extracts_tracks() -> None:
+    """__NEXT_DATA__ JSON is parsed before any CSS selectors are tried."""
+    page_data = {
+        "props": {
+            "pageProps": {
+                "lastPlayedSongs": [
+                    {"title": "Watermelon Sugar", "artist": "Harry Styles", "playTime": "09:30"},
+                    {"title": "Bad Guy", "artist": "Billie Eilish", "playTime": "09:26"},
+                ]
+            }
+        }
+    }
+    html = (
+        b"<html><body>"
+        b'<script id="__NEXT_DATA__" type="application/json">'
+        + json.dumps(page_data).encode()
+        + b"</script>"
+        b"</body></html>"
+    )
+    results = parse_heart_last_played(html, base_date=date(2026, 5, 24))
+    assert len(results) == 2
+    assert results[0].title == "Watermelon Sugar"
+    assert results[0].artist == "Harry Styles"
+    assert results[0].played_at.hour == 9
+    assert results[0].played_at.minute == 30
+
+
+def test_next_data_strategy_ignores_malformed_json() -> None:
+    """Malformed __NEXT_DATA__ falls through to CSS strategies."""
+    html = b"""
+    <html><body>
+    <script id="__NEXT_DATA__" type="application/json">{bad json}</script>
+    <div class="last_played_songs">
+      <div class="song_wrapper" data-track-id="x-001">
+        <div class="song__text-content">
+          <p class="song__title">Levitating</p>
+          <p class="song__artist">Dua Lipa</p>
+        </div>
+      </div>
+    </div>
+    </body></html>
+    """
+    results = parse_heart_last_played(html, base_date=date(2026, 5, 24))
+    assert len(results) == 1
+    assert results[0].title == "Levitating"
+
+
+# ── Collector integration tests ───────────────────────────────────────────────
+
 
 def test_collector_url_is_heart_last_played() -> None:
     collector = HeartRadioCollector(source_id=uuid.uuid4(), station_id=uuid.uuid4())

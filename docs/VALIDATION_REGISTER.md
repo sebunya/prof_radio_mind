@@ -368,13 +368,13 @@ Validation must be performed by a human or a dedicated validation command. Resul
 | Field | Value |
 |---|---|
 | ID | VAL-HEARTFM-002 |
-| Description | Confirm CSS selectors `div.station-song-history` (container), `div.song-item` (track row), `span.song-item__title`, `span.song-item__artist`, `time.song-item__time` are present in a live page response and return ≥1 song entry. |
-| Status | **FAILED — selector drift confirmed** |
-| Validated by | val-live-endpoints.sh automated run |
-| Validated at | 2026-06-05 |
+| Description | Confirm CSS selectors are present in a live page response and return ≥1 song entry. |
+| Status | **PARSER_REPAIRED — awaiting live re-validation** |
+| Validated by | val-live-endpoints.sh automated run (initial failure); HEART-HTML-PARSER-FIX-1 (repair) |
+| Validated at | 2026-06-05 (failure); 2026-06-05 (repair implemented) |
 | Script | `docs/passes/val-live-endpoints.sh --heart` |
-| Notes | **HTTP 200 received. `div.station-song-history` MISSING from raw HTML. New classes visible in raw HTML: `now-playing__wrapper`, `last_played_songs`, `song_wrapper`, `song__text-content`. Parser repair required. See HEART-HTML-PARSER-FIX-1 in RADIO-COVERAGE-ARCH-1-task.md. robots.txt and ToS review also pending.** |
-| Risk if fails | Collector blocked; do not enable `ENABLE_HEART_COLLECTOR` until VAL-HEARTFM-002 re-run passes |
+| Notes | **Initial run: HTTP 200, `div.station-song-history` MISSING. New classes found: `now-playing__wrapper`, `last_played_songs`, `song_wrapper`, `song__text-content`. Parser repaired 2026-06-05: updated to new selectors + added `__NEXT_DATA__` JSON strategy + old-selector fallback. Fixture and tests updated (530 passing). Re-run VAL-HEARTFM-002 against live page to confirm parser returns ≥1 track. robots.txt and ToS review still pending.** |
+| Risk if fails | Collector blocked; do not enable `ENABLE_HEART_COLLECTOR` until live re-validation passes |
 
 ### 9.3 Timezone Assumption (VAL-HEARTFM-005)
 

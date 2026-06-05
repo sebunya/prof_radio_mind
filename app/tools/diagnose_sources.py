@@ -198,9 +198,10 @@ def _build_catalogue() -> list[DiagSource]:
             display_url="https://www.heart.co.uk/radio/last-played-songs/",
             robots_txt_status="PENDING — https://www.heart.co.uk/robots.txt not yet checked",
             compliance_note=(
-                "T2 public HTML. VAL-HEARTFM-002 FAILED — CSS selectors drifted. "
-                "New classes found: now-playing__wrapper, last_played_songs, song_wrapper, "
-                "song__text-content. Parser repair required. robots.txt + ToS check pending."
+                "T2 public HTML. VAL-HEARTFM-002: selector drift repaired 2026-06-05. "
+                "Parser now tries __NEXT_DATA__ JSON → new CSS (last_played_songs / "
+                "song_wrapper) → old CSS fallback. Awaiting live re-validation. "
+                "robots.txt + ToS check still pending."
             ),
         ),
         DiagSource(
