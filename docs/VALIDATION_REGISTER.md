@@ -1,7 +1,6 @@
 # Radio Music Intelligence & Automation System
 # Validation Register
-# Pass 0 — Initial State
-# Last updated: 2026-05-24
+# Last updated: 2026-06-05 (EXTRACT-2 entries added)
 
 ---
 
@@ -155,6 +154,19 @@ Validation must be performed by a human or a dedicated validation command. Resul
 | Notes | Implement Retry-After handling regardless |
 | Risk if fails | IP block or degraded data quality if over-polled |
 
+### 3.6 iHeart Top Songs Endpoint — KIIS-FM (VAL-IHEART-TOP-001)
+
+| Field | Value |
+|---|---|
+| ID | VAL-IHEART-TOP-001 |
+| Description | Confirm that the iHeart topSongs endpoint for station 2501 is reachable, returns HTTP 200, and the JSON body contains a `topSongs` or `songs` list with ≥1 entry. |
+| Status | UNVALIDATED |
+| Validated by | — |
+| Validated at | — |
+| Script | `docs/passes/val-live-endpoints.sh --kiis_top` |
+| Notes | Response schema UNVALIDATED — parser falls back to `songs` key if `topSongs` absent. Daily cron at 00:00 UTC. |
+| Risk if fails | Top-songs chart unavailable; do not enable `ENABLE_IHEART_TOP_SONGS` |
+
 ---
 
 ## 4. KIIS-FM — Radiowave Fallback
@@ -305,7 +317,127 @@ Validation must be performed by a human or a dedicated validation command. Resul
 
 ---
 
-## 8. Deferred Validations
+## 8. BBC Radio 1 — BBC Sounds RMS API (EXTRACT-2)
+
+### 8.1 RMS API Reachability (VAL-BBC1-001)
+
+| Field | Value |
+|---|---|
+| ID | VAL-BBC1-001 |
+| Description | Confirm `GET https://rms.api.bbc.co.uk/v2/services/bbc_radio_one/segments/latest` is reachable from the production server, returns HTTP 200, and the JSON body contains a `data` list of segments. |
+| Status | UNVALIDATED |
+| Validated by | — |
+| Validated at | — |
+| Script | `docs/passes/val-live-endpoints.sh --bbc` |
+| Notes | HTTP 204 is also acceptable (no current segment). Endpoint returns recently broadcast segments in reverse chronological order; parser picks the latest music segment. |
+| Risk if fails | BBC Radio 1 collection blocked; do not enable `ENABLE_BBC_RADIO1_COLLECTOR` |
+
+### 8.2 BBC ToS — Automated Access Permissibility (VAL-BBC1-006)
+
+| Field | Value |
+|---|---|
+| ID | VAL-BBC1-006 |
+| Description | Manual review of BBC Developer terms of service to confirm that automated polling of the BBC Sounds RMS API at 5-minute intervals is permissible. Review https://www.bbc.co.uk/developer and any linked API terms. |
+| Status | BLOCKED — manual review required |
+| Validated by | — |
+| Validated at | — |
+| Script | None — manual check only |
+| Notes | Must be completed before `ENABLE_BBC_RADIO1_COLLECTOR` is set to true. Document findings (PASS/FAIL + rationale) here when complete. This is a hard prerequisite for BBC enablement — Step 5 in `ENABLE-COLLECTORS-SEQUENCE-task.md`. |
+| Risk if fails | ToS violation; must not enable BBC Radio 1 collector |
+
+---
+
+## 9. Heart FM UK — Last-Played-Songs Page (EXTRACT-2)
+
+### 9.1 Page Reachability (VAL-HEARTFM-001)
+
+| Field | Value |
+|---|---|
+| ID | VAL-HEARTFM-001 |
+| Description | Confirm `GET https://www.heart.co.uk/radio/last-played-songs/` is reachable from the production server, returns HTTP 200, and the response body is non-empty HTML. |
+| Status | UNVALIDATED |
+| Validated by | — |
+| Validated at | — |
+| Script | `docs/passes/val-live-endpoints.sh --heart` (covers reachability and selector check together) |
+| Notes | Covered by VAL-HEARTFM-002 script run — a pass on 002 implies 001 passes. |
+| Risk if fails | Heart FM collection blocked; fall back to manual CSV |
+
+### 9.2 CSS Selector Validation (VAL-HEARTFM-002)
+
+| Field | Value |
+|---|---|
+| ID | VAL-HEARTFM-002 |
+| Description | Confirm CSS selectors `div.station-song-history` (container), `div.song-item` (track row), `span.song-item__title`, `span.song-item__artist`, `time.song-item__time` are present in a live page response and return ≥1 song entry. |
+| Status | UNVALIDATED |
+| Validated by | — |
+| Validated at | — |
+| Script | `docs/passes/val-live-endpoints.sh --heart` |
+| Notes | Selectors designed against a synthetic fixture — MUST be verified against the live page. If `div.station-song-history` is absent, selector drift has occurred and parser will raise ValueError. |
+| Risk if fails | Parser raises ValueError on every run; do not enable until selectors confirmed |
+
+### 9.3 Timezone Assumption (VAL-HEARTFM-005)
+
+| Field | Value |
+|---|---|
+| ID | VAL-HEARTFM-005 |
+| Description | Confirm that time values displayed on the Heart FM last-played page (`HH:MM` in `time.song-item__time`) correspond to UK time (Europe/London), and document whether times are in local clock time or UTC, including DST behavior. |
+| Status | UNVALIDATED |
+| Validated by | — |
+| Validated at | — |
+| Script | None — manual inspection of live page timestamps vs actual broadcast time |
+| Notes | Parser currently assumes UTC directly from HH:MM without DST adjustment. If times are local UK time, `played_at` will be off by 1 hour during BST. Low urgency — timestamps are approximate anyway. |
+| Risk if fails | `played_at` off by 1 hour during British Summer Time; acceptable for V1 but should be fixed |
+
+### 9.4 Polling Cadence and ToS (VAL-HEARTFM-007)
+
+| Field | Value |
+|---|---|
+| ID | VAL-HEARTFM-007 |
+| Description | Review Heart FM / Global Radio terms of service and robots.txt to confirm automated polling of the last-played-songs page at 5-minute intervals is permissible. |
+| Status | UNVALIDATED |
+| Validated by | — |
+| Validated at | — |
+| Script | None — manual check only |
+| Notes | Check https://www.heart.co.uk/robots.txt and Global Radio developer/ToS pages. 5-minute cadence is the same as BBC Radio 1. |
+| Risk if fails | ToS violation; reduce cadence or switch to manual CSV |
+
+---
+
+## 10. Z100 New York (WHTZ) — iHeart Now-Playing (EXTRACT-2)
+
+### 10.1 iHeart Station ID 614 — Live Validation (VAL-Z100-001)
+
+| Field | Value |
+|---|---|
+| ID | VAL-Z100-001 |
+| Description | Confirm that iHeart station_id=614 is the correct station ID for Z100 New York (WHTZ 100.3 FM). Fetch `https://api.iheart.com/api/v3/live-meta/stream/614/currentTrack` from the production server. Confirm HTTP 200 or 204, and that a 200 response contains `currentTrack` with `artist` and `title`. |
+| Status | UNVALIDATED |
+| Validated by | — |
+| Validated at | — |
+| Script | `docs/passes/val-live-endpoints.sh --z100` |
+| Notes | station_id=614 confirmed in synthetic fixture; not validated against live API. HTTP 204 (between songs) is also a valid pass. |
+| Risk if fails | Collector fetches wrong station or fails; do not enable `ENABLE_Z100_COLLECTOR` |
+
+---
+
+## 11. WKSC 103.5 Chicago — iHeart Now-Playing (EXTRACT-2)
+
+### 11.1 iHeart Station ID 821 — Live Validation (VAL-WKSC-001)
+
+| Field | Value |
+|---|---|
+| ID | VAL-WKSC-001 |
+| Description | Confirm that iHeart station_id=821 is the correct station ID for WKSC 103.5 Chicago. Fetch `https://api.iheart.com/api/v3/live-meta/stream/821/currentTrack` from the production server. Confirm HTTP 200 or 204, and that a 200 response contains `currentTrack` with `artist` and `title`. |
+| Status | UNVALIDATED |
+| Validated by | — |
+| Validated at | — |
+| Script | `docs/passes/val-live-endpoints.sh --wksc` |
+| Notes | station_id=821 confirmed in synthetic fixture; not validated against live API. HTTP 204 (between songs) is also a valid pass. |
+| Risk if fails | Collector fetches wrong station or fails; do not enable `ENABLE_WKSC_COLLECTOR` |
+
+---
+
+## 13. Deferred Validations
 
 ### 8.1 Spotify Enrichment
 
@@ -331,7 +463,7 @@ Validation must be performed by a human or a dedicated validation command. Resul
 
 ---
 
-## 9. Operational Contracts
+## 14. Operational Contracts
 
 ### 9.1 Broadcast Day Definition
 
@@ -373,17 +505,24 @@ Validation must be performed by a human or a dedicated validation command. Resul
 
 ## Validation Progress Summary
 
-| Category | Total | Passed | Failed | Partial | Deferred | Unvalidated |
-|---|---|---|---|---|---|---|
-| Nova Radiowave | 4 | 0 | 0 | 0 | 0 | 4 |
-| Nova StreamTheWorld | 1 | 0 | 0 | 0 | 1 | 0 |
-| KIIS iHeart | 5 | 0 | 0 | 0 | 0 | 5 |
-| KIIS Radiowave fallback | 1 | 0 | 0 | 0 | 0 | 1 |
-| KIIS HTML fallback | 1 | 0 | 0 | 0 | 0 | 1 |
-| Capital FM UK Online Radio Box | 8 | 0 | 0 | 0 | 0 | 8 |
-| Capital manual | 1 | 0 | 0 | 0 | 0 | 1 |
-| Deferred | 2 | 0 | 0 | 0 | 2 | 0 |
-| Operational contracts | 3 | 0 | 0 | 0 | 0 | 3 |
-| **Total** | **26** | **0** | **0** | **0** | **3** | **23** |
+| Category | § | Total | Passed | Failed | Partial | Blocked | Deferred | Unvalidated |
+|---|---|---|---|---|---|---|---|---|
+| Nova Radiowave | 1 | 4 | 0 | 0 | 0 | 0 | 0 | 4 |
+| Nova StreamTheWorld | 2 | 1 | 0 | 0 | 0 | 0 | 1 | 0 |
+| KIIS iHeart now-playing | 3 | 5 | 0 | 0 | 0 | 0 | 0 | 5 |
+| KIIS iHeart top songs | 3.6 | 1 | 0 | 0 | 0 | 0 | 0 | 1 |
+| KIIS Radiowave fallback | 4 | 1 | 0 | 0 | 0 | 0 | 0 | 1 |
+| KIIS HTML fallback | 5 | 1 | 0 | 0 | 0 | 0 | 0 | 1 |
+| Capital FM UK Online Radio Box | 6 | 8 | 0 | 0 | 0 | 0 | 0 | 8 |
+| Capital manual | 7 | 1 | 0 | 0 | 0 | 0 | 0 | 1 |
+| BBC Radio 1 | 8 | 2 | 0 | 0 | 0 | 1 | 0 | 1 |
+| Heart FM UK | 9 | 4 | 0 | 0 | 0 | 0 | 0 | 4 |
+| Z100 New York (WHTZ) | 10 | 1 | 0 | 0 | 0 | 0 | 0 | 1 |
+| WKSC 103.5 Chicago | 11 | 1 | 0 | 0 | 0 | 0 | 0 | 1 |
+| Deferred | 13 | 2 | 0 | 0 | 0 | 0 | 2 | 0 |
+| Operational contracts | 14 | 3 | 0 | 0 | 0 | 0 | 0 | 3 |
+| **Total** | | **35** | **0** | **0** | **0** | **1** | **3** | **31** |
 
-All 23 non-deferred validations must be addressed before their dependent passes can be declared complete.
+VAL-BBC1-006 is BLOCKED (manual ToS review). All other 30 non-deferred, non-blocked
+validations are UNVALIDATED. No collector may be enabled until its VAL code is confirmed
+in this register and in `docs/passes/val-live-endpoints.sh`.
