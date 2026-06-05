@@ -1,232 +1,324 @@
 #!/usr/bin/env bash
-# VAL-COLLECTORS-1 — Live dry-run for the 5 new extracted collectors.
+# VAL-COLLECTORS-1 — Read-only production validation for EXTRACT-2 deployment.
 #
-# Run this FROM THE SERVER after EXTRACT-2 is deployed:
+# Checks only. Makes no changes. Enables nothing.
+# Verifies: container health, safety flags, auth protection, migration
+# version, DB station/source counts, collector/parser code presence, logs.
+#
+# Run FROM YOUR MAC after EXTRACT-2 is deployed:
 #
 #   ssh -o IdentitiesOnly=yes -i ~/.ssh/id_ed25519 root@178.105.238.18 'bash -s' \
 #       < ~/Documents/Prof_Mind/docs/passes/val-collectors-1-dryrun.sh \
 #       | tee /tmp/val-collectors-1.log
 #
-# Or run specific collectors by passing flags:
-#   ... 'bash -s' -- --bbc --heart --z100 --wksc --kiis_top
-#
 # Exit codes:
-#   0  all selected collectors passed
-#   1  one or more collectors failed
+#   0  all checks passed
+#   1  one or more checks failed
 
 set -euo pipefail
 
 SERVER_DIR="/opt/rmias"
 COMPOSE="docker compose -f ${SERVER_DIR}/docker-compose.hetzner.yml --env-file ${SERVER_DIR}/.env.production"
+APP_HOST="https://tenxradar.com"
+EXPECTED_ALEMBIC_HEAD="c4e2a1f9b8d7"
+EXPECTED_STATIONS=7
+EXPECTED_GIT_COMMIT="0f6049b"   # EXTRACT-2 merge commit
 
-# Parse optional flags
-RUN_BBC=false RUN_HEART=false RUN_Z100=false RUN_WKSC=false RUN_KIIS_TOP=false RUN_ALL=true
-for arg in "$@"; do
-  case "$arg" in
-    --bbc)      RUN_BBC=true;      RUN_ALL=false ;;
-    --heart)    RUN_HEART=true;    RUN_ALL=false ;;
-    --z100)     RUN_Z100=true;     RUN_ALL=false ;;
-    --wksc)     RUN_WKSC=true;     RUN_ALL=false ;;
-    --kiis_top) RUN_KIIS_TOP=true; RUN_ALL=false ;;
-  esac
-done
-if $RUN_ALL; then
-  RUN_BBC=true; RUN_HEART=true; RUN_Z100=true; RUN_WKSC=true; RUN_KIIS_TOP=true
+PASS=0
+FAIL=0
+
+_pass() { echo "  PASS  $*"; PASS=$((PASS+1)); }
+_fail() { echo "  FAIL  $*"; FAIL=$((FAIL+1)); }
+_head() { echo ""; echo "=== $* ==="; }
+
+echo "============================================================"
+echo " VAL-COLLECTORS-1  $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+echo "============================================================"
+
+# ── 1. Git / deployment version ──────────────────────────────────
+_head "1. Deployment version"
+
+cd "${SERVER_DIR}"
+actual_commit="$(git rev-parse --short HEAD)"
+if git rev-parse HEAD | grep -q "$(git rev-parse "${EXPECTED_GIT_COMMIT}" 2>/dev/null || true)"; then
+  _pass "git HEAD includes EXTRACT-2 commit ${EXPECTED_GIT_COMMIT}"
+else
+  # Short-hash check fallback
+  full_actual="$(git rev-parse HEAD)"
+  if git log --oneline | grep -q "${EXPECTED_GIT_COMMIT}"; then
+    _pass "git HEAD (${actual_commit}) contains EXTRACT-2 commit in ancestry"
+  else
+    _fail "git HEAD=${actual_commit} — EXTRACT-2 commit ${EXPECTED_GIT_COMMIT} not found in log"
+  fi
 fi
 
-echo "============================================================"
-echo " VAL-COLLECTORS-1 dry-run  $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
-echo "============================================================"
-echo ""
+echo "  git log (last 5):"
+git log --oneline -5 | sed 's/^/    /'
 
-# ────────────────────────────────────────────────────────────────
-# Safety gate: confirm all flags are still false before any run
-# ────────────────────────────────────────────────────────────────
-echo "=== Safety gate — flags must be false ==="
-cd "${SERVER_DIR}"
-for flag in ENABLE_BBC_RADIO1_COLLECTOR ENABLE_HEART_COLLECTOR ENABLE_Z100_COLLECTOR \
-            ENABLE_WKSC_COLLECTOR ENABLE_IHEART_TOP_SONGS SCHEDULER_ENABLED; do
-  val="$(grep -E "^${flag}=" .env.production 2>/dev/null | cut -d= -f2- || echo "not_set")"
-  if echo "$val" | grep -qiE "^(true|1|yes|on)$"; then
-    echo "ABORT: ${flag}=${val} — must be false before dry-run"
-    exit 1
-  fi
-  echo "  ${flag}=${val:-not_set}  OK"
-done
-echo ""
+# ── 2. Container status ──────────────────────────────────────────
+_head "2. Container status"
 
-PASS_COUNT=0
-FAIL_COUNT=0
+container_status="$($COMPOSE ps --format json 2>/dev/null | python3 -c "
+import sys, json
+lines = [l.strip() for l in sys.stdin if l.strip()]
+for line in lines:
+    try:
+        svc = json.loads(line)
+        name = svc.get('Service', svc.get('Name', '?'))
+        state = svc.get('State', svc.get('Status', '?'))
+        print(f'  {name}: {state}')
+    except Exception:
+        print(f'  {line}')
+" 2>/dev/null || $COMPOSE ps 2>/dev/null | tail -n +2 | awk '{print "  "$1": "$NF}')"
+echo "$container_status"
 
-# ────────────────────────────────────────────────────────────────
-# Helper: run a one-shot collector inside the container
-# ────────────────────────────────────────────────────────────────
-run_collector() {
-  local label="$1"
-  local python_expr="$2"
+if echo "$container_status" | grep -q "app.*running\|app.*Up"; then
+  _pass "app container running"
+else
+  _fail "app container not running"
+fi
 
-  echo "--- ${label} ---"
-  local out
-  out="$($COMPOSE exec -T app python3 -c "$python_expr" 2>&1)" && rc=0 || rc=$?
-  echo "$out"
-  if [ $rc -eq 0 ]; then
-    echo "RESULT: ${label} PASS"
-    PASS_COUNT=$((PASS_COUNT + 1))
-  else
-    echo "RESULT: ${label} FAIL (exit $rc)"
-    FAIL_COUNT=$((FAIL_COUNT + 1))
-  fi
-  echo ""
+# ── 3. Safety flags ──────────────────────────────────────────────
+_head "3. Safety flags (all must be false/absent)"
+
+flag_is_true() {
+  grep -qiE "^${1}=(true|1|yes|on)$" "${SERVER_DIR}/.env.production" 2>/dev/null
 }
 
-# ────────────────────────────────────────────────────────────────
-# BBC Radio 1
-# ────────────────────────────────────────────────────────────────
-if $RUN_BBC; then
-  run_collector "BBC Radio 1 (VAL-BBC1-001)" "
-import asyncio, uuid
-from app.infrastructure.collectors.bbc_radio_1 import BBCRadio1Collector
+safety_flags=(
+  SCHEDULER_ENABLED
+  ENABLE_CAPITAL_COLLECTOR
+  ENABLE_NOVA_COLLECTOR
+  ENABLE_KIIS_COLLECTOR
+  ENABLE_NIGHTLY_RECONCILIATION
+  ENABLE_BBC_RADIO1_COLLECTOR
+  ENABLE_HEART_COLLECTOR
+  ENABLE_HEART_FM_COLLECTOR
+  ENABLE_Z100_COLLECTOR
+  ENABLE_WKSC_COLLECTOR
+  ENABLE_IHEART_TOP_SONGS
+  ENABLE_GENERIC_IHEART_COLLECTOR
+  SPOTIFY_METADATA_ENRICHMENT_ENABLED
+  MUSICBRAINZ_METADATA_ENRICHMENT_ENABLED
+  METADATA_ENRICHMENT_ENABLED
+)
 
-async def run():
-    c = BBCRadio1Collector(
-        source_id=uuid.UUID('32800202-78b8-5e48-a502-f771615c8402'),
-        station_id=uuid.UUID('9ecfd309-55e9-5df9-996f-2ea283b10568'),
-        storage_root='/tmp/val_dryrun',
-    )
-    result = await c.run()
-    status = result.collector_run.status.value
-    plays = len(result.play_events)
-    no_tracks = len(result.no_track_events)
-    print(f'status={status} plays={plays} no_tracks={no_tracks}')
-    assert status in ('success', 'no_track'), f'unexpected status: {status}'
-    assert plays + no_tracks > 0 or status == 'no_track', 'no output produced'
-    print('VAL-BBC1-001: PASS')
+for flag in "${safety_flags[@]}"; do
+  val="$(grep -E "^${flag}=" "${SERVER_DIR}/.env.production" 2>/dev/null | cut -d= -f2- || echo "not_set")"
+  if flag_is_true "${flag}"; then
+    _fail "${flag}=${val} — must be false"
+  else
+    _pass "${flag}=${val:-not_set}"
+  fi
+done
 
-asyncio.run(run())
-"
+# ── 4. HTTP health and auth protection ──────────────────────────
+_head "4. HTTP health and auth protection"
+
+http_check() {
+  local label="$1" url="$2" expected="$3" extra_args="${4:-}"
+  # shellcheck disable=SC2086
+  actual="$(curl -s --max-time 10 -o /dev/null -w "%{http_code}" ${extra_args} "${url}" 2>/dev/null || echo "FAILED")"
+  if [ "${actual}" = "${expected}" ]; then
+    _pass "${label} → ${actual}"
+  else
+    _fail "${label} → ${actual} (expected ${expected})"
+  fi
+}
+
+http_check "GET /           (public)"  "${APP_HOST}/"                              "200"
+http_check "GET /health     (public)"  "${APP_HOST}/health"                        "200"
+http_check "GET /admin/     (unauth)"  "${APP_HOST}/admin/"                        "401"
+http_check "GET /api/admin/overview  (unauth)"  "${APP_HOST}/api/admin/overview"   "401"
+http_check "GET /api/admin/metadata-readiness (unauth)" \
+  "${APP_HOST}/api/admin/metadata-readiness"                                        "401"
+
+# Confirm WWW-Authenticate header is present on 401
+www_auth="$(curl -s --max-time 10 -o /dev/null -D - "${APP_HOST}/admin/" 2>/dev/null \
+  | grep -i "WWW-Authenticate:" | tr -d '\r' || echo "")"
+if echo "${www_auth}" | grep -qi "Basic realm"; then
+  _pass "WWW-Authenticate: Basic realm present on /admin/ 401"
+else
+  _fail "WWW-Authenticate: Basic realm MISSING on /admin/ 401"
 fi
 
-# ────────────────────────────────────────────────────────────────
-# Heart FM
-# ────────────────────────────────────────────────────────────────
-if $RUN_HEART; then
-  run_collector "Heart FM UK (VAL-HEARTFM-002)" "
-import asyncio, uuid
-from app.infrastructure.collectors.heart_radio import HeartRadioCollector
+# ── 5. Alembic migration version ────────────────────────────────
+_head "5. Alembic migration version"
 
+actual_alembic="$($COMPOSE exec -T app python3 -c "
+import asyncio
+from sqlalchemy import text
+from app.infrastructure.database.session import _get_factory as _factory
 async def run():
-    c = HeartRadioCollector(
-        source_id=uuid.UUID('4be04973-0050-55fa-ba03-30fac85f94e1'),
-        station_id=uuid.UUID('17f49778-fd59-5f82-886e-645c78356435'),
-        storage_root='/tmp/val_dryrun',
-    )
-    result = await c.run()
-    status = result.collector_run.status.value
-    plays = len(result.play_events)
-    no_tracks = len(result.no_track_events)
-    print(f'status={status} plays={plays} no_tracks={no_tracks}')
-    assert status in ('success', 'no_track'), f'unexpected status: {status}'
-    assert plays + no_tracks > 0 or status == 'no_track', 'no output produced'
-    print('VAL-HEARTFM-002: PASS')
-
+    async with _factory()() as s:
+        r = await s.execute(text('SELECT version_num FROM alembic_version'))
+        row = r.fetchone()
+        print(row[0] if row else 'NONE')
 asyncio.run(run())
-"
+" 2>/dev/null | tr -d '[:space:]')"
+
+echo "  alembic version: ${actual_alembic}"
+if [ "${actual_alembic}" = "${EXPECTED_ALEMBIC_HEAD}" ]; then
+  _pass "alembic at expected head ${EXPECTED_ALEMBIC_HEAD}"
+else
+  _fail "alembic version ${actual_alembic} (expected ${EXPECTED_ALEMBIC_HEAD})"
 fi
 
-# ────────────────────────────────────────────────────────────────
-# Z100 (WHTZ) iHeart now-playing
-# ────────────────────────────────────────────────────────────────
-if $RUN_Z100; then
-  run_collector "Z100 iHeart now-playing (VAL-Z100-001)" "
-import asyncio, uuid
-from app.infrastructure.collectors.iheart_now_playing import IHeartNowPlayingCollector
+# ── 6. DB station and source counts ─────────────────────────────
+_head "6. DB station and source counts"
+
+$COMPOSE exec -T app python3 -c "
+import asyncio
+from sqlalchemy import text
+from app.infrastructure.database.session import _get_factory as _factory
 
 async def run():
-    c = IHeartNowPlayingCollector(
-        source_id=uuid.UUID('b7cc2e45-5949-5995-be06-a89527aa4f66'),
-        station_id=uuid.UUID('442dced5-003f-5d3f-acc7-dacf397be992'),
-        iheart_station_id='614',
-        storage_root='/tmp/val_dryrun',
-    )
-    result = await c.run()
-    status = result.collector_run.status.value
-    plays = len(result.play_events)
-    no_tracks = len(result.no_track_events)
-    print(f'status={status} plays={plays} no_tracks={no_tracks}')
-    assert status in ('success', 'no_track'), f'unexpected status: {status}'
-    print('VAL-Z100-001: PASS')
+    async with _factory()() as s:
+        # Counts
+        sc = (await s.execute(text('SELECT COUNT(*) FROM stations'))).scalar()
+        src = (await s.execute(text('SELECT COUNT(*) FROM sources'))).scalar()
+        print(f'STATION_COUNT={sc}')
+        print(f'SOURCE_COUNT={src}')
+
+        # Original stations
+        for cs in ('NOVA969', 'KIISFM', 'CAPITALFM'):
+            r = (await s.execute(text('SELECT id FROM stations WHERE call_sign=:c'), {'c': cs})).fetchone()
+            print(f'STATION_{cs}={\"FOUND\" if r else \"MISSING\"}')
+
+        # EXTRACT-2 stations
+        for cs in ('BBCRADIO1', 'HEARTFMUK', 'WHTZ', 'WKSC'):
+            r = (await s.execute(text('SELECT id FROM stations WHERE call_sign=:c'), {'c': cs})).fetchone()
+            print(f'STATION_{cs}={\"FOUND\" if r else \"MISSING\"}')
+
+        # EXTRACT-2 sources by source_type
+        for cs, st in (('BBCRADIO1','bbc_sounds'),('HEARTFMUK','heart_last_played'),
+                       ('WHTZ','iheart'),('WKSC','iheart')):
+            r = (await s.execute(
+                text('SELECT id FROM sources s JOIN stations st ON s.station_id=st.id '
+                     'WHERE st.call_sign=:c AND s.source_type=:t'),
+                {'c': cs, 't': st}
+            )).fetchone()
+            print(f'SOURCE_{cs}_{st.upper()}={\"FOUND\" if r else \"MISSING\"}')
 
 asyncio.run(run())
-"
+" 2>/dev/null | while IFS='=' read -r key val; do
+  case "$key" in
+    STATION_COUNT)
+      echo "  stations in DB: ${val}"
+      if [ "${val}" -ge "${EXPECTED_STATIONS}" ]; then
+        _pass "station count ${val} >= ${EXPECTED_STATIONS}"
+      else
+        _fail "station count ${val} < ${EXPECTED_STATIONS} (expected at least ${EXPECTED_STATIONS})"
+      fi ;;
+    SOURCE_COUNT)
+      echo "  sources in DB: ${val}" ;;
+    STATION_*|SOURCE_*)
+      label="${key//_/ }"
+      if [ "${val}" = "FOUND" ]; then
+        _pass "${label}"
+      else
+        _fail "${label}"
+      fi ;;
+  esac
+done
+
+# ── 7. Collector and parser code presence ────────────────────────
+_head "7. Collector and parser code presence (import only)"
+
+$COMPOSE exec -T app python3 -c "
+modules = [
+    # Existing collectors
+    ('collector', 'app.infrastructure.collectors.nova_radiowave',        'NovaRadiowaveCollector'),
+    ('collector', 'app.infrastructure.collectors.kiis_iheart',           'KIISIHeartCollector'),
+    ('collector', 'app.infrastructure.collectors.online_radio_box',      'OnlineRadioBoxCollector'),
+    # EXTRACT-1 new collectors
+    ('collector', 'app.infrastructure.collectors.bbc_radio_1',           'BBCRadio1Collector'),
+    ('collector', 'app.infrastructure.collectors.heart_radio',           'HeartRadioCollector'),
+    ('collector', 'app.infrastructure.collectors.iheart_now_playing',    'IHeartNowPlayingCollector'),
+    ('collector', 'app.infrastructure.collectors.iheart_recently_played','IHeartRecentlyPlayedCollector'),
+    ('collector', 'app.infrastructure.collectors.iheart_top_songs',      'IHeartTopSongsCollector'),
+    ('collector', 'app.infrastructure.collectors.kiis_radiowave',        'KIISRadiowaveCollector'),
+    # Parsers
+    ('parser',    'app.infrastructure.parsers.bbc_sounds',               None),
+    ('parser',    'app.infrastructure.parsers.heart',                    None),
+    ('parser',    'app.infrastructure.parsers.iheart',                   None),
+    ('parser',    'app.infrastructure.parsers.online_radio_box',         None),
+    ('parser',    'app.infrastructure.parsers.radiowave',                None),
+    # Scheduler
+    ('scheduler', 'app.infrastructure.scheduler.scheduler',              'build_scheduler'),
+]
+for kind, module, symbol in modules:
+    try:
+        mod = __import__(module, fromlist=[symbol] if symbol else [])
+        if symbol:
+            getattr(mod, symbol)
+        print(f'IMPORT_OK {kind} {module}')
+    except Exception as e:
+        print(f'IMPORT_FAIL {kind} {module} {e}')
+" 2>/dev/null | while read -r status kind module rest; do
+  if [ "${status}" = "IMPORT_OK" ]; then
+    _pass "${kind}: ${module}"
+  else
+    _fail "${kind}: ${module} — ${rest}"
+  fi
+done
+
+# ── 8. Scheduler state (must not be running) ─────────────────────
+_head "8. Scheduler state"
+
+sched_log="$($COMPOSE logs --tail=100 app 2>/dev/null \
+  | grep -i "scheduler\|SCHEDULER" | tail -10 || true)"
+if echo "${sched_log}" | grep -qi "scheduler.*start\|scheduler.*running"; then
+  _fail "scheduler appears to be running — check logs"
+  echo "${sched_log}" | sed 's/^/    /'
+else
+  _pass "no scheduler start/running signals in recent logs"
 fi
 
-# ────────────────────────────────────────────────────────────────
-# WKSC iHeart now-playing
-# ────────────────────────────────────────────────────────────────
-if $RUN_WKSC; then
-  run_collector "WKSC 103.5 iHeart now-playing (VAL-WKSC-001)" "
-import asyncio, uuid
-from app.infrastructure.collectors.iheart_now_playing import IHeartNowPlayingCollector
+# ── 9. Recent log scan ───────────────────────────────────────────
+_head "9. Recent log scan (last 80 lines)"
 
-async def run():
-    c = IHeartNowPlayingCollector(
-        source_id=uuid.UUID('00535f6c-73c6-5cd0-aed0-2cc481891239'),
-        station_id=uuid.UUID('189482a2-f5a0-50c6-8774-cfd22dd43037'),
-        iheart_station_id='821',
-        storage_root='/tmp/val_dryrun',
-    )
-    result = await c.run()
-    status = result.collector_run.status.value
-    plays = len(result.play_events)
-    no_tracks = len(result.no_track_events)
-    print(f'status={status} plays={plays} no_tracks={no_tracks}')
-    assert status in ('success', 'no_track'), f'unexpected status: {status}'
-    print('VAL-WKSC-001: PASS')
+recent_logs="$($COMPOSE logs --tail=80 app 2>/dev/null || true)"
 
-asyncio.run(run())
-"
+# Errors
+error_lines="$(echo "${recent_logs}" | grep -iE "ERROR|CRITICAL|Traceback|Exception" \
+  | grep -vE "persist_result_failed|capital_now_playing|No such container" || true)"
+if [ -n "${error_lines}" ]; then
+  _fail "error/exception lines found in recent logs"
+  echo "${error_lines}" | head -10 | sed 's/^/    /'
+else
+  _pass "no ERROR/CRITICAL/Traceback in recent logs"
 fi
 
-# ────────────────────────────────────────────────────────────────
-# KIIS-FM iHeart top songs
-# ────────────────────────────────────────────────────────────────
-if $RUN_KIIS_TOP; then
-  run_collector "KIIS-FM iHeart top songs (VAL-IHEART-TOP-001)" "
-import asyncio, uuid
-from app.infrastructure.collectors.iheart_top_songs import IHeartTopSongsCollector
-
-async def run():
-    c = IHeartTopSongsCollector(
-        source_id=uuid.UUID('14f4d232-3258-5688-8d63-77b23532e1d7'),
-        station_id=uuid.UUID('dc1dc7fa-fb3a-5451-b6e8-42bcac001612'),
-        iheart_station_id='2501',
-        storage_root='/tmp/val_dryrun',
-    )
-    result = await c.run()
-    status = result.collector_run.status.value
-    plays = len(result.play_events)
-    no_tracks = len(result.no_track_events)
-    print(f'status={status} plays={plays} no_tracks={no_tracks}')
-    assert status in ('success', 'no_track'), f'unexpected status: {status}'
-    print('VAL-IHEART-TOP-001: PASS')
-
-asyncio.run(run())
-"
+# Collector activity (must be silent)
+collector_lines="$(echo "${recent_logs}" | grep -iE \
+  "bbc_radio1_collected|heart_fm_collected|z100_now_playing|wksc_now_playing|kiis_top_songs" || true)"
+if [ -n "${collector_lines}" ]; then
+  _fail "new collector activity found in logs — flags should be false"
+  echo "${collector_lines}" | head -5 | sed 's/^/    /'
+else
+  _pass "no extracted-collector activity in recent logs"
 fi
 
-# ────────────────────────────────────────────────────────────────
-# Summary
-# ────────────────────────────────────────────────────────────────
+# Seeder completion
+if echo "${recent_logs}" | grep -q "seeder complete"; then
+  _pass "seeder completed on last startup"
+else
+  echo "  INFO  seeder complete not found in last 80 lines (may be older startup)"
+fi
+
+# ── Summary ──────────────────────────────────────────────────────
+echo ""
 echo "============================================================"
-echo " SUMMARY: ${PASS_COUNT} passed, ${FAIL_COUNT} failed"
+echo " SUMMARY: ${PASS} passed, ${FAIL} failed"
 echo "============================================================"
 
-if [ $FAIL_COUNT -gt 0 ]; then
-  echo "One or more collectors FAILED. Do not enable their flags."
-  echo "Review output above and check VAL register before proceeding."
+if [ "${FAIL}" -gt 0 ]; then
+  echo " One or more checks FAILED. Do not enable any collector flag."
+  echo " Review output above."
   exit 1
 fi
 
-echo "All selected collectors passed dry-run."
-echo "Review plays/no_tracks output before enabling any flag."
-echo "Each flag requires a separate production enablement pass."
+echo " All checks passed."
+echo " EXTRACT-2 deployment validated. Flags remain false."
+echo " Proceed to VAL-COLLECTORS-1 live dry-run when ready for each collector."
