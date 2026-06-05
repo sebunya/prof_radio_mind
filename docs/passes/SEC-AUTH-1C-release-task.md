@@ -44,17 +44,17 @@ Previous production was at `d5ec156` (PR #8 only). This pass brings it to `8c07b
 - [x] Alembic chain on main: `c4e2a1f9b8d7` (head) — no change required
 
 ### Production Execution (requires SSH from local machine)
-- [ ] Phase 5: Read-only precheck — production at `d5ec156`, all safety flags false, alembic at head
-- [ ] Phase 6: `git reset --hard origin/main` on server; `docker compose up -d --build app`; health = `200`
-- [ ] Phase 7: Credentials rotated; `/root/tenx-admin-auth.txt` written with `chmod 600`
-- [ ] Phase 8: `docker compose up -d --force-recreate app`; auth env loaded; health = `200`
-- [ ] Phase 9: Unauthenticated routes — `/` and `/health` = `200`; all `/admin*` = `401`
-- [ ] Phase 10: Authenticated routes — all `/admin*` = `200`
-- [ ] Phase 11: Metadata readiness response — no secret leakage
-- [ ] Phase 12: All safety/collector flags `false` in container; logs clean
-- [ ] Phase 13: 5-minute passive observation — health and auth stable; logs clean
+- [x] Phase 5: Read-only precheck — production at `d5ec156`, all safety flags false, alembic at head
+- [x] Phase 6: `git reset --hard origin/main` on server; `docker compose up -d --build app`; health = `200`
+- [x] Phase 7: Credentials rotated; `/root/tenx-admin-auth.txt` written with `chmod 600`
+- [x] Phase 8: `docker compose up -d --force-recreate app`; auth env loaded; health = `200`
+- [x] Phase 9: Unauthenticated routes — `/` and `/health` = `200`; all `/admin*` = `401`
+- [x] Phase 10: Authenticated routes — all `/admin*` = `200`
+- [x] Phase 11: Metadata readiness response — no secret leakage
+- [x] Phase 12: All safety/collector flags `false` in container; logs clean
+- [x] Phase 13: 5-minute passive observation — health and auth stable; logs clean
 
 ### Post-Deploy
-- [ ] User retrieves credentials: `ssh ... 'cat /root/tenx-admin-auth.txt'`
-- [ ] User completes manual browser UI QA at `https://tenxradar.com/admin/`
-- [ ] BLOCKED: `EXTRACT-1B-PLAN` — requires manual UI QA confirmation
+- [x] User retrieves credentials: `ssh ... 'cat /root/tenx-admin-auth.txt'`
+- [x] User completes manual browser UI QA at `https://tenxradar.com/admin/`
+- [x] UNBLOCKED: `EXTRACT-1B` draft PR opened — `feat/recon2-scheduler-collector-wiring`
