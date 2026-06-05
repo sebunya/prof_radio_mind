@@ -10,6 +10,10 @@ from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 
 from app.core.settings import settings
+from app.infrastructure.collectors.bbc_radio_1 import BBCRadio1Collector
+from app.infrastructure.collectors.heart_radio import HeartRadioCollector
+from app.infrastructure.collectors.iheart_now_playing import IHeartNowPlayingCollector
+from app.infrastructure.collectors.iheart_top_songs import IHeartTopSongsCollector
 from app.infrastructure.collectors.kiis_iheart import KIISIHeartCollector
 from app.infrastructure.collectors.nova_radiowave import NovaRadiowaveCollector
 from app.infrastructure.collectors.online_radio_box import OnlineRadioBoxCollector
@@ -24,6 +28,14 @@ _KIIS_STATION_ID = uuid.uuid5(_NS, "station.KIISFM")
 _KIIS_SOURCE_ID = uuid.uuid5(_NS, "source.KIISFM.iheart")
 _CAPITAL_STATION_ID = uuid.uuid5(_NS, "station.CAPITALFM")
 _CAPITAL_SOURCE_ID = uuid.uuid5(_NS, "source.CAPITALFM.online_radio_box")
+_BBC1_STATION_ID = uuid.uuid5(_NS, "station.BBCRADIO1")
+_BBC1_SOURCE_ID = uuid.uuid5(_NS, "source.BBCRADIO1.bbc_sounds")
+_HEARTFM_STATION_ID = uuid.uuid5(_NS, "station.HEARTFMUK")
+_HEARTFM_SOURCE_ID = uuid.uuid5(_NS, "source.HEARTFMUK.heart_last_played")
+_Z100_STATION_ID = uuid.uuid5(_NS, "station.WHTZ")
+_Z100_SOURCE_ID = uuid.uuid5(_NS, "source.WHTZ.iheart")
+_WKSC_STATION_ID = uuid.uuid5(_NS, "station.WKSC")
+_WKSC_SOURCE_ID = uuid.uuid5(_NS, "source.WKSC.iheart")
 
 _scheduler: AsyncIOScheduler | None = None
 _CAPITAL_FAILURES = 0
@@ -260,6 +272,94 @@ async def job_nightly_reconciliation() -> None:
     logger.info("nightly_reconciliation completed total_dupes=%d", total_dupes)
 
 
+async def job_collect_bbc_radio1() -> None:
+    """Poll BBC Radio 1 RMS API for current segment (runs every 5 minutes)."""
+    collector = BBCRadio1Collector(
+        source_id=_BBC1_SOURCE_ID,
+        station_id=_BBC1_STATION_ID,
+        storage_root=settings.raw_payload_storage_path,
+    )
+    result = await collector.run()
+    logger.info(
+        "bbc_radio1_collected status=%s plays=%d no_tracks=%d",
+        result.collector_run.status.value,
+        len(result.play_events),
+        len(result.no_track_events),
+    )
+    await _persist_result(result)
+
+
+async def job_collect_heart_fm() -> None:
+    """Scrape Heart FM last-played-songs page (runs every 5 minutes)."""
+    collector = HeartRadioCollector(
+        source_id=_HEARTFM_SOURCE_ID,
+        station_id=_HEARTFM_STATION_ID,
+        storage_root=settings.raw_payload_storage_path,
+    )
+    result = await collector.run()
+    logger.info(
+        "heart_fm_collected status=%s plays=%d no_tracks=%d",
+        result.collector_run.status.value,
+        len(result.play_events),
+        len(result.no_track_events),
+    )
+    await _persist_result(result)
+
+
+async def job_collect_z100_now_playing() -> None:
+    """Poll Z100 iHeart now-playing endpoint (runs every 5 minutes)."""
+    collector = IHeartNowPlayingCollector(
+        source_id=_Z100_SOURCE_ID,
+        station_id=_Z100_STATION_ID,
+        iheart_station_id="614",
+        storage_root=settings.raw_payload_storage_path,
+    )
+    result = await collector.run()
+    logger.info(
+        "z100_now_playing status=%s plays=%d no_tracks=%d",
+        result.collector_run.status.value,
+        len(result.play_events),
+        len(result.no_track_events),
+    )
+    await _persist_result(result)
+
+
+async def job_collect_wksc_now_playing() -> None:
+    """Poll WKSC 103.5 iHeart now-playing endpoint (runs every 5 minutes)."""
+    collector = IHeartNowPlayingCollector(
+        source_id=_WKSC_SOURCE_ID,
+        station_id=_WKSC_STATION_ID,
+        iheart_station_id="821",
+        storage_root=settings.raw_payload_storage_path,
+    )
+    result = await collector.run()
+    logger.info(
+        "wksc_now_playing status=%s plays=%d no_tracks=%d",
+        result.collector_run.status.value,
+        len(result.play_events),
+        len(result.no_track_events),
+    )
+    await _persist_result(result)
+
+
+async def job_collect_kiis_top_songs() -> None:
+    """Collect KIIS-FM iHeart top songs chart (runs daily 00:00 UTC)."""
+    collector = IHeartTopSongsCollector(
+        source_id=_KIIS_SOURCE_ID,
+        station_id=_KIIS_STATION_ID,
+        iheart_station_id="2501",
+        storage_root=settings.raw_payload_storage_path,
+    )
+    result = await collector.run()
+    logger.info(
+        "kiis_top_songs status=%s plays=%d no_tracks=%d",
+        result.collector_run.status.value,
+        len(result.play_events),
+        len(result.no_track_events),
+    )
+    await _persist_result(result)
+
+
 def build_scheduler() -> AsyncIOScheduler:
     """Create and configure the APScheduler instance with all registered jobs."""
     global _scheduler
@@ -324,5 +424,75 @@ def build_scheduler() -> AsyncIOScheduler:
         logger.info("Scheduler registered job: Nightly reconciliation")
     else:
         logger.info("Scheduler skipped job: Nightly reconciliation (disabled)")
+
+    # BBC Radio 1 RMS API now-playing — every 5 minutes
+    if settings.enable_bbc_radio1_collector:
+        sched.add_job(
+            job_collect_bbc_radio1,
+            IntervalTrigger(minutes=5),
+            id="bbc_radio1_now_playing",
+            name="BBC Radio 1 RMS API poll",
+            replace_existing=True,
+            misfire_grace_time=60,
+        )
+        logger.info("Scheduler registered job: BBC Radio 1 RMS API poll")
+    else:
+        logger.info("Scheduler skipped job: BBC Radio 1 (disabled)")
+
+    # Heart FM last-played scrape — every 5 minutes
+    if settings.enable_heart_collector:
+        sched.add_job(
+            job_collect_heart_fm,
+            IntervalTrigger(minutes=5),
+            id="heart_fm_last_played",
+            name="Heart FM last-played scrape",
+            replace_existing=True,
+            misfire_grace_time=60,
+        )
+        logger.info("Scheduler registered job: Heart FM last-played scrape")
+    else:
+        logger.info("Scheduler skipped job: Heart FM (disabled)")
+
+    # Z100 (WHTZ) iHeart now-playing — every 5 minutes
+    if settings.enable_z100_collector:
+        sched.add_job(
+            job_collect_z100_now_playing,
+            IntervalTrigger(minutes=5),
+            id="z100_now_playing",
+            name="Z100 iHeart now-playing poll",
+            replace_existing=True,
+            misfire_grace_time=60,
+        )
+        logger.info("Scheduler registered job: Z100 iHeart now-playing poll")
+    else:
+        logger.info("Scheduler skipped job: Z100 (disabled)")
+
+    # WKSC 103.5 iHeart now-playing — every 5 minutes
+    if settings.enable_wksc_collector:
+        sched.add_job(
+            job_collect_wksc_now_playing,
+            IntervalTrigger(minutes=5),
+            id="wksc_now_playing",
+            name="WKSC 103.5 iHeart now-playing poll",
+            replace_existing=True,
+            misfire_grace_time=60,
+        )
+        logger.info("Scheduler registered job: WKSC 103.5 iHeart now-playing poll")
+    else:
+        logger.info("Scheduler skipped job: WKSC (disabled)")
+
+    # KIIS-FM iHeart top songs — daily 00:00 UTC
+    if settings.enable_iheart_top_songs:
+        sched.add_job(
+            job_collect_kiis_top_songs,
+            CronTrigger(hour=0, minute=0, timezone="UTC"),
+            id="kiis_top_songs_daily",
+            name="KIIS-FM iHeart top songs chart",
+            replace_existing=True,
+            misfire_grace_time=3600,
+        )
+        logger.info("Scheduler registered job: KIIS-FM iHeart top songs chart")
+    else:
+        logger.info("Scheduler skipped job: KIIS-FM top songs (disabled)")
 
     return sched
