@@ -375,6 +375,108 @@ async def job_collect_kiis_top_songs() -> None:
     await _persist_result(result)
 
 
+async def job_generate_nightly_reports() -> None:
+    """Build DailyReport records for all active stations (runs daily 18:00 UTC).
+
+    Generates yesterday's ranking for every station that has play events,
+    persisting or updating the daily_reports + report_versions rows.
+    Stations with zero plays for the day are silently skipped.
+    Runs after nightly reconciliation (17:00 UTC) so dedup is current.
+    """
+    from datetime import UTC, datetime, timedelta
+
+    from app.application.ranking.engine import build_snapshot
+    from app.application.reports.confidence import SourceCoverage, compute_confidence
+    from app.infrastructure.database.repositories.daily_report_repo import (
+        SQLDailyReportRepository,
+    )
+    from app.infrastructure.database.repositories.play_event_repo import SQLPlayEventRepository
+    from app.infrastructure.database.repositories.station_repo import SQLStationRepository
+    from app.infrastructure.database.session import _get_factory as _factory
+
+    report_date = (datetime.now(tz=UTC).date() - timedelta(days=1))
+    from_dt = datetime(report_date.year, report_date.month, report_date.day, tzinfo=UTC)
+    to_dt = from_dt + timedelta(days=1)
+    generated = 0
+    skipped = 0
+
+    try:
+        async with _factory()() as session:
+            stations = await SQLStationRepository(session).list_active()
+    except Exception as exc:
+        logger.error("nightly_reports_station_load_failed error=%s", exc)
+        return
+
+    for station in stations:
+        try:
+            async with _factory()() as session:
+                events = await SQLPlayEventRepository(session).list_for_station(
+                    station.id, from_dt, to_dt
+                )
+
+            if not events:
+                skipped += 1
+                continue
+
+            plays = [(e.raw_artist, e.raw_title) for e in events]
+            snapshot = build_snapshot(plays, str(station.id), str(report_date), top_n=40)
+
+            cov = SourceCoverage(total_plays=len(events))
+            for ev in events:
+                attr = getattr(ev, "attribution", None) or ""
+                if attr == "radiowave":
+                    cov.radiowave_plays += 1
+                elif attr == "iheart":
+                    cov.iheart_plays += 1
+                elif attr == "manual_csv":
+                    cov.manual_csv_plays += 1
+                else:
+                    cov.radiowave_plays += 1
+
+            confidence_score, confidence_level = compute_confidence(cov)
+            snapshot_rows = [
+                {
+                    "position": e.position,
+                    "artist": e.song_key.artist,
+                    "title": e.song_key.title,
+                    "play_count": e.play_count,
+                }
+                for e in snapshot.entries
+            ]
+
+            async with _factory()() as session:
+                _, version = await SQLDailyReportRepository(session).upsert(
+                    station_id=station.id,
+                    report_date=report_date,
+                    confidence_level=confidence_level.value,
+                    confidence_score=float(confidence_score),
+                    total_plays=snapshot.total_plays,
+                    unique_songs=len(snapshot.entries),
+                    source_coverage=cov.to_dict(),
+                    snapshot_rows=snapshot_rows,
+                )
+                await session.commit()
+
+            logger.info(
+                "nightly_report_generated station=%s date=%s plays=%d entries=%d "
+                "confidence=%s version=%d",
+                station.call_sign, report_date, snapshot.total_plays,
+                len(snapshot.entries), confidence_level.value, version,
+            )
+            generated += 1
+
+        except Exception as exc:
+            logger.error(
+                "nightly_report_station_failed station=%s date=%s error=%s",
+                getattr(station, "call_sign", station.id), report_date, exc,
+            )
+
+    logger.info(
+        "nightly_reports_complete date=%s generated=%d skipped_no_plays=%d",
+        report_date, generated, skipped,
+    )
+
+
 async def job_collect_iheart_recently_played() -> None:
     """Hourly batch fallback for all iHeart stations (KIISFM, Z100, WKSC).
 
@@ -490,6 +592,20 @@ def build_scheduler() -> AsyncIOScheduler:
         logger.info("Scheduler registered job: Nightly reconciliation")
     else:
         logger.info("Scheduler skipped job: Nightly reconciliation (disabled)")
+
+    # Nightly report generation — 18:00 UTC daily (after reconciliation at 17:00)
+    if settings.enable_nightly_report_generation:
+        sched.add_job(
+            job_generate_nightly_reports,
+            CronTrigger(hour=18, minute=0, timezone="UTC"),
+            id="nightly_report_generation",
+            name="Nightly daily-report generation (all stations)",
+            replace_existing=True,
+            misfire_grace_time=3600,
+        )
+        logger.info("Scheduler registered job: Nightly report generation")
+    else:
+        logger.info("Scheduler skipped job: Nightly report generation (disabled)")
 
     # BBC Radio 1 RMS API now-playing — every 5 minutes
     if settings.enable_bbc_radio1_collector:

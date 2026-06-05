@@ -20,6 +20,7 @@ from app.infrastructure.scheduler.scheduler import (
     job_collect_nova_diary,
     job_collect_wksc_now_playing,
     job_collect_z100_now_playing,
+    job_generate_nightly_reports,
     job_nightly_reconciliation,
 )
 
@@ -39,12 +40,13 @@ def test_scheduler_default_no_jobs() -> None:
         patch.object(settings, "enable_iheart_top_songs", False),
         patch.object(settings, "enable_kiis_radiowave_collector", False),
         patch.object(settings, "enable_iheart_recently_played", False),
+        patch.object(settings, "enable_nightly_report_generation", False),
     ):
         sched = build_scheduler()
         assert len(sched.get_jobs()) == 0
 
 
-def test_scheduler_all_enabled_has_eleven_jobs() -> None:
+def test_scheduler_all_enabled_has_twelve_jobs() -> None:
     from app.core.settings import settings
     with (
         patch.object(settings, "enable_nova_collector", True),
@@ -58,15 +60,17 @@ def test_scheduler_all_enabled_has_eleven_jobs() -> None:
         patch.object(settings, "enable_iheart_top_songs", True),
         patch.object(settings, "enable_kiis_radiowave_collector", True),
         patch.object(settings, "enable_iheart_recently_played", True),
+        patch.object(settings, "enable_nightly_report_generation", True),
     ):
         sched = build_scheduler()
-        assert len(sched.get_jobs()) == 11
+        assert len(sched.get_jobs()) == 12
         ids = {j.id for j in sched.get_jobs()}
         assert ids == {
             "nova_daily_diary",
             "kiis_now_playing",
             "capital_now_playing",
             "nightly_reconciliation",
+            "nightly_report_generation",
             "bbc_radio1_now_playing",
             "heart_fm_last_played",
             "z100_now_playing",
@@ -420,3 +424,18 @@ async def test_iheart_recently_played_job_invokes_collector() -> None:
 
     # Three stations are polled per invocation
     assert mock_collector.run.await_count == 3
+
+
+def test_nightly_report_generation_job_uses_cron_trigger() -> None:
+    from app.core.settings import settings
+    with patch.object(settings, "enable_nightly_report_generation", True):
+        sched = build_scheduler()
+        job = sched.get_job("nightly_report_generation")
+        assert job is not None
+        assert isinstance(job.trigger, CronTrigger)
+
+
+@pytest.mark.anyio
+async def test_nightly_report_job_is_no_op_without_db() -> None:
+    # Must complete without raising even when DB is unavailable
+    await job_generate_nightly_reports()

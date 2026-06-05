@@ -27,6 +27,8 @@ class Settings(BaseSettings):
     enable_kiis_radiowave_collector: bool = False
     # iHeart recently-played batch fallback (EXTRACT-4): covers KIISFM, Z100, WKSC
     enable_iheart_recently_played: bool = False
+    # Nightly report generation — builds DailyReport records for all active stations
+    enable_nightly_report_generation: bool = False
 
     # Security
     max_upload_bytes: int = 10 * 1024 * 1024  # 10 MB
