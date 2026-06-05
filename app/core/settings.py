@@ -25,6 +25,8 @@ class Settings(BaseSettings):
     enable_iheart_top_songs: bool = False
     # KIIS-FM 102.7 Los Angeles Radiowave diary (EXTRACT-3) — disabled by default
     enable_kiis_radiowave_collector: bool = False
+    # iHeart recently-played batch fallback (EXTRACT-4): covers KIISFM, Z100, WKSC
+    enable_iheart_recently_played: bool = False
 
     # Security
     max_upload_bytes: int = 10 * 1024 * 1024  # 10 MB

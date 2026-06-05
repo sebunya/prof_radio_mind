@@ -13,6 +13,7 @@ from app.infrastructure.scheduler.scheduler import (
     job_collect_bbc_radio1,
     job_collect_capital_now_playing,
     job_collect_heart_fm,
+    job_collect_iheart_recently_played,
     job_collect_kiis1027_radiowave,
     job_collect_kiis_now_playing,
     job_collect_kiis_top_songs,
@@ -37,12 +38,13 @@ def test_scheduler_default_no_jobs() -> None:
         patch.object(settings, "enable_wksc_collector", False),
         patch.object(settings, "enable_iheart_top_songs", False),
         patch.object(settings, "enable_kiis_radiowave_collector", False),
+        patch.object(settings, "enable_iheart_recently_played", False),
     ):
         sched = build_scheduler()
         assert len(sched.get_jobs()) == 0
 
 
-def test_scheduler_all_enabled_has_ten_jobs() -> None:
+def test_scheduler_all_enabled_has_eleven_jobs() -> None:
     from app.core.settings import settings
     with (
         patch.object(settings, "enable_nova_collector", True),
@@ -55,9 +57,10 @@ def test_scheduler_all_enabled_has_ten_jobs() -> None:
         patch.object(settings, "enable_wksc_collector", True),
         patch.object(settings, "enable_iheart_top_songs", True),
         patch.object(settings, "enable_kiis_radiowave_collector", True),
+        patch.object(settings, "enable_iheart_recently_played", True),
     ):
         sched = build_scheduler()
-        assert len(sched.get_jobs()) == 10
+        assert len(sched.get_jobs()) == 11
         ids = {j.id for j in sched.get_jobs()}
         assert ids == {
             "nova_daily_diary",
@@ -70,6 +73,7 @@ def test_scheduler_all_enabled_has_ten_jobs() -> None:
             "wksc_now_playing",
             "kiis_top_songs_daily",
             "kiis1027_radiowave_diary",
+            "iheart_recently_played_hourly",
         }
 
 
@@ -383,3 +387,36 @@ async def test_kiis1027_radiowave_job_invokes_collector() -> None:
         await job_collect_kiis1027_radiowave()
 
     mock_collector.run.assert_awaited_once()
+
+
+def test_iheart_recently_played_job_uses_interval_trigger() -> None:
+    from app.core.settings import settings
+    with patch.object(settings, "enable_iheart_recently_played", True):
+        sched = build_scheduler()
+        job = sched.get_job("iheart_recently_played_hourly")
+        assert job is not None
+        assert isinstance(job.trigger, IntervalTrigger)
+
+
+@pytest.mark.anyio
+async def test_iheart_recently_played_job_invokes_collector() -> None:
+    import uuid
+
+    from app.domain.entities.collector_run import CollectorRun
+    from app.infrastructure.collectors.base import CollectorResult
+
+    run = CollectorRun.create(source_id=uuid.uuid4(), station_id=uuid.uuid4())
+    real_result = CollectorResult(collector_run=run, play_events=[], no_track_events=[])
+
+    mock_collector = AsyncMock()
+    mock_collector.run = AsyncMock(return_value=real_result)
+
+    _sched = "app.infrastructure.scheduler.scheduler"
+    with (
+        patch(f"{_sched}.IHeartRecentlyPlayedCollector", return_value=mock_collector),
+        patch(f"{_sched}._persist_result", new_callable=AsyncMock),
+    ):
+        await job_collect_iheart_recently_played()
+
+    # Three stations are polled per invocation
+    assert mock_collector.run.await_count == 3

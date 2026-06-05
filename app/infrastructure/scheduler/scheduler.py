@@ -13,6 +13,7 @@ from app.core.settings import settings
 from app.infrastructure.collectors.bbc_radio_1 import BBCRadio1Collector
 from app.infrastructure.collectors.heart_radio import HeartRadioCollector
 from app.infrastructure.collectors.iheart_now_playing import IHeartNowPlayingCollector
+from app.infrastructure.collectors.iheart_recently_played import IHeartRecentlyPlayedCollector
 from app.infrastructure.collectors.iheart_top_songs import IHeartTopSongsCollector
 from app.infrastructure.collectors.kiis_iheart import KIISIHeartCollector
 from app.infrastructure.collectors.kiis_radiowave import KIISRadiowaveCollector
@@ -83,10 +84,21 @@ async def _persist_result(result: object) -> None:
                         clean_artist, play_event.raw_title
                     )
 
-                # Skip if this now-playing event is a duplicate of a recent save.
-                # Use a 1 800-second (30-minute) window — 2× the Capital FM poll
-                # interval — so a song still playing on consecutive polls is stored
-                # once, while a legitimate replay hours later is captured.
+                # Batch-collector dedup: source_event_id is stable across polls,
+                # so skip if this exact play instance is already stored.
+                if play_event.source_event_id and await play_repo.exists_by_source_event_id(
+                    play_event.station_id,
+                    play_event.source_event_id,
+                ):
+                    logger.debug(
+                        "persist_result_skip_duplicate station_id=%s source_event_id=%s",
+                        play_event.station_id,
+                        play_event.source_event_id,
+                    )
+                    continue
+
+                # Now-playing dedup: fingerprint within a 30-minute window catches
+                # the same song appearing on successive 5-minute polls.
                 if play_event.fingerprint and await play_repo.exists_by_fingerprint(
                     play_event.station_id,
                     play_event.fingerprint,
@@ -363,6 +375,35 @@ async def job_collect_kiis_top_songs() -> None:
     await _persist_result(result)
 
 
+async def job_collect_iheart_recently_played() -> None:
+    """Hourly batch fallback for all iHeart stations (KIISFM, Z100, WKSC).
+
+    Catches short tracks missed by the 5-minute now-playing poll.
+    Deduplication is handled by source_event_id check in _persist_result.
+    """
+    for station_id, source_id, iheart_station_id in (
+        (_KIIS_STATION_ID, _KIIS_SOURCE_ID, "2501"),
+        (_Z100_STATION_ID, _Z100_SOURCE_ID, "614"),
+        (_WKSC_STATION_ID, _WKSC_SOURCE_ID, "821"),
+    ):
+        collector = IHeartRecentlyPlayedCollector(
+            source_id=source_id,
+            station_id=station_id,
+            iheart_station_id=iheart_station_id,
+            storage_root=settings.raw_payload_storage_path,
+        )
+        result = await collector.run()
+        logger.info(
+            "iheart_recently_played_collected station_id=%s iheart_id=%s "
+            "status=%s plays=%d",
+            station_id,
+            iheart_station_id,
+            result.collector_run.status.value,
+            len(result.play_events),
+        )
+        await _persist_result(result)
+
+
 async def job_collect_kiis1027_radiowave() -> None:
     """Collect KIIS-FM 102.7 Radiowave Monitor diary for yesterday (runs daily 09:00 UTC)."""
     from datetime import UTC, datetime, timedelta
@@ -519,6 +560,20 @@ def build_scheduler() -> AsyncIOScheduler:
         logger.info("Scheduler registered job: KIIS-FM iHeart top songs chart")
     else:
         logger.info("Scheduler skipped job: KIIS-FM top songs (disabled)")
+
+    # iHeart recently-played batch fallback — hourly (KIISFM, Z100, WKSC)
+    if settings.enable_iheart_recently_played:
+        sched.add_job(
+            job_collect_iheart_recently_played,
+            IntervalTrigger(hours=1),
+            id="iheart_recently_played_hourly",
+            name="iHeart recently-played batch fallback",
+            replace_existing=True,
+            misfire_grace_time=300,
+        )
+        logger.info("Scheduler registered job: iHeart recently-played batch fallback")
+    else:
+        logger.info("Scheduler skipped job: iHeart recently-played (disabled)")
 
     # KIIS-FM 102.7 Los Angeles Radiowave diary — daily 09:00 UTC (01:00 AM Pacific)
     if settings.enable_kiis_radiowave_collector:
