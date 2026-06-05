@@ -71,6 +71,7 @@
 - [ ] Waited 15 minutes
 - [ ] `val-post-enable.sh --z100` → SUMMARY: 0 failed
 - [ ] Play events visible in admin UI for Z100
+- [ ] `ENABLE_NIGHTLY_REPORT_GENERATION=true` set (safe to enable now; job skips stations with no data)
 - [ ] Waiting 24 hours
 
 ---
