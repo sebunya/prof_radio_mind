@@ -10,9 +10,14 @@ from apscheduler.triggers.interval import IntervalTrigger
 
 from app.infrastructure.scheduler.scheduler import (
     build_scheduler,
+    job_collect_bbc_radio1,
     job_collect_capital_now_playing,
+    job_collect_heart_fm,
     job_collect_kiis_now_playing,
+    job_collect_kiis_top_songs,
     job_collect_nova_diary,
+    job_collect_wksc_now_playing,
+    job_collect_z100_now_playing,
     job_nightly_reconciliation,
 )
 
@@ -25,27 +30,42 @@ def test_scheduler_default_no_jobs() -> None:
         patch.object(settings, "enable_kiis_collector", False),
         patch.object(settings, "enable_capital_collector", False),
         patch.object(settings, "enable_nightly_reconciliation", False),
+        patch.object(settings, "enable_bbc_radio1_collector", False),
+        patch.object(settings, "enable_heart_collector", False),
+        patch.object(settings, "enable_z100_collector", False),
+        patch.object(settings, "enable_wksc_collector", False),
+        patch.object(settings, "enable_iheart_top_songs", False),
     ):
         sched = build_scheduler()
         assert len(sched.get_jobs()) == 0
 
 
-def test_scheduler_all_enabled_has_four_jobs() -> None:
+def test_scheduler_all_enabled_has_nine_jobs() -> None:
     from app.core.settings import settings
     with (
         patch.object(settings, "enable_nova_collector", True),
         patch.object(settings, "enable_kiis_collector", True),
         patch.object(settings, "enable_capital_collector", True),
         patch.object(settings, "enable_nightly_reconciliation", True),
+        patch.object(settings, "enable_bbc_radio1_collector", True),
+        patch.object(settings, "enable_heart_collector", True),
+        patch.object(settings, "enable_z100_collector", True),
+        patch.object(settings, "enable_wksc_collector", True),
+        patch.object(settings, "enable_iheart_top_songs", True),
     ):
         sched = build_scheduler()
-        assert len(sched.get_jobs()) == 4
+        assert len(sched.get_jobs()) == 9
         ids = {j.id for j in sched.get_jobs()}
         assert ids == {
             "nova_daily_diary",
             "kiis_now_playing",
             "capital_now_playing",
             "nightly_reconciliation",
+            "bbc_radio1_now_playing",
+            "heart_fm_last_played",
+            "z100_now_playing",
+            "wksc_now_playing",
+            "kiis_top_songs_daily",
         }
 
 
@@ -81,6 +101,51 @@ def test_reconciliation_job_uses_cron_trigger() -> None:
     with patch.object(settings, "enable_nightly_reconciliation", True):
         sched = build_scheduler()
         job = sched.get_job("nightly_reconciliation")
+        assert job is not None
+        assert isinstance(job.trigger, CronTrigger)
+
+
+def test_bbc_radio1_job_uses_interval_trigger() -> None:
+    from app.core.settings import settings
+    with patch.object(settings, "enable_bbc_radio1_collector", True):
+        sched = build_scheduler()
+        job = sched.get_job("bbc_radio1_now_playing")
+        assert job is not None
+        assert isinstance(job.trigger, IntervalTrigger)
+
+
+def test_heart_fm_job_uses_interval_trigger() -> None:
+    from app.core.settings import settings
+    with patch.object(settings, "enable_heart_collector", True):
+        sched = build_scheduler()
+        job = sched.get_job("heart_fm_last_played")
+        assert job is not None
+        assert isinstance(job.trigger, IntervalTrigger)
+
+
+def test_z100_job_uses_interval_trigger() -> None:
+    from app.core.settings import settings
+    with patch.object(settings, "enable_z100_collector", True):
+        sched = build_scheduler()
+        job = sched.get_job("z100_now_playing")
+        assert job is not None
+        assert isinstance(job.trigger, IntervalTrigger)
+
+
+def test_wksc_job_uses_interval_trigger() -> None:
+    from app.core.settings import settings
+    with patch.object(settings, "enable_wksc_collector", True):
+        sched = build_scheduler()
+        job = sched.get_job("wksc_now_playing")
+        assert job is not None
+        assert isinstance(job.trigger, IntervalTrigger)
+
+
+def test_kiis_top_songs_job_uses_cron_trigger() -> None:
+    from app.core.settings import settings
+    with patch.object(settings, "enable_iheart_top_songs", True):
+        sched = build_scheduler()
+        job = sched.get_job("kiis_top_songs_daily")
         assert job is not None
         assert isinstance(job.trigger, CronTrigger)
 
@@ -165,5 +230,120 @@ async def test_capital_job_invokes_collector() -> None:
         patch(f"{_sched}._persist_result", new_callable=AsyncMock),
     ):
         await job_collect_capital_now_playing()
+
+    mock_collector.run.assert_awaited_once()
+
+
+@pytest.mark.anyio
+async def test_bbc_radio1_job_invokes_collector() -> None:
+    import uuid
+
+    from app.domain.entities.collector_run import CollectorRun
+    from app.infrastructure.collectors.base import CollectorResult
+
+    run = CollectorRun.create(source_id=uuid.uuid4(), station_id=uuid.uuid4())
+    real_result = CollectorResult(collector_run=run, play_events=[], no_track_events=[])
+
+    mock_collector = AsyncMock()
+    mock_collector.run = AsyncMock(return_value=real_result)
+
+    _sched = "app.infrastructure.scheduler.scheduler"
+    with (
+        patch(f"{_sched}.BBCRadio1Collector", return_value=mock_collector),
+        patch(f"{_sched}._persist_result", new_callable=AsyncMock),
+    ):
+        await job_collect_bbc_radio1()
+
+    mock_collector.run.assert_awaited_once()
+
+
+@pytest.mark.anyio
+async def test_heart_fm_job_invokes_collector() -> None:
+    import uuid
+
+    from app.domain.entities.collector_run import CollectorRun
+    from app.infrastructure.collectors.base import CollectorResult
+
+    run = CollectorRun.create(source_id=uuid.uuid4(), station_id=uuid.uuid4())
+    real_result = CollectorResult(collector_run=run, play_events=[], no_track_events=[])
+
+    mock_collector = AsyncMock()
+    mock_collector.run = AsyncMock(return_value=real_result)
+
+    _sched = "app.infrastructure.scheduler.scheduler"
+    with (
+        patch(f"{_sched}.HeartRadioCollector", return_value=mock_collector),
+        patch(f"{_sched}._persist_result", new_callable=AsyncMock),
+    ):
+        await job_collect_heart_fm()
+
+    mock_collector.run.assert_awaited_once()
+
+
+@pytest.mark.anyio
+async def test_z100_job_invokes_collector() -> None:
+    import uuid
+
+    from app.domain.entities.collector_run import CollectorRun
+    from app.infrastructure.collectors.base import CollectorResult
+
+    run = CollectorRun.create(source_id=uuid.uuid4(), station_id=uuid.uuid4())
+    real_result = CollectorResult(collector_run=run, play_events=[], no_track_events=[])
+
+    mock_collector = AsyncMock()
+    mock_collector.run = AsyncMock(return_value=real_result)
+
+    _sched = "app.infrastructure.scheduler.scheduler"
+    with (
+        patch(f"{_sched}.IHeartNowPlayingCollector", return_value=mock_collector),
+        patch(f"{_sched}._persist_result", new_callable=AsyncMock),
+    ):
+        await job_collect_z100_now_playing()
+
+    mock_collector.run.assert_awaited_once()
+
+
+@pytest.mark.anyio
+async def test_wksc_job_invokes_collector() -> None:
+    import uuid
+
+    from app.domain.entities.collector_run import CollectorRun
+    from app.infrastructure.collectors.base import CollectorResult
+
+    run = CollectorRun.create(source_id=uuid.uuid4(), station_id=uuid.uuid4())
+    real_result = CollectorResult(collector_run=run, play_events=[], no_track_events=[])
+
+    mock_collector = AsyncMock()
+    mock_collector.run = AsyncMock(return_value=real_result)
+
+    _sched = "app.infrastructure.scheduler.scheduler"
+    with (
+        patch(f"{_sched}.IHeartNowPlayingCollector", return_value=mock_collector),
+        patch(f"{_sched}._persist_result", new_callable=AsyncMock),
+    ):
+        await job_collect_wksc_now_playing()
+
+    mock_collector.run.assert_awaited_once()
+
+
+@pytest.mark.anyio
+async def test_kiis_top_songs_job_invokes_collector() -> None:
+    import uuid
+
+    from app.domain.entities.collector_run import CollectorRun
+    from app.infrastructure.collectors.base import CollectorResult
+
+    run = CollectorRun.create(source_id=uuid.uuid4(), station_id=uuid.uuid4())
+    real_result = CollectorResult(collector_run=run, play_events=[], no_track_events=[])
+
+    mock_collector = AsyncMock()
+    mock_collector.run = AsyncMock(return_value=real_result)
+
+    _sched = "app.infrastructure.scheduler.scheduler"
+    with (
+        patch(f"{_sched}.IHeartTopSongsCollector", return_value=mock_collector),
+        patch(f"{_sched}._persist_result", new_callable=AsyncMock),
+    ):
+        await job_collect_kiis_top_songs()
 
     mock_collector.run.assert_awaited_once()
