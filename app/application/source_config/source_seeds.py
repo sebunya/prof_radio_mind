@@ -1,4 +1,4 @@
-"""Static seed definitions for the three MVP stations' sources.
+"""Static seed definitions for station sources.
 
 Validation status is noted in comments — do not assume anything is validated
 unless VAL-* codes are confirmed in docs/VALIDATION_REGISTER.md.
@@ -100,5 +100,88 @@ SOURCE_SEEDS: tuple[SourceSeed, ...] = (
             "Always available — manual fallback. "
             "Import schema must still be tested before client-facing reporting."
         ),
+    ),
+    # --- BBC Radio 1 --- (EXTRACT-2)
+    # VAL-BBC1-001: BBC Sounds/RMS API reachability UNVALIDATED
+    # VAL-BBC1-006: BBC ToS for automated access UNCONFIRMED
+    SourceSeed(
+        station_call_sign="BBCRADIO1",
+        source_type=SourceType.BBC_SOUNDS,
+        name="BBC Radio 1 RMS API",
+        base_url="https://rms.api.bbc.co.uk/v2/services/bbc_radio_one/segments/latest",
+        config={"service_id": "bbc_radio_one"},
+        priority=1,
+        validation_note=(
+            "UNVALIDATED — VAL-BBC1-001 (live reachability) and VAL-BBC1-006 (ToS) required"
+        ),
+    ),
+    SourceSeed(
+        station_call_sign="BBCRADIO1",
+        source_type=SourceType.MANUAL_CSV,
+        name="BBC Radio 1 Manual CSV Fallback",
+        base_url=None,
+        config=None,
+        priority=99,
+        validation_note="Always available — manual fallback",
+    ),
+    # --- Heart FM UK --- (EXTRACT-2)
+    # VAL-HEARTFM-002: CSS selectors against live page UNVALIDATED (synthetic fixture only)
+    SourceSeed(
+        station_call_sign="HEARTFMUK",
+        source_type=SourceType.HEART_LAST_PLAYED,
+        name="Heart FM Last Played Page",
+        base_url="https://www.heart.co.uk/radio/",
+        config={"parser": "heart_last_played_css"},
+        priority=1,
+        validation_note="UNVALIDATED — VAL-HEARTFM-002 (live CSS selectors) required",
+    ),
+    SourceSeed(
+        station_call_sign="HEARTFMUK",
+        source_type=SourceType.MANUAL_CSV,
+        name="Heart FM UK Manual CSV Fallback",
+        base_url=None,
+        config=None,
+        priority=99,
+        validation_note="Always available — manual fallback",
+    ),
+    # --- Z100 New York (WHTZ) --- (EXTRACT-2)
+    # VAL-Z100-001: iHeart station_id=614 confirmed in fixture; not validated against live API
+    SourceSeed(
+        station_call_sign="WHTZ",
+        source_type=SourceType.IHEART,
+        name="Z100 iHeart Now Playing",
+        base_url="https://api.iheart.com/api/v3/live-meta/stream",
+        config={"station_id": "614"},
+        priority=1,
+        validation_note="UNVALIDATED — VAL-Z100-001 (live station_id=614) required before enable",
+    ),
+    SourceSeed(
+        station_call_sign="WHTZ",
+        source_type=SourceType.MANUAL_CSV,
+        name="Z100 Manual CSV Fallback",
+        base_url=None,
+        config=None,
+        priority=99,
+        validation_note="Always available — manual fallback",
+    ),
+    # --- WKSC 103.5 Chicago --- (EXTRACT-2)
+    # VAL-WKSC-001: iHeart station_id=821 confirmed in fixture; not validated against live API
+    SourceSeed(
+        station_call_sign="WKSC",
+        source_type=SourceType.IHEART,
+        name="WKSC 103.5 iHeart Now Playing",
+        base_url="https://api.iheart.com/api/v3/live-meta/stream",
+        config={"station_id": "821"},
+        priority=1,
+        validation_note="UNVALIDATED — VAL-WKSC-001 (live station_id=821) required before enable",
+    ),
+    SourceSeed(
+        station_call_sign="WKSC",
+        source_type=SourceType.MANUAL_CSV,
+        name="WKSC 103.5 Manual CSV Fallback",
+        base_url=None,
+        config=None,
+        priority=99,
+        validation_note="Always available — manual fallback",
     ),
 )

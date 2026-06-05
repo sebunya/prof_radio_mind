@@ -11,6 +11,8 @@ class SourceType(StrEnum):
     ONLINE_RADIO_BOX = "online_radio_box"
     MANUAL_CSV = "manual_csv"
     UNKNOWN = "unknown"
+    BBC_SOUNDS = "bbc_sounds"
+    HEART_LAST_PLAYED = "heart_last_played"
 
 
 @dataclass
