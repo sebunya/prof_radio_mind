@@ -1,6 +1,6 @@
 # Radio Music Intelligence & Automation System
 # Validation Register
-# Last updated: 2026-06-05 (EXTRACT-2 + EXTRACT-4 entries added)
+# Last updated: 2026-06-05 (RADIO-COVERAGE-ARCH-1: production VAL-LIVE-ENDPOINTS findings applied)
 
 ---
 
@@ -32,10 +32,10 @@ Validation must be performed by a human or a dedicated validation command. Resul
 |---|---|
 | ID | VAL-NOVA-001 |
 | Description | Confirm the Radiowave Monitor diary URL for Nova 96.9 (IDDS=11129) is reachable and returns the expected HTML diary page |
-| Status | UNVALIDATED |
+| Status | UNVALIDATED — **domain discrepancy found** |
 | Validated by | — |
 | Validated at | — |
-| Notes | Must be confirmed before Pass 6 (Radiowave collector) |
+| Notes | **CRITICAL: Nova collector uses `radiowave.com.au/diary?idds=11129`. The D5 diagnostic incorrectly tested `radiowavemonitor.com/IDDS=11129` (wrong domain). radiowave.com.au has never been tested live. Run D6 diagnostic in RADIO-COVERAGE-ARCH-1-task.md.** |
 | Risk if fails | Nova collection blocked; escalate to manual CSV fallback |
 
 ### 1.2 Radiowave DOM Selector Validation
@@ -160,12 +160,12 @@ Validation must be performed by a human or a dedicated validation command. Resul
 |---|---|
 | ID | VAL-IHEART-TOP-001 |
 | Description | Confirm that the iHeart topSongs endpoint for station 2501 is reachable, returns HTTP 200, and the JSON body contains a `topSongs` or `songs` list with ≥1 entry. |
-| Status | UNVALIDATED |
-| Validated by | — |
-| Validated at | — |
+| Status | **FAILED — endpoint path does not exist** |
+| Validated by | val-live-endpoints.sh automated run |
+| Validated at | 2026-06-05 |
 | Script | `docs/passes/val-live-endpoints.sh --kiis_top` |
-| Notes | Response schema UNVALIDATED — parser falls back to `songs` key if `topSongs` absent. Daily cron at 00:00 UTC. |
-| Risk if fails | Top-songs chart unavailable; do not enable `ENABLE_IHEART_TOP_SONGS` |
+| Notes | **HTTP 404. The `/topSongs` sub-path was invented by pattern extension from `/currentTrack` and was never verified against a live API. The path does not exist. The entire `/api/v3/live-meta/stream/` base is also unavailable. Do not enable `ENABLE_IHEART_TOP_SONGS`. A new endpoint must be discovered before this VAL code can be re-attempted.** |
+| Risk if fails | Top-songs chart collector cannot operate; do not enable |
 
 ---
 
@@ -177,12 +177,12 @@ Validation must be performed by a human or a dedicated validation command. Resul
 |---|---|
 | ID | VAL-KIIS-RAD-001 |
 | Description | Confirm the Radiowave Monitor has a diary for KIIS-FM 102.7 LA at IDDS=5080. Fetch `https://www.radiowavemonitor.com/pub_charts/diaries.aspx?IDDS=5080&date=YYYY-MM-DD` for yesterday from the production server. Confirm HTTP 200 and that `tr.diary-row` elements are present. |
-| Status | UNVALIDATED |
-| Validated by | — |
-| Validated at | — |
+| Status | **FAILED — HTTP 200 but 0 tr.diary-row rows across all tested dates** |
+| Validated by | val-live-endpoints.sh + D5 diagnostic |
+| Validated at | 2026-06-05 |
 | Script | `docs/passes/val-live-endpoints.sh --kiis1027_radiowave` |
-| Notes | IDDS=5080 is the LA KIIS (KIIS1027) diary. The same `parse_radiowave_diary` parser used by Nova handles both stations; `tr.diary-row` selector must match. |
-| Risk if fails | KIIS-FM 102.7 Radiowave diary unavailable; do not enable `ENABLE_KIIS_RADIOWAVE_COLLECTOR` |
+| Notes | **HTTP 200 but 0 diary rows for all dates tested (1–7 days back). IDDS=5080 was never verified against live data. Radiowave Monitor (`radiowavemonitor.com`) may not track US stations — its known coverage is Australian radio. IDDS re-discovery required. Do not enable `ENABLE_KIIS_RADIOWAVE_COLLECTOR`. See RADIOWAVE-REVALIDATION-1 in RADIO-COVERAGE-ARCH-1-task.md.** |
+| Risk if fails | KIIS1027 Radiowave source unavailable; ICY stream is the next path |
 
 ---
 
@@ -326,12 +326,12 @@ Validation must be performed by a human or a dedicated validation command. Resul
 |---|---|
 | ID | VAL-BBC1-001 |
 | Description | Confirm `GET https://rms.api.bbc.co.uk/v2/services/bbc_radio_one/segments/latest` is reachable from the production server, returns HTTP 200, and the JSON body contains a `data` list of segments. |
-| Status | UNVALIDATED |
-| Validated by | — |
-| Validated at | — |
+| Status | **PASSED** |
+| Validated by | val-live-endpoints.sh automated run |
+| Validated at | 2026-06-05 |
 | Script | `docs/passes/val-live-endpoints.sh --bbc` |
-| Notes | HTTP 204 is also acceptable (no current segment). Endpoint returns recently broadcast segments in reverse chronological order; parser picks the latest music segment. |
-| Risk if fails | BBC Radio 1 collection blocked; do not enable `ENABLE_BBC_RADIO1_COLLECTOR` |
+| Notes | HTTP 200, `data` list present, music segments confirmed. **Only remaining blocker: VAL-BBC1-006 (manual ToS review).** |
+| Risk if fails | N/A — passed |
 
 ### 8.2 BBC ToS — Automated Access Permissibility (VAL-BBC1-006)
 
@@ -369,12 +369,12 @@ Validation must be performed by a human or a dedicated validation command. Resul
 |---|---|
 | ID | VAL-HEARTFM-002 |
 | Description | Confirm CSS selectors `div.station-song-history` (container), `div.song-item` (track row), `span.song-item__title`, `span.song-item__artist`, `time.song-item__time` are present in a live page response and return ≥1 song entry. |
-| Status | UNVALIDATED |
-| Validated by | — |
-| Validated at | — |
+| Status | **FAILED — selector drift confirmed** |
+| Validated by | val-live-endpoints.sh automated run |
+| Validated at | 2026-06-05 |
 | Script | `docs/passes/val-live-endpoints.sh --heart` |
-| Notes | Selectors designed against a synthetic fixture — MUST be verified against the live page. If `div.station-song-history` is absent, selector drift has occurred and parser will raise ValueError. |
-| Risk if fails | Parser raises ValueError on every run; do not enable until selectors confirmed |
+| Notes | **HTTP 200 received. `div.station-song-history` MISSING from raw HTML. New classes visible in raw HTML: `now-playing__wrapper`, `last_played_songs`, `song_wrapper`, `song__text-content`. Parser repair required. See HEART-HTML-PARSER-FIX-1 in RADIO-COVERAGE-ARCH-1-task.md. robots.txt and ToS review also pending.** |
+| Risk if fails | Collector blocked; do not enable `ENABLE_HEART_COLLECTOR` until VAL-HEARTFM-002 re-run passes |
 
 ### 9.3 Timezone Assumption (VAL-HEARTFM-005)
 
@@ -412,12 +412,12 @@ Validation must be performed by a human or a dedicated validation command. Resul
 |---|---|
 | ID | VAL-Z100-001 |
 | Description | Confirm that iHeart station_id=614 is the correct station ID for Z100 New York (WHTZ 100.3 FM). Fetch `https://api.iheart.com/api/v3/live-meta/stream/614/currentTrack` from the production server. Confirm HTTP 200 or 204, and that a 200 response contains `currentTrack` with `artist` and `title`. |
-| Status | UNVALIDATED |
-| Validated by | — |
-| Validated at | — |
+| Status | **FAILED — iHeart v3 live-meta API unavailable** |
+| Validated by | val-live-endpoints.sh automated run |
+| Validated at | 2026-06-05 |
 | Script | `docs/passes/val-live-endpoints.sh --z100` |
-| Notes | station_id=614 confirmed in synthetic fixture; not validated against live API. HTTP 204 (between songs) is also a valid pass. |
-| Risk if fails | Collector fetches wrong station or fails; do not enable `ENABLE_Z100_COLLECTOR` |
+| Notes | **HTTP 404. All `/api/v3/live-meta/stream/{id}` sub-paths return 404 including the base path. v2 station discovery returns id=1469 for WHTZ (not 614), but correcting the ID alone is insufficient while the API endpoint itself is unavailable. Do not enable `ENABLE_Z100_COLLECTOR`. Stream metadata (ICY) is the next path — see STREAM-METADATA-DISCOVERY-1.** |
+| Risk if fails | Collector cannot operate; no automated Z100 data until a valid endpoint is found |
 
 ---
 
@@ -429,12 +429,12 @@ Validation must be performed by a human or a dedicated validation command. Resul
 |---|---|
 | ID | VAL-WKSC-001 |
 | Description | Confirm that iHeart station_id=821 is the correct station ID for WKSC 103.5 Chicago. Fetch `https://api.iheart.com/api/v3/live-meta/stream/821/currentTrack` from the production server. Confirm HTTP 200 or 204, and that a 200 response contains `currentTrack` with `artist` and `title`. |
-| Status | UNVALIDATED |
-| Validated by | — |
-| Validated at | — |
+| Status | **FAILED — iHeart v3 live-meta API unavailable** |
+| Validated by | val-live-endpoints.sh automated run |
+| Validated at | 2026-06-05 |
 | Script | `docs/passes/val-live-endpoints.sh --wksc` |
-| Notes | station_id=821 confirmed in synthetic fixture; not validated against live API. HTTP 204 (between songs) is also a valid pass. |
-| Risk if fails | Collector fetches wrong station or fails; do not enable `ENABLE_WKSC_COLLECTOR` |
+| Notes | **HTTP 404. Same failure mode as VAL-Z100-001. v2 station discovery returns id=849 for WKSC (not 821), but API endpoint unavailability makes station ID correction moot. Do not enable `ENABLE_WKSC_COLLECTOR`. See STREAM-METADATA-DISCOVERY-1.** |
+| Risk if fails | Collector cannot operate; no automated WKSC data until a valid endpoint is found |
 
 ---
 
@@ -446,12 +446,12 @@ Validation must be performed by a human or a dedicated validation command. Resul
 |---|---|
 | ID | VAL-IHEART-RECENT-001 |
 | Description | Confirm that the iHeart recently-played endpoint returns HTTP 200 (or 204) for all three covered stations: KIISFM (2501), Z100/WHTZ (614), WKSC (821). Fetch `https://api.iheart.com/api/v3/live-meta/stream/{id}/recentlyPlayed` for each station from the production server. Confirm HTTP 200 with a JSON body containing a `tracks` (or `recentTracks`) array, or HTTP 204. |
-| Status | UNVALIDATED |
-| Validated by | — |
-| Validated at | — |
+| Status | **FAILED — endpoint path does not exist** |
+| Validated by | val-live-endpoints.sh automated run |
+| Validated at | 2026-06-05 |
 | Script | `docs/passes/val-live-endpoints.sh --iheart_recent` |
-| Notes | Tested against station 2501 (KIISFM) as representative; Z100 and WKSC endpoints share the same URL pattern. Response key may be `tracks` or `recentTracks` — parser handles both. `source_event_id`-based dedup in `_persist_result` prevents re-insertion on repeat polls. |
-| Risk if fails | Batch fallback unavailable; do not enable `ENABLE_IHEART_RECENTLY_PLAYED` |
+| Notes | **HTTP 404 for station 2501 (valid station). `/recentlyPlayed` sub-path was assumed, not verified. The entire `/api/v3/live-meta/stream/` API is unavailable. Do not enable `ENABLE_IHEART_RECENTLY_PLAYED`. A new endpoint must be discovered or stream metadata (ICY) used as the fallback instead.** |
+| Risk if fails | Batch fallback collector cannot operate; do not enable |
 
 ---
 
