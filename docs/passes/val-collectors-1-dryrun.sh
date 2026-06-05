@@ -22,7 +22,7 @@ COMPOSE="docker compose -f ${SERVER_DIR}/docker-compose.hetzner.yml --env-file $
 APP_HOST="https://tenxradar.com"
 EXPECTED_ALEMBIC_HEAD="c4e2a1f9b8d7"
 EXPECTED_STATIONS=8
-EXPECTED_GIT_COMMIT="d3684b4"   # EXTRACT-4 follow-through commit
+EXPECTED_GIT_COMMIT="819a4c3"   # latest tip: collector_runs fix + full runbook
 
 PASS=0
 FAIL=0
