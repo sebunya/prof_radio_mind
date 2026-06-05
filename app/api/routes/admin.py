@@ -38,10 +38,23 @@ class OverviewStats(BaseModel):
 class OverviewResponse(BaseModel):
     app_env: str
     scheduler_enabled: bool
-    enable_capital_collector: bool
+    # Original collectors
     enable_nova_collector: bool
     enable_kiis_collector: bool
+    enable_capital_collector: bool
     enable_nightly_reconciliation: bool
+    # EXTRACT-1B / EXTRACT-2 collectors
+    enable_bbc_radio1_collector: bool
+    enable_heart_collector: bool
+    enable_z100_collector: bool
+    enable_wksc_collector: bool
+    enable_iheart_top_songs: bool
+    # EXTRACT-3 / EXTRACT-4 collectors
+    enable_kiis_radiowave_collector: bool
+    enable_iheart_recently_played: bool
+    # Nightly automation
+    enable_nightly_report_generation: bool
+    # Operational
     raw_payload_retention_days: int
     enable_docs_in_production: bool
     admin_basic_auth_configured: bool
@@ -51,10 +64,23 @@ class OverviewResponse(BaseModel):
 class OperationsResponse(BaseModel):
     app_env: str
     scheduler_enabled: bool
-    enable_capital_collector: bool
+    # Original collectors
     enable_nova_collector: bool
     enable_kiis_collector: bool
+    enable_capital_collector: bool
     enable_nightly_reconciliation: bool
+    # EXTRACT-1B / EXTRACT-2 collectors
+    enable_bbc_radio1_collector: bool
+    enable_heart_collector: bool
+    enable_z100_collector: bool
+    enable_wksc_collector: bool
+    enable_iheart_top_songs: bool
+    # EXTRACT-3 / EXTRACT-4 collectors
+    enable_kiis_radiowave_collector: bool
+    enable_iheart_recently_played: bool
+    # Nightly automation
+    enable_nightly_report_generation: bool
+    # Operational
     raw_payload_retention_days: int
     enable_docs_in_production: bool
     admin_basic_auth_configured: bool
@@ -211,10 +237,18 @@ async def get_overview(session: AsyncSession = Depends(get_db)) -> OverviewRespo
     return OverviewResponse(
         app_env=settings.app_env,
         scheduler_enabled=settings.scheduler_enabled,
-        enable_capital_collector=settings.enable_capital_collector,
         enable_nova_collector=settings.enable_nova_collector,
         enable_kiis_collector=settings.enable_kiis_collector,
+        enable_capital_collector=settings.enable_capital_collector,
         enable_nightly_reconciliation=settings.enable_nightly_reconciliation,
+        enable_bbc_radio1_collector=settings.enable_bbc_radio1_collector,
+        enable_heart_collector=settings.enable_heart_collector,
+        enable_z100_collector=settings.enable_z100_collector,
+        enable_wksc_collector=settings.enable_wksc_collector,
+        enable_iheart_top_songs=settings.enable_iheart_top_songs,
+        enable_kiis_radiowave_collector=settings.enable_kiis_radiowave_collector,
+        enable_iheart_recently_played=settings.enable_iheart_recently_played,
+        enable_nightly_report_generation=settings.enable_nightly_report_generation,
         raw_payload_retention_days=settings.raw_payload_retention_days,
         enable_docs_in_production=settings.enable_docs_in_production,
         admin_basic_auth_configured=auth_configured,
@@ -223,7 +257,7 @@ async def get_overview(session: AsyncSession = Depends(get_db)) -> OverviewRespo
             total_sources=total_sources,
             pending_reviews=pending_reviews,
             active_webhooks=active_webhooks,
-        )
+        ),
     )
 
 
@@ -237,14 +271,22 @@ async def get_operations() -> OperationsResponse:
     return OperationsResponse(
         app_env=settings.app_env,
         scheduler_enabled=settings.scheduler_enabled,
-        enable_capital_collector=settings.enable_capital_collector,
         enable_nova_collector=settings.enable_nova_collector,
         enable_kiis_collector=settings.enable_kiis_collector,
+        enable_capital_collector=settings.enable_capital_collector,
         enable_nightly_reconciliation=settings.enable_nightly_reconciliation,
+        enable_bbc_radio1_collector=settings.enable_bbc_radio1_collector,
+        enable_heart_collector=settings.enable_heart_collector,
+        enable_z100_collector=settings.enable_z100_collector,
+        enable_wksc_collector=settings.enable_wksc_collector,
+        enable_iheart_top_songs=settings.enable_iheart_top_songs,
+        enable_kiis_radiowave_collector=settings.enable_kiis_radiowave_collector,
+        enable_iheart_recently_played=settings.enable_iheart_recently_played,
+        enable_nightly_report_generation=settings.enable_nightly_report_generation,
         raw_payload_retention_days=settings.raw_payload_retention_days,
         enable_docs_in_production=settings.enable_docs_in_production,
         admin_basic_auth_configured=auth_configured,
-        db_migration_version="c4e2a1f9b8d7"
+        db_migration_version="c4e2a1f9b8d7",
     )
 
 
@@ -460,8 +502,9 @@ async def get_collector_runs(
 ) -> list[CollectorRunResponse]:
     try:
         stmt = (
-            select(CollectorRun, StationModel)
+            select(CollectorRun, StationModel, SourceModel)
             .join(StationModel, CollectorRun.station_id == StationModel.id)
+            .join(SourceModel, CollectorRun.source_id == SourceModel.id)
             .order_by(CollectorRun.created_at.desc())
             .limit(10)
         )
@@ -471,15 +514,14 @@ async def get_collector_runs(
         return [
             CollectorRunResponse(
                 id=str(run.id),
-                # Status represents name if custom metadata is absent
-                collector_name=run.status,
+                collector_name=f"{station.call_sign}/{source.source_type}",
                 station_call_sign=station.call_sign,
                 status=run.status,
                 error_message=run.error_message,
                 started_at=run.started_at,
                 completed_at=run.completed_at,
             )
-            for run, station in rows
+            for run, station, source in rows
         ]
     except Exception as e:
         import logging

@@ -68,4 +68,12 @@ STATION_SEEDS: tuple[StationSeed, ...] = (
         city="Chicago",
         country_code="US",
     ),
+    # --- EXTRACT-3: KIIS-FM 102.7 Los Angeles (separate from KIISFM Sydney 106.5) ---
+    StationSeed(
+        call_sign="KIIS1027",
+        name="KIIS-FM 102.7 Los Angeles",
+        frequency="102.7 FM",
+        city="Los Angeles",
+        country_code="US",
+    ),
 )

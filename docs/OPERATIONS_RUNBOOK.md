@@ -134,7 +134,7 @@ docker compose logs -f db    # follow database logs
 docker compose up -d --scale app=2
 ```
 
-> **Note:** The in-memory rate limiter and ReviewStore are single-process only. Horizontal scaling requires replacing them with Redis-backed equivalents. See Pass 22 scope.
+> **Note:** The in-memory rate limiter and ReviewStore are single-process only. Horizontal scaling requires replacing them with Redis-backed equivalents.
 
 ---
 
@@ -255,18 +255,24 @@ All endpoints return JSON. Errors follow RFC 7807 Problem Details.
 
 Jobs are registered at startup via APScheduler (`AsyncIOScheduler`, timezone UTC):
 
-| Job ID | Schedule | Description |
-|---|---|---|
-| `nova_daily_diary` | Cron: 16:00 UTC daily | Fetch Nova 96.9 Radiowave diary (02:00 AEST) |
-| `kiis_now_playing` | Interval: every 5 minutes | Poll KIIS-FM iHeart now-playing API |
-| `nightly_reconciliation` | Cron: 17:00 UTC daily | Deduplication and normalization pass (03:00 AEST) |
+All jobs are flag-gated and **disabled by default**. Enable only after the corresponding VAL checks pass.
 
-**Validation status:**  
-- VAL-NOVA-001 (Radiowave IDDS=11129): **UNVALIDATED** — confirm before enabling in production  
-- VAL-KIIS-001 (iHeart station_id=2501): **UNVALIDATED** — confirm before enabling  
-- VAL-KIIS-003 (HTTP 204 behaviour): **UNCONFIRMED** — guard implemented regardless  
+| Job ID | Schedule | Flag | Description |
+|---|---|---|---|
+| `nova_daily_diary` | Cron: 16:00 UTC daily | `ENABLE_NOVA_COLLECTOR` | Nova 96.9 Radiowave diary (02:00 AEST) |
+| `kiis_now_playing` | Interval: every 5 min | `ENABLE_KIIS_COLLECTOR` | KIIS-FM 106.5 (AU) iHeart now-playing poll |
+| `capital_now_playing` | Interval: every 15 min | `ENABLE_CAPITAL_COLLECTOR` | Capital FM Online Radio Box now-playing scrape |
+| `nightly_reconciliation` | Cron: 17:00 UTC daily | `ENABLE_NIGHTLY_RECONCILIATION` | Deduplication and normalization pass (03:00 AEST) |
+| `nightly_report_generation` | Cron: 18:00 UTC daily | `ENABLE_NIGHTLY_REPORT_GENERATION` | Build DailyReport records for all active stations |
+| `bbc_radio1_now_playing` | Interval: every 5 min | `ENABLE_BBC_RADIO1_COLLECTOR` | BBC Radio 1 RMS API now-playing poll |
+| `heart_fm_last_played` | Interval: every 5 min | `ENABLE_HEART_COLLECTOR` | Heart FM last-played page scrape |
+| `z100_now_playing` | Interval: every 5 min | `ENABLE_Z100_COLLECTOR` | Z100 (WHTZ) iHeart now-playing poll |
+| `wksc_now_playing` | Interval: every 5 min | `ENABLE_WKSC_COLLECTOR` | WKSC 103.5 Kiss FM iHeart now-playing poll |
+| `kiis_top_songs_daily` | Cron: 00:00 UTC daily | `ENABLE_IHEART_TOP_SONGS` | KIIS-FM 106.5 iHeart top songs chart (midnight) |
+| `iheart_recently_played_hourly` | Interval: every 60 min | `ENABLE_IHEART_RECENTLY_PLAYED` | iHeart recently-played batch fallback (KIISFM, Z100, WKSC) |
+| `kiis1027_radiowave_diary` | Cron: 09:00 UTC daily | `ENABLE_KIIS_RADIOWAVE_COLLECTOR` | KIIS-FM 102.7 LA Radiowave diary (01:00 PDT) |
 
-See [VALIDATION_REGISTER.md](../VALIDATION_REGISTER.md) for full validation status.
+See [VALIDATION_REGISTER.md](../VALIDATION_REGISTER.md) for full validation status and enablement order.
 
 ---
 
@@ -300,7 +306,7 @@ The review queue surfaces items that require human attention (drift detected, lo
      -d '{"resolved_by": "operator@example.com"}'
    ```
 
-> **MVP limitation:** The review store is in-memory. Items are lost on application restart until the DB persistence layer is wired (Pass 22).
+> **MVP limitation:** The review store is in-memory. Items are lost on application restart until the DB persistence layer is wired.
 
 ---
 

@@ -29,10 +29,22 @@ def test_overview_scheduler_disabled_by_default(client: TestClient) -> None:
 
 def test_overview_all_collectors_disabled_by_default(client: TestClient) -> None:
     body = client.get("/api/admin/overview").json()
-    assert body["enable_capital_collector"] is False
+    # Original collectors
     assert body["enable_nova_collector"] is False
     assert body["enable_kiis_collector"] is False
+    assert body["enable_capital_collector"] is False
     assert body["enable_nightly_reconciliation"] is False
+    # EXTRACT-1B / EXTRACT-2 collectors
+    assert body["enable_bbc_radio1_collector"] is False
+    assert body["enable_heart_collector"] is False
+    assert body["enable_z100_collector"] is False
+    assert body["enable_wksc_collector"] is False
+    assert body["enable_iheart_top_songs"] is False
+    # EXTRACT-3 / EXTRACT-4 collectors
+    assert body["enable_kiis_radiowave_collector"] is False
+    assert body["enable_iheart_recently_played"] is False
+    # Nightly automation
+    assert body["enable_nightly_report_generation"] is False
 
 
 def test_overview_admin_auth_not_configured_by_default(client: TestClient) -> None:
