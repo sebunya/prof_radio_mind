@@ -19,6 +19,7 @@
 #       | tee /tmp/val-post-enable-z100.log
 #
 # Available flags: --z100  --wksc  --kiis_top  --heart  --bbc  --iheart_recent
+#                  --kiis1027_radiowave
 #
 # Exit codes:
 #   0  all checks passed (collector is running cleanly)
@@ -48,12 +49,13 @@ for arg in "$@"; do
     --kiis_top)      COLLECTOR="kiis_top" ;;
     --heart)         COLLECTOR="heart" ;;
     --bbc)           COLLECTOR="bbc" ;;
-    --iheart_recent) COLLECTOR="iheart_recent" ;;
+    --iheart_recent)      COLLECTOR="iheart_recent" ;;
+    --kiis1027_radiowave) COLLECTOR="kiis1027_radiowave" ;;
   esac
 done
 
 if [ -z "$COLLECTOR" ]; then
-  echo "ERROR: Specify exactly one collector: --z100 | --wksc | --kiis_top | --heart | --bbc | --iheart_recent"
+  echo "ERROR: Specify exactly one collector: --z100 | --wksc | --kiis_top | --heart | --bbc | --iheart_recent | --kiis1027_radiowave"
   exit 1
 fi
 
@@ -113,6 +115,15 @@ case "$COLLECTOR" in
     JOB_ID="iheart_recently_played_hourly"
     CADENCE="every 60 minutes"
     WINDOW_MINUTES=90
+    ;;
+  kiis1027_radiowave)
+    FLAG="ENABLE_KIIS_RADIOWAVE_COLLECTOR"
+    LOG_KEYWORD="kiis1027_radiowave_collected"
+    CALL_SIGN="KIIS1027"
+    SOURCE_TYPE="radiowave"
+    JOB_ID="kiis1027_radiowave_diary"
+    CADENCE="daily at 09:00 UTC"
+    WINDOW_MINUTES=1440
     ;;
 esac
 
@@ -225,6 +236,8 @@ asyncio.run(run())
   if [ "${run_count:-0}" -eq 0 ]; then
     if [ "${COLLECTOR}" = "kiis_top" ]; then
       _warn "no collector runs in last 24h — daily collector runs at 00:00 UTC only"
+    elif [ "${COLLECTOR}" = "kiis1027_radiowave" ]; then
+      _warn "no collector runs in last 24h — daily collector runs at 09:00 UTC only"
     elif [ "${COLLECTOR}" = "iheart_recent" ]; then
       _warn "no collector runs in last 90 min — hourly batch job; wait up to 60 min for first run"
     else
@@ -302,6 +315,8 @@ asyncio.run(run())
     _pass "${plays} play event(s), ${no_tracks} no-track event(s) in window"
   elif [ "${COLLECTOR}" = "kiis_top" ]; then
     _info "no events yet — daily collector first runs at midnight UTC"
+  elif [ "${COLLECTOR}" = "kiis1027_radiowave" ]; then
+    _info "no events yet — daily collector first runs at 09:00 UTC"
   elif [ "${COLLECTOR}" = "iheart_recent" ]; then
     _info "no events yet for KIISFM/iheart in window — check Z100 and WKSC source_ids too"
   else
@@ -324,6 +339,8 @@ else
     _info "no '${LOG_KEYWORD}' log lines yet — daily job has not fired since last restart"
   elif [ "${COLLECTOR}" = "iheart_recent" ]; then
     _warn "no '${LOG_KEYWORD}' log lines yet — hourly job; wait up to 60 min for first run"
+  elif [ "${COLLECTOR}" = "kiis1027_radiowave" ]; then
+    _info "no '${LOG_KEYWORD}' log lines yet — daily job fires at 09:00 UTC"
   else
     _fail "no '${LOG_KEYWORD}' log lines in last 200 lines — collector may not be running"
   fi

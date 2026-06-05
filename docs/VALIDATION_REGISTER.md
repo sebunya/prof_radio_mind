@@ -176,12 +176,13 @@ Validation must be performed by a human or a dedicated validation command. Resul
 | Field | Value |
 |---|---|
 | ID | VAL-KIIS-RAD-001 |
-| Description | Confirm whether Radiowave Monitor has a diary for KIIS-FM at IDDS=5080. Fetch the page, check it returns KIIS play data, confirm DOM selector compatibility with the Nova parser. |
+| Description | Confirm the Radiowave Monitor has a diary for KIIS-FM 102.7 LA at IDDS=5080. Fetch `https://www.radiowavemonitor.com/pub_charts/diaries.aspx?IDDS=5080&date=YYYY-MM-DD` for yesterday from the production server. Confirm HTTP 200 and that `tr.diary-row` elements are present. |
 | Status | UNVALIDATED |
 | Validated by | — |
 | Validated at | — |
-| Notes | Reconciliation/fallback source only. Not the primary MVP source for KIIS. |
-| Risk if fails | KIIS reconciliation has one fewer fallback option |
+| Script | `docs/passes/val-live-endpoints.sh --kiis1027_radiowave` |
+| Notes | IDDS=5080 is the LA KIIS (KIIS1027) diary. The same `parse_radiowave_diary` parser used by Nova handles both stations; `tr.diary-row` selector must match. |
+| Risk if fails | KIIS-FM 102.7 Radiowave diary unavailable; do not enable `ENABLE_KIIS_RADIOWAVE_COLLECTOR` |
 
 ---
 

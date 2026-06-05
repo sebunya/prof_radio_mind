@@ -8,8 +8,8 @@
 ## Prerequisites (all must be ✅ before any collector is enabled)
 
 - [ ] EXTRACT-2/3/4 deployed to production and confirmed in DB (VAL-COLLECTORS-1 pass)
-- [ ] All live endpoints reachable (VAL-LIVE-ENDPOINTS pass — 6 passed, 0 failed)
-- [ ] VAL-BBC1-006: BBC ToS manual review complete (before Step 6 only)
+- [ ] All live endpoints reachable (VAL-LIVE-ENDPOINTS pass — 7 passed, 0 failed)
+- [ ] VAL-BBC1-006: BBC ToS manual review complete (before Step 7 only)
 - [ ] `GET /health` returns 200
 
 ---
@@ -167,7 +167,37 @@ GROUP BY source_id;
 
 ---
 
-## Step 5 — Heart FM (`ENABLE_HEART_COLLECTOR`)
+## Step 5 — KIIS-FM 102.7 Radiowave (`ENABLE_KIIS_RADIOWAVE_COLLECTOR`)
+
+**Prerequisite VAL codes:** VAL-KIIS-RAD-001 PASS
+
+| Item | Detail |
+|------|--------|
+| Flag | `ENABLE_KIIS_RADIOWAVE_COLLECTOR=true` |
+| Station | KIIS-FM 102.7 Los Angeles (`KIIS1027`) |
+| Source type | `radiowave` (IDDS=5080) |
+| Collector | `KIISRadiowaveCollector` |
+| Cadence | Daily at **09:00 UTC** (01:00 AM Pacific) |
+| Log pattern | `kiis1027_radiowave_collected date=... status=... plays=... no_tracks=...` |
+| Post-enable flag | `--kiis1027_radiowave` |
+
+**Why fifth:** Daily Radiowave diary — same parser as Nova (proven). Very low traffic. First confirmed run is the day after enablement at 09:00 UTC.
+
+**Note:** The post-enable check window is 24 hours. Run `val-post-enable.sh --kiis1027_radiowave` the following morning (after 09:00 UTC) to confirm the first diary run.
+
+### Checklist
+- [ ] iHeart recently-played (Step 3) and KIIS top songs (Step 4) stable
+- [ ] VAL-KIIS-RAD-001 PASS confirmed
+- [ ] `ENABLE_KIIS_RADIOWAVE_COLLECTOR=true` set in `.env.production`
+- [ ] Container force-recreated
+- [ ] Waited until 09:00 UTC the following day for first diary run
+- [ ] `val-post-enable.sh --kiis1027_radiowave` → SUMMARY: 0 failed
+- [ ] Play events visible in admin UI for KIIS-FM 102.7
+- [ ] Waiting 24 hours (from first confirmed run)
+
+---
+
+## Step 6 — Heart FM (`ENABLE_HEART_COLLECTOR`)
 
 **Prerequisite VAL codes:** VAL-HEARTFM-002 PASS
 
@@ -184,7 +214,7 @@ GROUP BY source_id;
 **Risk note:** CSS scraper — higher maintenance risk than API-based collectors. If `div.station-song-history` selector drifts, the collector fails with `SCHEMA_CHANGED`. Monitor logs more closely for the first 48 hours.
 
 ### Checklist
-- [ ] KIIS top songs (Step 4) stable (at least one successful run)
+- [ ] KIIS1027 radiowave (Step 5) stable (at least one confirmed daily run)
 - [ ] VAL-HEARTFM-002 PASS confirmed
 - [ ] `ENABLE_HEART_COLLECTOR=true` set in `.env.production`
 - [ ] Container force-recreated
@@ -196,7 +226,7 @@ GROUP BY source_id;
 
 ---
 
-## Step 6 — BBC Radio 1 (`ENABLE_BBC_RADIO1_COLLECTOR`)
+## Step 7 — BBC Radio 1 (`ENABLE_BBC_RADIO1_COLLECTOR`)
 
 **Prerequisite VAL codes:** VAL-BBC1-001 PASS **and** VAL-BBC1-006 PASS (manual ToS)
 
@@ -218,8 +248,8 @@ GROUP BY source_id;
 - [ ] Confirmed: automated polling of `rms.api.bbc.co.uk/v2/services/bbc_radio_one/segments/latest` at 5-minute intervals is permissible
 - [ ] Finding documented (PASS/FAIL) in `docs/VALIDATION_REGISTER.md`
 
-### Step 6 Enablement Checklist
-- [ ] Heart FM (Step 5) stable for 24 hours
+### Step 7 Enablement Checklist
+- [ ] Heart FM (Step 6) stable for 24 hours
 - [ ] VAL-BBC1-001 PASS confirmed
 - [ ] VAL-BBC1-006 PASS confirmed (manual)
 - [ ] `ENABLE_BBC_RADIO1_COLLECTOR=true` set in `.env.production`

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # val-live-endpoints.sh — Live endpoint reachability validation.
 # VAL-BBC1-001, VAL-HEARTFM-002, VAL-Z100-001, VAL-WKSC-001,
-# VAL-IHEART-TOP-001, VAL-IHEART-RECENT-001
+# VAL-IHEART-TOP-001, VAL-IHEART-RECENT-001, VAL-KIIS-RAD-001
 #
 # Makes raw HTTP requests only. No collector execution. No parser execution.
 # No DB reads or writes. No flag changes. No scheduler interaction.
@@ -20,7 +20,7 @@
 #       < ~/Documents/Prof_Mind/docs/passes/val-live-endpoints.sh
 #
 # Available flags: --bbc  --heart  --z100  --wksc  --kiis_top  --iheart_recent
-#                  (default: all six)
+#                  --kiis1027_radiowave  (default: all seven)
 #
 # Exit codes:
 #   0  all selected checks passed
@@ -40,23 +40,24 @@ _head() { echo ""; echo "=== $* ==="; }
 
 # ── Parse run-mode flags ──────────────────────────────────────────
 RUN_BBC=false; RUN_HEART=false; RUN_Z100=false; RUN_WKSC=false
-RUN_KIIS_TOP=false; RUN_IHEART_RECENT=false
+RUN_KIIS_TOP=false; RUN_IHEART_RECENT=false; RUN_KIIS1027_RAD=false
 RUN_ALL=true
 
 for arg in "$@"; do
   case "$arg" in
-    --bbc)           RUN_BBC=true;           RUN_ALL=false ;;
-    --heart)         RUN_HEART=true;         RUN_ALL=false ;;
-    --z100)          RUN_Z100=true;          RUN_ALL=false ;;
-    --wksc)          RUN_WKSC=true;          RUN_ALL=false ;;
-    --kiis_top)      RUN_KIIS_TOP=true;      RUN_ALL=false ;;
-    --iheart_recent) RUN_IHEART_RECENT=true; RUN_ALL=false ;;
+    --bbc)               RUN_BBC=true;           RUN_ALL=false ;;
+    --heart)             RUN_HEART=true;         RUN_ALL=false ;;
+    --z100)              RUN_Z100=true;          RUN_ALL=false ;;
+    --wksc)              RUN_WKSC=true;          RUN_ALL=false ;;
+    --kiis_top)          RUN_KIIS_TOP=true;      RUN_ALL=false ;;
+    --iheart_recent)     RUN_IHEART_RECENT=true; RUN_ALL=false ;;
+    --kiis1027_radiowave) RUN_KIIS1027_RAD=true; RUN_ALL=false ;;
   esac
 done
 
 if $RUN_ALL; then
   RUN_BBC=true; RUN_HEART=true; RUN_Z100=true; RUN_WKSC=true
-  RUN_KIIS_TOP=true; RUN_IHEART_RECENT=true
+  RUN_KIIS_TOP=true; RUN_IHEART_RECENT=true; RUN_KIIS1027_RAD=true
 fi
 
 echo "============================================================"
@@ -78,6 +79,7 @@ for flag in \
   ENABLE_WKSC_COLLECTOR \
   ENABLE_IHEART_TOP_SONGS \
   ENABLE_IHEART_RECENTLY_PLAYED \
+  ENABLE_KIIS_RADIOWAVE_COLLECTOR \
   SCHEDULER_ENABLED; do
   val="$(grep -E "^${flag}=" "${SERVER_DIR}/.env.production" 2>/dev/null | cut -d= -f2- || echo 'not_set')"
   if flag_is_true "${flag}"; then
@@ -386,6 +388,47 @@ asyncio.run(check())
   fi
 fi
 
+# ── VAL-KIIS-RAD-001: KIIS-FM 102.7 Radiowave Monitor diary (IDDS=5080) ──
+if $RUN_KIIS1027_RAD; then
+  _head "VAL-KIIS-RAD-001 — KIIS-FM 102.7 Radiowave Monitor diary (IDDS=5080)"
+
+  kiis1027_result="$($COMPOSE exec -T app python3 -c "
+import asyncio
+from datetime import UTC, datetime, timedelta
+from app.infrastructure.http.client import build_client
+
+async def check():
+    yesterday = (datetime.now(tz=UTC).date() - timedelta(days=1)).strftime('%Y-%m-%d')
+    url = f'https://www.radiowavemonitor.com/pub_charts/diaries.aspx?IDDS=5080&date={yesterday}'
+    try:
+        async with await build_client(timeout=20.0) as c:
+            r = await c.get(url)
+        status = r.status_code
+        if status != 200:
+            print(f'STATUS={status} ERROR=non_200')
+            return
+        from bs4 import BeautifulSoup
+        soup = BeautifulSoup(r.content, 'lxml')
+        rows = soup.select('tr.diary-row')
+        print(f'STATUS={status} ROWS={len(rows)}')
+    except Exception as e:
+        print(f'STATUS=ERROR EXCEPTION={type(e).__name__}')
+
+asyncio.run(check())
+" 2>&1 | tail -1)"
+
+  echo "  URL: https://www.radiowavemonitor.com/pub_charts/diaries.aspx?IDDS=5080&date=YESTERDAY"
+  echo "  ${kiis1027_result}"
+
+  if echo "${kiis1027_result}" | grep -qE "^STATUS=200 ROWS=[1-9]"; then
+    _pass "VAL-KIIS-RAD-001 — HTTP 200, tr.diary-row entries present"
+  elif echo "${kiis1027_result}" | grep -qE "^STATUS=200 ROWS=0"; then
+    _fail "VAL-KIIS-RAD-001 — HTTP 200 but 0 diary rows (no data for IDDS=5080 yesterday)"
+  else
+    _fail "VAL-KIIS-RAD-001 — ${kiis1027_result}"
+  fi
+fi
+
 # ── Summary ───────────────────────────────────────────────────────
 echo ""
 echo "============================================================"
@@ -409,5 +452,6 @@ echo "   1. ENABLE_Z100_COLLECTOR"
 echo "   2. ENABLE_WKSC_COLLECTOR"
 echo "   3. ENABLE_IHEART_RECENTLY_PLAYED  (batch fallback: KIISFM + Z100 + WKSC)"
 echo "   4. ENABLE_IHEART_TOP_SONGS"
-echo "   5. ENABLE_HEART_COLLECTOR"
-echo "   6. ENABLE_BBC_RADIO1_COLLECTOR (after VAL-BBC1-006 manual review)"
+echo "   5. ENABLE_KIIS_RADIOWAVE_COLLECTOR  (KIIS-FM 102.7 LA daily diary)"
+echo "   6. ENABLE_HEART_COLLECTOR"
+echo "   7. ENABLE_BBC_RADIO1_COLLECTOR (after VAL-BBC1-006 manual review)"
