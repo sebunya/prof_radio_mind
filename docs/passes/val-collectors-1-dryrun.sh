@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# VAL-COLLECTORS-1 — Read-only production validation for EXTRACT-2 deployment.
+# VAL-COLLECTORS-1 — Read-only production validation for EXTRACT-2/3/4 deployment.
 #
 # Checks only. Makes no changes. Enables nothing.
 # Verifies: container health, safety flags, auth protection, migration
 # version, DB station/source counts, collector/parser code presence, logs.
 #
-# Run FROM YOUR MAC after EXTRACT-2 is deployed:
+# Run FROM YOUR MAC after EXTRACT-2/3/4 is deployed:
 #
 #   ssh -o IdentitiesOnly=yes -i ~/.ssh/id_ed25519 root@178.105.238.18 'bash -s' \
 #       < ~/Documents/Prof_Mind/docs/passes/val-collectors-1-dryrun.sh \
@@ -21,8 +21,8 @@ SERVER_DIR="/opt/rmias"
 COMPOSE="docker compose -f ${SERVER_DIR}/docker-compose.hetzner.yml --env-file ${SERVER_DIR}/.env.production"
 APP_HOST="https://tenxradar.com"
 EXPECTED_ALEMBIC_HEAD="c4e2a1f9b8d7"
-EXPECTED_STATIONS=7
-EXPECTED_GIT_COMMIT="0f6049b"   # EXTRACT-2 merge commit
+EXPECTED_STATIONS=8
+EXPECTED_GIT_COMMIT="819a4c3"   # latest tip: collector_runs fix + full runbook
 
 PASS=0
 FAIL=0
@@ -41,14 +41,14 @@ _head "1. Deployment version"
 cd "${SERVER_DIR}"
 actual_commit="$(git rev-parse --short HEAD)"
 if git rev-parse HEAD | grep -q "$(git rev-parse "${EXPECTED_GIT_COMMIT}" 2>/dev/null || true)"; then
-  _pass "git HEAD includes EXTRACT-2 commit ${EXPECTED_GIT_COMMIT}"
+  _pass "git HEAD includes EXTRACT-4 commit ${EXPECTED_GIT_COMMIT}"
 else
   # Short-hash check fallback
   full_actual="$(git rev-parse HEAD)"
   if git log --oneline | grep -q "${EXPECTED_GIT_COMMIT}"; then
-    _pass "git HEAD (${actual_commit}) contains EXTRACT-2 commit in ancestry"
+    _pass "git HEAD (${actual_commit}) contains EXTRACT-4 commit in ancestry"
   else
-    _fail "git HEAD=${actual_commit} — EXTRACT-2 commit ${EXPECTED_GIT_COMMIT} not found in log"
+    _fail "git HEAD=${actual_commit} — EXTRACT-4 commit ${EXPECTED_GIT_COMMIT} not found in log"
   fi
 fi
 
@@ -97,6 +97,9 @@ safety_flags=(
   ENABLE_Z100_COLLECTOR
   ENABLE_WKSC_COLLECTOR
   ENABLE_IHEART_TOP_SONGS
+  ENABLE_KIIS_RADIOWAVE_COLLECTOR
+  ENABLE_IHEART_RECENTLY_PLAYED
+  ENABLE_NIGHTLY_REPORT_GENERATION
   ENABLE_GENERIC_IHEART_COLLECTOR
   SPOTIFY_METADATA_ENRICHMENT_ENABLED
   MUSICBRAINZ_METADATA_ENRICHMENT_ENABLED
@@ -190,9 +193,23 @@ async def run():
             r = (await s.execute(text('SELECT id FROM stations WHERE call_sign=:c'), {'c': cs})).fetchone()
             print(f'STATION_{cs}={\"FOUND\" if r else \"MISSING\"}')
 
+        # EXTRACT-3 station
+        for cs in ('KIIS1027',):
+            r = (await s.execute(text('SELECT id FROM stations WHERE call_sign=:c'), {'c': cs})).fetchone()
+            print(f'STATION_{cs}={\"FOUND\" if r else \"MISSING\"}')
+
         # EXTRACT-2 sources by source_type
         for cs, st in (('BBCRADIO1','bbc_sounds'),('HEARTFMUK','heart_last_played'),
                        ('WHTZ','iheart'),('WKSC','iheart')):
+            r = (await s.execute(
+                text('SELECT id FROM sources s JOIN stations st ON s.station_id=st.id '
+                     'WHERE st.call_sign=:c AND s.source_type=:t'),
+                {'c': cs, 't': st}
+            )).fetchone()
+            print(f'SOURCE_{cs}_{st.upper()}={\"FOUND\" if r else \"MISSING\"}')
+
+        # EXTRACT-3 source
+        for cs, st in (('KIIS1027','radiowave'),):
             r = (await s.execute(
                 text('SELECT id FROM sources s JOIN stations st ON s.station_id=st.id '
                      'WHERE st.call_sign=:c AND s.source_type=:t'),
@@ -290,9 +307,10 @@ else
   _pass "no ERROR/CRITICAL/Traceback in recent logs"
 fi
 
-# Collector activity (must be silent)
+# Collector activity (must be silent — all flags must be false)
 collector_lines="$(echo "${recent_logs}" | grep -iE \
-  "bbc_radio1_collected|heart_fm_collected|z100_now_playing|wksc_now_playing|kiis_top_songs" || true)"
+  "bbc_radio1_collected|heart_fm_collected|z100_now_playing|wksc_now_playing|kiis_top_songs|\
+iheart_recently_played_collected|kiis1027_radiowave_collected" || true)"
 if [ -n "${collector_lines}" ]; then
   _fail "new collector activity found in logs — flags should be false"
   echo "${collector_lines}" | head -5 | sed 's/^/    /'
@@ -320,5 +338,5 @@ if [ "${FAIL}" -gt 0 ]; then
 fi
 
 echo " All checks passed."
-echo " EXTRACT-2 deployment validated. Flags remain false."
-echo " Proceed to VAL-COLLECTORS-1 live dry-run when ready for each collector."
+echo " EXTRACT-2/3/4 deployment validated. Flags remain false."
+echo " Proceed to VAL-LIVE-ENDPOINTS to validate each collector's endpoint before enabling."

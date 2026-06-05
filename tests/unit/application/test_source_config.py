@@ -16,8 +16,8 @@ from app.application.validation.base import (
 from app.domain.entities.source import SourceType
 
 
-def test_station_seeds_has_seven_stations() -> None:
-    assert len(STATION_SEEDS) == 7
+def test_station_seeds_has_eight_stations() -> None:
+    assert len(STATION_SEEDS) == 8
 
 
 def test_station_seeds_call_signs() -> None:
@@ -25,13 +25,14 @@ def test_station_seeds_call_signs() -> None:
     assert call_signs == {
         "NOVA969", "KIISFM", "CAPITALFM",
         "BBCRADIO1", "HEARTFMUK", "WHTZ", "WKSC",
+        "KIIS1027",
     }
 
 
 def test_station_seeds_countries() -> None:
     au_stations = {"NOVA969", "KIISFM"}
     gb_stations = {"CAPITALFM", "BBCRADIO1", "HEARTFMUK"}
-    us_stations = {"WHTZ", "WKSC"}
+    us_stations = {"WHTZ", "WKSC", "KIIS1027"}
     for seed in STATION_SEEDS:
         if seed.call_sign in au_stations:
             assert seed.country_code == "AU"
@@ -71,6 +72,7 @@ def test_all_stations_have_manual_csv_fallback() -> None:
     for station_call_sign in (
         "NOVA969", "KIISFM", "CAPITALFM",
         "BBCRADIO1", "HEARTFMUK", "WHTZ", "WKSC",
+        "KIIS1027",
     ):
         manual = [
             s
@@ -199,3 +201,32 @@ def test_wksc_source_uuid_matches_scheduler() -> None:
     from app.application.seeder import source_id_for
     from app.infrastructure.scheduler.scheduler import _WKSC_SOURCE_ID
     assert source_id_for("WKSC", "iheart") == _WKSC_SOURCE_ID
+
+
+# --- EXTRACT-3: KIIS-FM 102.7 Los Angeles ---
+
+def test_kiis1027_has_radiowave_source() -> None:
+    seeds = [s for s in SOURCE_SEEDS if s.station_call_sign == "KIIS1027"]
+    types = {s.source_type for s in seeds}
+    assert SourceType.RADIOWAVE in types
+
+
+def test_kiis1027_radiowave_idds_config() -> None:
+    seed = next(
+        s for s in SOURCE_SEEDS
+        if s.station_call_sign == "KIIS1027" and s.source_type == SourceType.RADIOWAVE
+    )
+    assert seed.config is not None
+    assert seed.config.get("idds") == "5080"
+
+
+def test_kiis1027_station_uuid_matches_scheduler() -> None:
+    from app.application.seeder import station_id_for
+    from app.infrastructure.scheduler.scheduler import _KIIS1027_STATION_ID
+    assert station_id_for("KIIS1027") == _KIIS1027_STATION_ID
+
+
+def test_kiis1027_radiowave_source_uuid_matches_scheduler() -> None:
+    from app.application.seeder import source_id_for
+    from app.infrastructure.scheduler.scheduler import _KIIS1027_RADIOWAVE_SOURCE_ID
+    assert source_id_for("KIIS1027", "radiowave") == _KIIS1027_RADIOWAVE_SOURCE_ID
