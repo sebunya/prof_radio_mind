@@ -24,9 +24,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from app.core.settings import settings
-from app.domain.entities.collector_run import CollectorStatus
 from app.infrastructure.collectors.kiis_radiowave import KIISRadiowaveCollector
-from app.infrastructure.scheduler.scheduler import _persist_result
 
 logging.basicConfig(
     level=logging.INFO,
@@ -87,7 +85,10 @@ async def run() -> None:
             run_id = uuid.uuid4()
             plays, no_tracks = collector.parse(raw_bytes, http_status, run_id)
 
-            logger.info("[%s] play_events=%d  no_track_events=%d", diary_date, len(plays), len(no_tracks))
+            logger.info(
+                "[%s] play_events=%d  no_track_events=%d",
+                diary_date, len(plays), len(no_tracks),
+            )
 
             if plays:
                 logger.info("[%s] Tracks (unexpected — selectors may now match):", diary_date)
