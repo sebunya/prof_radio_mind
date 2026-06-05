@@ -65,7 +65,7 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Type
+from typing import Any
 
 from app.infrastructure.collectors.base import BaseCollector
 
@@ -84,7 +84,7 @@ class DiagSource:
     station_call_sign: str
     source_label: str
     seed_id_suffix: str           # appended to "source.{call_sign}." for uuid5
-    collector_cls: Type[BaseCollector]
+    collector_cls: type[BaseCollector]
     collector_kwargs: dict[str, Any]
     display_url: str
     robots_txt_status: str        # e.g. "PENDING — not yet checked"
@@ -127,12 +127,12 @@ def _build_catalogue() -> list[DiagSource]:
       WKSC  seed=821  corrected=849   (from v2 station search)
     The v3 live-meta API is unavailable for all IDs — expected to return 404.
     """
-    from app.infrastructure.collectors.nova_radiowave import NovaRadiowaveCollector
-    from app.infrastructure.collectors.iheart_now_playing import IHeartNowPlayingCollector
-    from app.infrastructure.collectors.online_radio_box import OnlineRadioBoxCollector
     from app.infrastructure.collectors.bbc_radio_1 import BBCRadio1Collector
     from app.infrastructure.collectors.heart_radio import HeartRadioCollector
+    from app.infrastructure.collectors.iheart_now_playing import IHeartNowPlayingCollector
     from app.infrastructure.collectors.kiis_radiowave import KIISRadiowaveCollector
+    from app.infrastructure.collectors.nova_radiowave import NovaRadiowaveCollector
+    from app.infrastructure.collectors.online_radio_box import OnlineRadioBoxCollector
 
     return [
         DiagSource(
@@ -239,7 +239,9 @@ def _build_catalogue() -> list[DiagSource]:
                 "idds": "5080",
             },
             display_url="https://www.radiowavemonitor.com/pub_charts/diaries.aspx?IDDS=5080",
-            robots_txt_status="PENDING — https://www.radiowavemonitor.com/robots.txt not yet checked",
+            robots_txt_status=(
+                "PENDING — https://www.radiowavemonitor.com/robots.txt not yet checked"
+            ),
             compliance_note=(
                 "T2 public HTML diary. VAL-KIIS-RAD-001 FAILED (0 tr.diary-row rows). "
                 "IDDS=5080 UNVALIDATED — radiowavemonitor.com may not track US stations. "
@@ -277,7 +279,8 @@ async def probe_source(src: DiagSource, save_dir: Path | None) -> DiagResult:
     # Step 2 — optionally save raw bytes (no DB, no hashing)
     if save_dir is not None:
         label_slug = src.source_label.replace(" ", "_").replace("/", "-")[:40]
-        fname = f"{src.station_call_sign}_{label_slug}_{datetime.now(tz=UTC).strftime('%H%M%S')}.bin"
+        ts = datetime.now(tz=UTC).strftime("%H%M%S")
+        fname = f"{src.station_call_sign}_{label_slug}_{ts}.bin"
         fpath = save_dir / fname
         try:
             save_dir.mkdir(parents=True, exist_ok=True)
