@@ -22,7 +22,7 @@ COMPOSE="docker compose -f ${SERVER_DIR}/docker-compose.hetzner.yml --env-file $
 APP_HOST="https://tenxradar.com"
 EXPECTED_ALEMBIC_HEAD="c4e2a1f9b8d7"
 EXPECTED_STATIONS=8
-EXPECTED_GIT_COMMIT="819a4c3"   # latest tip: collector_runs fix + full runbook
+EXPECTED_GIT_COMMIT="4e84f72"   # adopted final collector validation merge on main
 
 PASS=0
 FAIL=0
@@ -37,25 +37,18 @@ echo "============================================================"
 
 # ── 1. Git / deployment version ──────────────────────────────────
 _head "1. Deployment version"
-
 cd "${SERVER_DIR}"
 actual_commit="$(git rev-parse --short HEAD)"
-if git rev-parse HEAD | grep -q "$(git rev-parse "${EXPECTED_GIT_COMMIT}" 2>/dev/null || true)"; then
-  _pass "git HEAD includes EXTRACT-4 commit ${EXPECTED_GIT_COMMIT}"
+echo "  git HEAD=${actual_commit}"
+echo "  git log (last 8):"
+git log --oneline -8 | sed 's/^/    /'
+
+if [ "${actual_commit}" = "${EXPECTED_GIT_COMMIT}" ] || git log --oneline -20 | grep -q "${EXPECTED_GIT_COMMIT}"; then
+  _pass "git HEAD includes accepted final collector validation commit ${EXPECTED_GIT_COMMIT}"
 else
-  # Short-hash check fallback
-  full_actual="$(git rev-parse HEAD)"
-  if git log --oneline | grep -q "${EXPECTED_GIT_COMMIT}"; then
-    _pass "git HEAD (${actual_commit}) contains EXTRACT-4 commit in ancestry"
-  else
-    _fail "git HEAD=${actual_commit} — EXTRACT-4 commit ${EXPECTED_GIT_COMMIT} not found in log"
-  fi
+  _fail "git HEAD=${actual_commit} — accepted final collector validation commit ${EXPECTED_GIT_COMMIT} not found in deployed history"
 fi
 
-echo "  git log (last 5):"
-git log --oneline -5 | sed 's/^/    /'
-
-# ── 2. Container status ──────────────────────────────────────────
 _head "2. Container status"
 
 container_status="$($COMPOSE ps --format json 2>/dev/null | python3 -c "
