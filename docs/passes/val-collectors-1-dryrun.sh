@@ -22,7 +22,7 @@ COMPOSE="docker compose -f ${SERVER_DIR}/docker-compose.hetzner.yml --env-file $
 APP_HOST="https://tenxradar.com"
 EXPECTED_ALEMBIC_HEAD="c4e2a1f9b8d7"
 EXPECTED_STATIONS=8
-EXPECTED_GIT_COMMIT="819a4c3"   # latest tip: collector_runs fix + full runbook
+EXPECTED_GIT_COMMIT="1f8427b"   # latest tip: RADIO-COVERAGE-ARCH-1 docs + diagnose_sources CLI
 
 PASS=0
 FAIL=0
