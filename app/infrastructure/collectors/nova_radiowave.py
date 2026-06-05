@@ -17,7 +17,7 @@ from app.domain.entities.play_event import PlayEvent
 from app.infrastructure.collectors.base import BaseCollector
 from app.infrastructure.parsers.radiowave import parse_radiowave_diary
 
-_DEFAULT_BASE_URL = "https://www.radiowave.com.au/diary"
+_DEFAULT_BASE_URL = "https://www.radiowavemonitor.com/pub_charts/diaries.aspx"
 _DEFAULT_IDDS = "11129"
 _REQUEST_TIMEOUT = 30.0
 
@@ -42,7 +42,7 @@ class NovaRadiowaveCollector(BaseCollector):
 
     def _build_url(self) -> str:
         date_str = self.diary_date.strftime("%Y-%m-%d")
-        return f"{self.base_url}?idds={self.idds}&date={date_str}"
+        return f"{self.base_url}?IDDS={self.idds}&date={date_str}"
 
     async def fetch_raw(self) -> tuple[bytes, int | None, str | None]:
         from app.infrastructure.http.client import build_client

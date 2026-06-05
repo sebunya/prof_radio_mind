@@ -13,6 +13,8 @@ class SourceType(StrEnum):
     UNKNOWN = "unknown"
     BBC_SOUNDS = "bbc_sounds"
     HEART_LAST_PLAYED = "heart_last_played"
+    IHEART_WEB = "iheart_web"
+    UKRADIOLIVE = "ukradiolive"
 
 
 @dataclass

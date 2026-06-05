@@ -26,15 +26,16 @@ class SourceSeed:
 
 SOURCE_SEEDS: tuple[SourceSeed, ...] = (
     # --- Nova 96.9 ---
-    # VAL-NOVA-001: Radiowave IDDS=11129 is UNVALIDATED; assumed from historical knowledge
+    # VAL-NOVA-001: URL corrected to radiowavemonitor.com (same domain as KIIS1027).
+    # Previous base_url (radiowave.com.au) was wrong. Parser selectors still unvalidated.
     SourceSeed(
         station_call_sign="NOVA969",
         source_type=SourceType.RADIOWAVE,
         name="Nova 96.9 Radiowave Diary",
-        base_url="https://www.radiowave.com.au/diary",
+        base_url="https://www.radiowavemonitor.com/pub_charts/diaries.aspx",
         config={"idds": "11129"},
         priority=1,
-        validation_note="UNVALIDATED — VAL-NOVA-001 must be confirmed before Pass 6",
+        validation_note="URL corrected to radiowavemonitor.com. Parser selectors unvalidated.",
     ),
     SourceSeed(
         station_call_sign="NOVA969",
@@ -66,28 +67,35 @@ SOURCE_SEEDS: tuple[SourceSeed, ...] = (
         priority=99,
         validation_note="Always available — manual fallback",
     ),
-    # --- Capital FM ---
-    # VAL-CAPUK-ORB-001: Online Radio Box candidate source is UNVALIDATED
+    # --- Capital FM --- (EXTRACT-3 update)
+    # VAL-CAPUK-URL-001: ukradiolive.com/capital-fm/playlist confirmed reachable 2026-06-05.
+    # Parser selectors UNVALIDATED — run dry_run_capital_ukradiolive for raw HTML.
+    SourceSeed(
+        station_call_sign="CAPITALFM",
+        source_type=SourceType.UKRADIOLIVE,
+        name="Capital FM UK Radio Live Playlist",
+        base_url="https://ukradiolive.com/capital-fm/playlist",
+        config={"station_slug": "capital-fm"},
+        priority=1,
+        validation_note=(
+            "UNVALIDATED — VAL-CAPUK-URL-001 required. Run dry_run_capital_ukradiolive "
+            "to inspect HTML structure and confirm parser selectors."
+        ),
+    ),
+    # VAL-CAPUK-ORB-001: Online Radio Box candidate demoted to priority 2
     SourceSeed(
         station_call_sign="CAPITALFM",
         source_type=SourceType.ONLINE_RADIO_BOX,
-        name="Capital FM UK Online Radio Box Candidate",
+        name="Capital FM UK Online Radio Box",
         base_url="https://onlineradiobox.com/uk/capitalfmuk/",
         config={
             "station_slug": "capitalfmuk",
             "market": "uk",
             "city": "London",
             "country_code": "GB",
-            "validation_status": "UNVALIDATED",
-            "parser_status": "NOT_BUILT",
-            "source_page_type": "online_radio_box_station_page",
         },
-        priority=1,
-        validation_note=(
-            "UNVALIDATED — Capital FM UK Online Radio Box candidate source. "
-            "Parser, fixture extraction, polling cadence and source behavior "
-            "must be validated before enabling automated collection."
-        ),
+        priority=2,
+        validation_note="UNVALIDATED — VAL-CAPUK-ORB-001. Demoted to priority 2.",
     ),
     SourceSeed(
         station_call_sign="CAPITALFM",
@@ -96,10 +104,7 @@ SOURCE_SEEDS: tuple[SourceSeed, ...] = (
         base_url=None,
         config=None,
         priority=99,
-        validation_note=(
-            "Always available — manual fallback. "
-            "Import schema must still be tested before client-facing reporting."
-        ),
+        validation_note="Always available — manual fallback",
     ),
     # --- BBC Radio 1 --- (EXTRACT-2)
     # VAL-BBC1-001: BBC Sounds/RMS API reachability UNVALIDATED
@@ -187,15 +192,30 @@ SOURCE_SEEDS: tuple[SourceSeed, ...] = (
         validation_note="Always available — manual fallback",
     ),
     # --- KIIS-FM 102.7 Los Angeles (EXTRACT-3) ---
-    # VAL-KIIS-RAD-001: Radiowave IDDS=5080 UNVALIDATED — distinct from KIISFM Sydney 106.5
+    # VAL-KIIS1027-WEB-001: iHeart web recently-played page — UNVALIDATED.
+    # iHeart v3 API is entirely dead (404 on all paths). This replaces it.
+    SourceSeed(
+        station_call_sign="KIIS1027",
+        source_type=SourceType.IHEART_WEB,
+        name="KIIS-FM 102.7 iHeart Recently Played",
+        base_url="https://kiisfm.iheart.com/music/recently-played/",
+        config={"station_slug": "kiisfm"},
+        priority=1,
+        validation_note=(
+            "UNVALIDATED — VAL-KIIS1027-WEB-001 required. "
+            "Run dry_run_kiis_iheart_web to inspect HTML/JSON structure."
+        ),
+    ),
+    # VAL-KIIS-RAD-001: Radiowave IDDS=5080 FAILED live (0 tr.diary-row rows).
+    # Kept at priority 2 pending parser selector fix after HTML dump inspection.
     SourceSeed(
         station_call_sign="KIIS1027",
         source_type=SourceType.RADIOWAVE,
         name="KIIS-FM 102.7 Radiowave Monitor Diary",
         base_url="https://www.radiowavemonitor.com/pub_charts/diaries.aspx",
         config={"idds": "5080"},
-        priority=1,
-        validation_note="UNVALIDATED — VAL-KIIS-RAD-001 required before enable",
+        priority=2,
+        validation_note="VAL-KIIS-RAD-001 FAILED. Demoted to priority 2; selector fix pending.",
     ),
     SourceSeed(
         station_call_sign="KIIS1027",

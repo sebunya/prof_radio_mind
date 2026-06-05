@@ -2,10 +2,12 @@
 
 Runs a single fetch-parse-persist cycle without enabling the scheduler.
 
-Source URL: https://www.radiowave.com.au/diary?idds=11129
-VAL-NOVA-001: UNVALIDATED — radiowave.com.au was never tested live (D5 diagnostic
-              used wrong domain radiowavemonitor.com). This dry run IS the live test.
-robots.txt:   PENDING — https://www.radiowave.com.au/robots.txt not yet checked.
+Source URL: https://www.radiowavemonitor.com/pub_charts/diaries.aspx?IDDS=11129
+VAL-NOVA-001: URL corrected to radiowavemonitor.com (same domain as KIIS1027).
+              Previous base_url (radiowave.com.au) was wrong — this dry run tests
+              the corrected URL for the first time.
+              Parser selectors (tr.diary-row) are synthetic and may return 0 rows.
+robots.txt:   PENDING — https://www.radiowavemonitor.com/robots.txt not yet checked.
 ToS review:   PENDING.
 
 Usage (inside the running app container):

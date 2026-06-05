@@ -230,3 +230,61 @@ def test_kiis1027_radiowave_source_uuid_matches_scheduler() -> None:
     from app.application.seeder import source_id_for
     from app.infrastructure.scheduler.scheduler import _KIIS1027_RADIOWAVE_SOURCE_ID
     assert source_id_for("KIIS1027", "radiowave") == _KIIS1027_RADIOWAVE_SOURCE_ID
+
+
+# --- EXTRACT-3 update: new source types, corrected URLs ---
+
+def test_iheart_web_source_type_parses() -> None:
+    assert SourceType("iheart_web") == SourceType.IHEART_WEB
+    assert SourceType.IHEART_WEB.value == "iheart_web"
+
+
+def test_ukradiolive_source_type_parses() -> None:
+    assert SourceType("ukradiolive") == SourceType.UKRADIOLIVE
+    assert SourceType.UKRADIOLIVE.value == "ukradiolive"
+
+
+def test_kiis1027_has_iheart_web_source() -> None:
+    seeds = [s for s in SOURCE_SEEDS if s.station_call_sign == "KIIS1027"]
+    types = {s.source_type for s in seeds}
+    assert SourceType.IHEART_WEB in types
+
+
+def test_kiis1027_iheart_web_is_priority_1() -> None:
+    seed = next(
+        s for s in SOURCE_SEEDS
+        if s.station_call_sign == "KIIS1027" and s.source_type == SourceType.IHEART_WEB
+    )
+    assert seed.priority == 1
+
+
+def test_kiis1027_radiowave_demoted_to_priority_2() -> None:
+    seed = next(
+        s for s in SOURCE_SEEDS
+        if s.station_call_sign == "KIIS1027" and s.source_type == SourceType.RADIOWAVE
+    )
+    assert seed.priority == 2
+
+
+def test_capitalfm_has_ukradiolive_source() -> None:
+    seeds = [s for s in SOURCE_SEEDS if s.station_call_sign == "CAPITALFM"]
+    types = {s.source_type for s in seeds}
+    assert SourceType.UKRADIOLIVE in types
+
+
+def test_capitalfm_ukradiolive_is_priority_1() -> None:
+    seed = next(
+        s for s in SOURCE_SEEDS
+        if s.station_call_sign == "CAPITALFM" and s.source_type == SourceType.UKRADIOLIVE
+    )
+    assert seed.priority == 1
+
+
+def test_nova_radiowave_url_corrected() -> None:
+    seed = next(
+        s for s in SOURCE_SEEDS
+        if s.station_call_sign == "NOVA969" and s.source_type == SourceType.RADIOWAVE
+    )
+    assert seed.base_url is not None
+    assert "radiowavemonitor.com" in seed.base_url
+    assert "radiowave.com.au" not in (seed.base_url or "")
