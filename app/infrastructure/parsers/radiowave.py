@@ -1,6 +1,7 @@
-"""Radiowave diary HTML parser for Nova 96.9 (IDDS=11129).
+"""Radiowave diary HTML parser.
 
-Parses the diary HTML table into PlayEvent instances.
+Parses the diary HTML table into PlayEvent instances. Used by both Nova 96.9
+(IDDS=11129, Australia/Sydney) and KIIS-FM 102.7 (IDDS=5080, America/Los_Angeles).
 
 Key behaviours:
 - Strips label annotation from artist field (text in [brackets] or <span class="label-tag">)
@@ -8,6 +9,7 @@ Key behaviours:
 - Missing detail link is handled gracefully (source_event_id derived from data-event-id)
 - Drift detection: if fewer than DRIFT_THRESHOLD rows are returned from a non-empty page,
   a warning is attached to the result
+- station_timezone controls how HH:MM diary times are converted to UTC
 """
 
 from __future__ import annotations
@@ -15,7 +17,8 @@ from __future__ import annotations
 import re
 import uuid
 from dataclasses import dataclass, field
-from datetime import UTC, date, datetime, time
+from datetime import UTC, date, datetime
+from zoneinfo import ZoneInfo
 
 from bs4 import BeautifulSoup, Tag
 
@@ -26,6 +29,8 @@ _DRIFT_FRACTION = 0.5
 _MIN_EXPECTED_ROWS = 4
 
 _LABEL_TAG_RE = re.compile(r"\s*\[.*?\]\s*$")
+_SYDNEY = ZoneInfo("Australia/Sydney")
+_LOS_ANGELES = ZoneInfo("America/Los_Angeles")
 
 
 @dataclass
@@ -45,15 +50,16 @@ def _strip_label_from_artist(artist_raw: str) -> str:
     return _LABEL_TAG_RE.sub("", artist_raw).strip()
 
 
-def _parse_time_cell(time_str: str, diary_date: date) -> datetime:
-    """Convert 'HH:MM' string + diary date to a UTC-aware datetime.
-
-    Radiowave times are Sydney local time. For MVP we store them as-is
-    with UTC timezone marker; DST conversion is deferred to Pass 11.
-    """
+def _parse_time_cell(
+    time_str: str, diary_date: date, station_timezone: ZoneInfo = _SYDNEY
+) -> datetime:
+    """Convert 'HH:MM' string + diary date to a UTC-aware datetime."""
     h, m = (int(p) for p in time_str.strip().split(":"))
-    naive = datetime.combine(diary_date, time(h, m))
-    return naive.replace(tzinfo=UTC)
+    dt_local = datetime(
+        diary_date.year, diary_date.month, diary_date.day, h, m, 0,
+        tzinfo=station_timezone,
+    )
+    return dt_local.astimezone(UTC)
 
 
 def parse_radiowave_diary(
@@ -63,16 +69,20 @@ def parse_radiowave_diary(
     collector_run_id: uuid.UUID,
     diary_date: date | None = None,
     expected_min_rows: int = _MIN_EXPECTED_ROWS,
+    station_timezone: ZoneInfo = _SYDNEY,
 ) -> RadiowaveParseResult:
     """Parse Radiowave diary HTML into PlayEvents.
 
     Args:
         html: Raw HTML bytes or string from the Radiowave diary page
         source_id: UUID of the Radiowave source record
-        station_id: UUID of the station (Nova 96.9)
+        station_id: UUID of the station
         collector_run_id: UUID of the current collector run
         diary_date: Date to assign to parsed times (defaults to today UTC)
         expected_min_rows: Minimum rows expected; fewer triggers drift detection
+        station_timezone: Local timezone of the station — controls HH:MM → UTC
+            conversion. Defaults to Australia/Sydney for Nova. Pass
+            ZoneInfo("America/Los_Angeles") for KIIS-FM 102.7.
     """
     if diary_date is None:
         diary_date = datetime.now(tz=UTC).date()
@@ -109,7 +119,9 @@ def parse_radiowave_diary(
         raw_label = label_cell.get_text(strip=True) if label_cell else None
 
         try:
-            played_at = _parse_time_cell(time_cell.get_text(strip=True), diary_date)
+            played_at = _parse_time_cell(
+                time_cell.get_text(strip=True), diary_date, station_timezone
+            )
         except (ValueError, AttributeError) as exc:
             parse_errors.append(f"Could not parse time for {source_event_id}: {exc}")
             continue

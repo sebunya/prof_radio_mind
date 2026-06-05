@@ -17,6 +17,12 @@ class Settings(BaseSettings):
     enable_kiis_collector: bool = False
     enable_capital_collector: bool = False
     enable_nightly_reconciliation: bool = False
+    # New collector flags — all disabled by default; not yet wired into scheduler
+    enable_bbc_radio1_collector: bool = False
+    enable_heart_collector: bool = False
+    enable_z100_collector: bool = False
+    enable_wksc_collector: bool = False
+    enable_iheart_top_songs: bool = False
 
     # Security
     max_upload_bytes: int = 10 * 1024 * 1024  # 10 MB
