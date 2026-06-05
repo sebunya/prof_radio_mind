@@ -259,8 +259,11 @@ def test_collector_runs_200(client_with_db) -> None:
     mock_station = MagicMock()
     mock_station.call_sign = "CAPITALFM"
 
+    mock_source = MagicMock()
+    mock_source.source_type = "radiowave"
+
     mock_result = MagicMock()
-    mock_result.all.return_value = [(mock_run, mock_station)]
+    mock_result.all.return_value = [(mock_run, mock_station, mock_source)]
     session.execute = AsyncMock(return_value=mock_result)
 
     r = client.get("/api/admin/collector-runs")
@@ -269,3 +272,4 @@ def test_collector_runs_200(client_with_db) -> None:
     assert len(body) == 1
     assert body[0]["status"] == "completed"
     assert body[0]["station_call_sign"] == "CAPITALFM"
+    assert body[0]["collector_name"] == "CAPITALFM/radiowave"

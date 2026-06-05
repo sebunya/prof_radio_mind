@@ -502,8 +502,9 @@ async def get_collector_runs(
 ) -> list[CollectorRunResponse]:
     try:
         stmt = (
-            select(CollectorRun, StationModel)
+            select(CollectorRun, StationModel, SourceModel)
             .join(StationModel, CollectorRun.station_id == StationModel.id)
+            .join(SourceModel, CollectorRun.source_id == SourceModel.id)
             .order_by(CollectorRun.created_at.desc())
             .limit(10)
         )
@@ -513,15 +514,14 @@ async def get_collector_runs(
         return [
             CollectorRunResponse(
                 id=str(run.id),
-                # Status represents name if custom metadata is absent
-                collector_name=run.status,
+                collector_name=f"{station.call_sign}/{source.source_type}",
                 station_call_sign=station.call_sign,
                 status=run.status,
                 error_message=run.error_message,
                 started_at=run.started_at,
                 completed_at=run.completed_at,
             )
-            for run, station in rows
+            for run, station, source in rows
         ]
     except Exception as e:
         import logging
