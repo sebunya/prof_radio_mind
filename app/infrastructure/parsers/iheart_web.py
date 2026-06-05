@@ -19,7 +19,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Tag
 
 logger = logging.getLogger(__name__)
 
@@ -86,7 +86,7 @@ def _extract_played_at(item: dict) -> datetime:
 
 def _try_next_data(soup: BeautifulSoup) -> list[IHeartWebParseResult] | None:
     script = soup.find("script", id="__NEXT_DATA__")
-    if not script:
+    if not isinstance(script, Tag):
         return None
     try:
         data = json.loads(script.string or "")
