@@ -43,10 +43,10 @@ echo "  git HEAD=${actual_commit}"
 echo "  git log (last 8):"
 git log --oneline -8 | sed 's/^/    /'
 
-if [ "${actual_commit}" = "${EXPECTED_GIT_COMMIT}" ] || git log --oneline -20 | grep -q "${EXPECTED_GIT_COMMIT}"; then
+if git merge-base --is-ancestor "${EXPECTED_GIT_COMMIT}" HEAD 2>/dev/null; then
   _pass "git HEAD includes accepted final collector validation commit ${EXPECTED_GIT_COMMIT}"
 else
-  _fail "git HEAD=${actual_commit} — accepted final collector validation commit ${EXPECTED_GIT_COMMIT} not found in deployed history"
+  _fail "git HEAD=${actual_commit} — accepted final collector validation commit ${EXPECTED_GIT_COMMIT} is not an ancestor of deployed HEAD"
 fi
 
 _head "2. Container status"
