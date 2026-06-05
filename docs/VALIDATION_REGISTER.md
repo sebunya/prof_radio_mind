@@ -1,6 +1,6 @@
 # Radio Music Intelligence & Automation System
 # Validation Register
-# Last updated: 2026-06-05 (EXTRACT-2 entries added)
+# Last updated: 2026-06-05 (EXTRACT-2 + EXTRACT-4 entries added)
 
 ---
 
@@ -437,6 +437,23 @@ Validation must be performed by a human or a dedicated validation command. Resul
 
 ---
 
+## 12. iHeart Recently-Played Batch Fallback (EXTRACT-4)
+
+### 12.1 iHeart Recently-Played Endpoint Reachability (VAL-IHEART-RECENT-001)
+
+| Field | Value |
+|---|---|
+| ID | VAL-IHEART-RECENT-001 |
+| Description | Confirm that the iHeart recently-played endpoint returns HTTP 200 (or 204) for all three covered stations: KIISFM (2501), Z100/WHTZ (614), WKSC (821). Fetch `https://api.iheart.com/api/v3/live-meta/stream/{id}/recentlyPlayed` for each station from the production server. Confirm HTTP 200 with a JSON body containing a `tracks` (or `recentTracks`) array, or HTTP 204. |
+| Status | UNVALIDATED |
+| Validated by | — |
+| Validated at | — |
+| Script | `docs/passes/val-live-endpoints.sh --iheart_recent` |
+| Notes | Tested against station 2501 (KIISFM) as representative; Z100 and WKSC endpoints share the same URL pattern. Response key may be `tracks` or `recentTracks` — parser handles both. `source_event_id`-based dedup in `_persist_result` prevents re-insertion on repeat polls. |
+| Risk if fails | Batch fallback unavailable; do not enable `ENABLE_IHEART_RECENTLY_PLAYED` |
+
+---
+
 ## 13. Deferred Validations
 
 ### 8.1 Spotify Enrichment
@@ -519,10 +536,11 @@ Validation must be performed by a human or a dedicated validation command. Resul
 | Heart FM UK | 9 | 4 | 0 | 0 | 0 | 0 | 0 | 4 |
 | Z100 New York (WHTZ) | 10 | 1 | 0 | 0 | 0 | 0 | 0 | 1 |
 | WKSC 103.5 Chicago | 11 | 1 | 0 | 0 | 0 | 0 | 0 | 1 |
+| iHeart recently-played | 12 | 1 | 0 | 0 | 0 | 0 | 0 | 1 |
 | Deferred | 13 | 2 | 0 | 0 | 0 | 0 | 2 | 0 |
 | Operational contracts | 14 | 3 | 0 | 0 | 0 | 0 | 0 | 3 |
-| **Total** | | **35** | **0** | **0** | **0** | **1** | **3** | **31** |
+| **Total** | | **36** | **0** | **0** | **0** | **1** | **3** | **32** |
 
-VAL-BBC1-006 is BLOCKED (manual ToS review). All other 30 non-deferred, non-blocked
+VAL-BBC1-006 is BLOCKED (manual ToS review). All other 31 non-deferred, non-blocked
 validations are UNVALIDATED. No collector may be enabled until its VAL code is confirmed
 in this register and in `docs/passes/val-live-endpoints.sh`.

@@ -18,7 +18,7 @@
 #       < ~/Documents/Prof_Mind/docs/passes/val-post-enable.sh \
 #       | tee /tmp/val-post-enable-z100.log
 #
-# Available flags: --z100  --wksc  --kiis_top  --heart  --bbc
+# Available flags: --z100  --wksc  --kiis_top  --heart  --bbc  --iheart_recent
 #
 # Exit codes:
 #   0  all checks passed (collector is running cleanly)
@@ -43,16 +43,17 @@ _head() { echo ""; echo "=== $* ==="; }
 COLLECTOR=""
 for arg in "$@"; do
   case "$arg" in
-    --z100)     COLLECTOR="z100" ;;
-    --wksc)     COLLECTOR="wksc" ;;
-    --kiis_top) COLLECTOR="kiis_top" ;;
-    --heart)    COLLECTOR="heart" ;;
-    --bbc)      COLLECTOR="bbc" ;;
+    --z100)          COLLECTOR="z100" ;;
+    --wksc)          COLLECTOR="wksc" ;;
+    --kiis_top)      COLLECTOR="kiis_top" ;;
+    --heart)         COLLECTOR="heart" ;;
+    --bbc)           COLLECTOR="bbc" ;;
+    --iheart_recent) COLLECTOR="iheart_recent" ;;
   esac
 done
 
 if [ -z "$COLLECTOR" ]; then
-  echo "ERROR: Specify exactly one collector: --z100 | --wksc | --kiis_top | --heart | --bbc"
+  echo "ERROR: Specify exactly one collector: --z100 | --wksc | --kiis_top | --heart | --bbc | --iheart_recent"
   exit 1
 fi
 
@@ -102,6 +103,16 @@ case "$COLLECTOR" in
     JOB_ID="bbc_radio1_now_playing"
     CADENCE="every 5 minutes"
     WINDOW_MINUTES=30
+    ;;
+  iheart_recent)
+    FLAG="ENABLE_IHEART_RECENTLY_PLAYED"
+    LOG_KEYWORD="iheart_recently_played_collected"
+    # Batch job covers KIISFM + Z100 + WKSC; KIISFM used as representative for DB check
+    CALL_SIGN="KIISFM"
+    SOURCE_TYPE="iheart"
+    JOB_ID="iheart_recently_played_hourly"
+    CADENCE="every 60 minutes"
+    WINDOW_MINUTES=90
     ;;
 esac
 
@@ -214,6 +225,8 @@ asyncio.run(run())
   if [ "${run_count:-0}" -eq 0 ]; then
     if [ "${COLLECTOR}" = "kiis_top" ]; then
       _warn "no collector runs in last 24h — daily collector runs at 00:00 UTC only"
+    elif [ "${COLLECTOR}" = "iheart_recent" ]; then
+      _warn "no collector runs in last 90 min — hourly batch job; wait up to 60 min for first run"
     else
       _fail "no collector runs in observation window — expected at least one run every 5 minutes"
     fi
@@ -289,6 +302,8 @@ asyncio.run(run())
     _pass "${plays} play event(s), ${no_tracks} no-track event(s) in window"
   elif [ "${COLLECTOR}" = "kiis_top" ]; then
     _info "no events yet — daily collector first runs at midnight UTC"
+  elif [ "${COLLECTOR}" = "iheart_recent" ]; then
+    _info "no events yet for KIISFM/iheart in window — check Z100 and WKSC source_ids too"
   else
     _warn "0 events in window — collector may have run but station was silent; check logs"
   fi
@@ -307,6 +322,8 @@ if [ -n "${collector_lines}" ]; then
 else
   if [ "${COLLECTOR}" = "kiis_top" ]; then
     _info "no '${LOG_KEYWORD}' log lines yet — daily job has not fired since last restart"
+  elif [ "${COLLECTOR}" = "iheart_recent" ]; then
+    _warn "no '${LOG_KEYWORD}' log lines yet — hourly job; wait up to 60 min for first run"
   else
     _fail "no '${LOG_KEYWORD}' log lines in last 200 lines — collector may not be running"
   fi

@@ -7,9 +7,9 @@
 
 ## Prerequisites (all must be ✅ before any collector is enabled)
 
-- [ ] EXTRACT-2 deployed to production and confirmed in DB (VAL-COLLECTORS-1 pass)
-- [ ] All live endpoints reachable (VAL-LIVE-ENDPOINTS pass — 5 passed, 0 failed)
-- [ ] VAL-BBC1-006: BBC ToS manual review complete (before Step 5 only)
+- [ ] EXTRACT-2/3/4 deployed to production and confirmed in DB (VAL-COLLECTORS-1 pass)
+- [ ] All live endpoints reachable (VAL-LIVE-ENDPOINTS pass — 6 passed, 0 failed)
+- [ ] VAL-BBC1-006: BBC ToS manual review complete (before Step 6 only)
 - [ ] `GET /health` returns 200
 
 ---
@@ -94,6 +94,7 @@
 ### Checklist
 - [ ] Z100 (Step 1) stable for 24 hours
 - [ ] VAL-WKSC-001 PASS confirmed
+
 - [ ] `ENABLE_WKSC_COLLECTOR=true` set in `.env.production`
 - [ ] Container force-recreated
 - [ ] Waited 15 minutes
@@ -103,7 +104,43 @@
 
 ---
 
-## Step 3 — KIIS-FM Top Songs (`ENABLE_IHEART_TOP_SONGS`)
+## Step 3 — iHeart Recently-Played (`ENABLE_IHEART_RECENTLY_PLAYED`)
+
+**Prerequisite VAL codes:** VAL-IHEART-RECENT-001 PASS
+
+| Item | Detail |
+|------|--------|
+| Flag | `ENABLE_IHEART_RECENTLY_PLAYED=true` |
+| Station | KIISFM + Z100 (WHTZ) + WKSC — all three in one job |
+| Source type | `iheart` (station IDs 2501 / 614 / 821) |
+| Collector | `IHeartRecentlyPlayedCollector` |
+| Cadence | Every **60 minutes** |
+| Log pattern | `iheart_recently_played_collected station_id=... iheart_id=... status=... plays=...` |
+| Post-enable flag | `--iheart_recent` |
+
+**Why third:** iHeart API, same stations as Steps 1–2. Batch fallback that catches short tracks missed by the 5-minute now-playing poll. Low traffic (1 request/hour per station). `source_event_id` dedup prevents re-insertion on repeat polls. Enable after Z100 and WKSC now-playing are confirmed stable so the fallback complements rather than replaces primary collection.
+
+**Note:** Post-enable check uses KIISFM as the representative DB query station. To verify all three stations, check DB directly:
+```sql
+SELECT source_id, COUNT(*), MAX(played_at)
+FROM play_events
+WHERE played_at > NOW() - INTERVAL '90 minutes'
+GROUP BY source_id;
+```
+
+### Checklist
+- [ ] WKSC (Step 2) stable for 24 hours
+- [ ] VAL-IHEART-RECENT-001 PASS confirmed
+- [ ] `ENABLE_IHEART_RECENTLY_PLAYED=true` set in `.env.production`
+- [ ] Container force-recreated
+- [ ] Waited 65 minutes for first run
+- [ ] `val-post-enable.sh --iheart_recent` → SUMMARY: 0 failed
+- [ ] Play events visible in admin UI for at least one of KIISFM / Z100 / WKSC
+- [ ] Waiting 24 hours
+
+---
+
+## Step 4 — KIIS-FM Top Songs (`ENABLE_IHEART_TOP_SONGS`)
 
 **Prerequisite VAL codes:** VAL-IHEART-TOP-001 PASS
 
@@ -117,10 +154,10 @@
 | Log pattern | `kiis_top_songs status=... plays=... no_tracks=...` |
 | Post-enable flag | `--kiis_top` |
 
-**Why third:** iHeart API, daily cron — very low traffic. First run will be at the next midnight UTC after enablement.
+**Why fourth:** iHeart API, daily cron — very low traffic. First run will be at the next midnight UTC after enablement.
 
 ### Checklist
-- [ ] WKSC (Step 2) stable for 24 hours
+- [ ] iHeart recently-played (Step 3) stable for 24 hours
 - [ ] VAL-IHEART-TOP-001 PASS confirmed
 - [ ] `ENABLE_IHEART_TOP_SONGS=true` set in `.env.production`
 - [ ] Container force-recreated
@@ -130,7 +167,7 @@
 
 ---
 
-## Step 4 — Heart FM (`ENABLE_HEART_COLLECTOR`)
+## Step 5 — Heart FM (`ENABLE_HEART_COLLECTOR`)
 
 **Prerequisite VAL codes:** VAL-HEARTFM-002 PASS
 
@@ -147,7 +184,7 @@
 **Risk note:** CSS scraper — higher maintenance risk than API-based collectors. If `div.station-song-history` selector drifts, the collector fails with `SCHEMA_CHANGED`. Monitor logs more closely for the first 48 hours.
 
 ### Checklist
-- [ ] KIIS top songs (Step 3) stable (at least one successful run)
+- [ ] KIIS top songs (Step 4) stable (at least one successful run)
 - [ ] VAL-HEARTFM-002 PASS confirmed
 - [ ] `ENABLE_HEART_COLLECTOR=true` set in `.env.production`
 - [ ] Container force-recreated
@@ -159,9 +196,9 @@
 
 ---
 
-## Step 5 — BBC Radio 1 (`ENABLE_BBC_RADIO1_COLLECTOR`)
+## Step 6 — BBC Radio 1 (`ENABLE_BBC_RADIO1_COLLECTOR`)
 
-**Prerequisite VAL codes:** VAL-BBC1-001 PASS **and** VAL-BBC1-006 PASS (manual)
+**Prerequisite VAL codes:** VAL-BBC1-001 PASS **and** VAL-BBC1-006 PASS (manual ToS)
 
 | Item | Detail |
 |------|--------|
@@ -181,8 +218,8 @@
 - [ ] Confirmed: automated polling of `rms.api.bbc.co.uk/v2/services/bbc_radio_one/segments/latest` at 5-minute intervals is permissible
 - [ ] Finding documented (PASS/FAIL) in `docs/VALIDATION_REGISTER.md`
 
-### Step 5 Enablement Checklist
-- [ ] Heart FM (Step 4) stable for 24 hours
+### Step 6 Enablement Checklist
+- [ ] Heart FM (Step 5) stable for 24 hours
 - [ ] VAL-BBC1-001 PASS confirmed
 - [ ] VAL-BBC1-006 PASS confirmed (manual)
 - [ ] `ENABLE_BBC_RADIO1_COLLECTOR=true` set in `.env.production`
@@ -199,7 +236,7 @@
 ```bash
 # Live log tail for a specific collector
 ssh root@178.105.238.18 "docker compose -f /opt/rmias/docker-compose.hetzner.yml logs -f app" \
-  | grep -i "z100_now_playing\|wksc_now_playing\|heart_fm_collected\|bbc_radio1_collected\|kiis_top_songs"
+  | grep -i "z100_now_playing\|wksc_now_playing\|iheart_recently_played_collected\|kiis_top_songs\|heart_fm_collected\|bbc_radio1_collected"
 
 # Check for failures in last 50 lines
 ssh root@178.105.238.18 "docker compose -f /opt/rmias/docker-compose.hetzner.yml logs --tail=50 app" \
