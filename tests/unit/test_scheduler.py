@@ -13,6 +13,7 @@ from app.infrastructure.scheduler.scheduler import (
     job_collect_bbc_radio1,
     job_collect_capital_now_playing,
     job_collect_heart_fm,
+    job_collect_kiis1027_radiowave,
     job_collect_kiis_now_playing,
     job_collect_kiis_top_songs,
     job_collect_nova_diary,
@@ -35,12 +36,13 @@ def test_scheduler_default_no_jobs() -> None:
         patch.object(settings, "enable_z100_collector", False),
         patch.object(settings, "enable_wksc_collector", False),
         patch.object(settings, "enable_iheart_top_songs", False),
+        patch.object(settings, "enable_kiis_radiowave_collector", False),
     ):
         sched = build_scheduler()
         assert len(sched.get_jobs()) == 0
 
 
-def test_scheduler_all_enabled_has_nine_jobs() -> None:
+def test_scheduler_all_enabled_has_ten_jobs() -> None:
     from app.core.settings import settings
     with (
         patch.object(settings, "enable_nova_collector", True),
@@ -52,9 +54,10 @@ def test_scheduler_all_enabled_has_nine_jobs() -> None:
         patch.object(settings, "enable_z100_collector", True),
         patch.object(settings, "enable_wksc_collector", True),
         patch.object(settings, "enable_iheart_top_songs", True),
+        patch.object(settings, "enable_kiis_radiowave_collector", True),
     ):
         sched = build_scheduler()
-        assert len(sched.get_jobs()) == 9
+        assert len(sched.get_jobs()) == 10
         ids = {j.id for j in sched.get_jobs()}
         assert ids == {
             "nova_daily_diary",
@@ -66,6 +69,7 @@ def test_scheduler_all_enabled_has_nine_jobs() -> None:
             "z100_now_playing",
             "wksc_now_playing",
             "kiis_top_songs_daily",
+            "kiis1027_radiowave_diary",
         }
 
 
@@ -345,5 +349,37 @@ async def test_kiis_top_songs_job_invokes_collector() -> None:
         patch(f"{_sched}._persist_result", new_callable=AsyncMock),
     ):
         await job_collect_kiis_top_songs()
+
+    mock_collector.run.assert_awaited_once()
+
+
+def test_kiis1027_radiowave_job_uses_cron_trigger() -> None:
+    from app.core.settings import settings
+    with patch.object(settings, "enable_kiis_radiowave_collector", True):
+        sched = build_scheduler()
+        job = sched.get_job("kiis1027_radiowave_diary")
+        assert job is not None
+        assert isinstance(job.trigger, CronTrigger)
+
+
+@pytest.mark.anyio
+async def test_kiis1027_radiowave_job_invokes_collector() -> None:
+    import uuid
+
+    from app.domain.entities.collector_run import CollectorRun
+    from app.infrastructure.collectors.base import CollectorResult
+
+    run = CollectorRun.create(source_id=uuid.uuid4(), station_id=uuid.uuid4())
+    real_result = CollectorResult(collector_run=run, play_events=[], no_track_events=[])
+
+    mock_collector = AsyncMock()
+    mock_collector.run = AsyncMock(return_value=real_result)
+
+    _sched = "app.infrastructure.scheduler.scheduler"
+    with (
+        patch(f"{_sched}.KIISRadiowaveCollector", return_value=mock_collector),
+        patch(f"{_sched}._persist_result", new_callable=AsyncMock),
+    ):
+        await job_collect_kiis1027_radiowave()
 
     mock_collector.run.assert_awaited_once()

@@ -184,4 +184,24 @@ SOURCE_SEEDS: tuple[SourceSeed, ...] = (
         priority=99,
         validation_note="Always available — manual fallback",
     ),
+    # --- KIIS-FM 102.7 Los Angeles (EXTRACT-3) ---
+    # VAL-KIIS-RAD-001: Radiowave IDDS=5080 UNVALIDATED — distinct from KIISFM Sydney 106.5
+    SourceSeed(
+        station_call_sign="KIIS1027",
+        source_type=SourceType.RADIOWAVE,
+        name="KIIS-FM 102.7 Radiowave Monitor Diary",
+        base_url="https://www.radiowavemonitor.com/pub_charts/diaries.aspx",
+        config={"idds": "5080"},
+        priority=1,
+        validation_note="UNVALIDATED — VAL-KIIS-RAD-001 required before enable",
+    ),
+    SourceSeed(
+        station_call_sign="KIIS1027",
+        source_type=SourceType.MANUAL_CSV,
+        name="KIIS-FM 102.7 Manual CSV Fallback",
+        base_url=None,
+        config=None,
+        priority=99,
+        validation_note="Always available — manual fallback",
+    ),
 )

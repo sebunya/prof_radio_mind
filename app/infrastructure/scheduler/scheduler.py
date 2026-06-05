@@ -15,6 +15,7 @@ from app.infrastructure.collectors.heart_radio import HeartRadioCollector
 from app.infrastructure.collectors.iheart_now_playing import IHeartNowPlayingCollector
 from app.infrastructure.collectors.iheart_top_songs import IHeartTopSongsCollector
 from app.infrastructure.collectors.kiis_iheart import KIISIHeartCollector
+from app.infrastructure.collectors.kiis_radiowave import KIISRadiowaveCollector
 from app.infrastructure.collectors.nova_radiowave import NovaRadiowaveCollector
 from app.infrastructure.collectors.online_radio_box import OnlineRadioBoxCollector
 
@@ -36,6 +37,8 @@ _Z100_STATION_ID = uuid.uuid5(_NS, "station.WHTZ")
 _Z100_SOURCE_ID = uuid.uuid5(_NS, "source.WHTZ.iheart")
 _WKSC_STATION_ID = uuid.uuid5(_NS, "station.WKSC")
 _WKSC_SOURCE_ID = uuid.uuid5(_NS, "source.WKSC.iheart")
+_KIIS1027_STATION_ID = uuid.uuid5(_NS, "station.KIIS1027")
+_KIIS1027_RADIOWAVE_SOURCE_ID = uuid.uuid5(_NS, "source.KIIS1027.radiowave")
 
 _scheduler: AsyncIOScheduler | None = None
 _CAPITAL_FAILURES = 0
@@ -360,6 +363,28 @@ async def job_collect_kiis_top_songs() -> None:
     await _persist_result(result)
 
 
+async def job_collect_kiis1027_radiowave() -> None:
+    """Collect KIIS-FM 102.7 Radiowave Monitor diary for yesterday (runs daily 09:00 UTC)."""
+    from datetime import UTC, datetime, timedelta
+
+    diary_date = datetime.now(tz=UTC).date() - timedelta(days=1)
+    collector = KIISRadiowaveCollector(
+        source_id=_KIIS1027_RADIOWAVE_SOURCE_ID,
+        station_id=_KIIS1027_STATION_ID,
+        diary_date=diary_date,
+        storage_root=settings.raw_payload_storage_path,
+    )
+    result = await collector.run()
+    logger.info(
+        "kiis1027_radiowave_collected date=%s status=%s plays=%d no_tracks=%d",
+        diary_date,
+        result.collector_run.status.value,
+        len(result.play_events),
+        len(result.no_track_events),
+    )
+    await _persist_result(result)
+
+
 def build_scheduler() -> AsyncIOScheduler:
     """Create and configure the APScheduler instance with all registered jobs."""
     global _scheduler
@@ -494,5 +519,19 @@ def build_scheduler() -> AsyncIOScheduler:
         logger.info("Scheduler registered job: KIIS-FM iHeart top songs chart")
     else:
         logger.info("Scheduler skipped job: KIIS-FM top songs (disabled)")
+
+    # KIIS-FM 102.7 Los Angeles Radiowave diary — daily 09:00 UTC (01:00 AM Pacific)
+    if settings.enable_kiis_radiowave_collector:
+        sched.add_job(
+            job_collect_kiis1027_radiowave,
+            CronTrigger(hour=9, minute=0, timezone="UTC"),
+            id="kiis1027_radiowave_diary",
+            name="KIIS-FM 102.7 Radiowave diary",
+            replace_existing=True,
+            misfire_grace_time=3600,
+        )
+        logger.info("Scheduler registered job: KIIS-FM 102.7 Radiowave diary")
+    else:
+        logger.info("Scheduler skipped job: KIIS-FM 102.7 Radiowave diary (disabled)")
 
     return sched
