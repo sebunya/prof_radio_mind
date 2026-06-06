@@ -13,8 +13,8 @@ from app.core.settings import settings
 from app.infrastructure.collectors.capital_ukradiolive import CapitalUKRadioLiveCollector
 from app.infrastructure.collectors.kiis_iheart_web import KIISIHeartWebCollector
 from app.infrastructure.collectors.kiis_radiowave import KIISRadiowaveCollector
-from app.infrastructure.collectors.nova_radoxo import NovaRadoxoCollector
 from app.infrastructure.collectors.nova_radiowave import NovaRadiowaveCollector
+from app.infrastructure.collectors.nova_radoxo import NovaRadoxoCollector
 from app.infrastructure.collectors.online_radio_box import OnlineRadioBoxCollector
 from app.infrastructure.collectors.radio_australia_org import RadioAustraliaOrgCollector
 
