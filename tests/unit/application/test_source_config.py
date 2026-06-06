@@ -332,3 +332,66 @@ def test_capitalfm_online_radio_box_uses_playlist_url() -> None:
     )
     assert seed.base_url is not None
     assert "playlist" in seed.base_url
+
+
+# --- EXTRACT-3 update: radio-australia.org sources ---
+
+def test_radio_australia_org_source_type_parses() -> None:
+    assert SourceType("radio_australia_org") == SourceType.RADIO_AUSTRALIA_ORG
+    assert SourceType.RADIO_AUSTRALIA_ORG.value == "radio_australia_org"
+
+
+def test_nova969_has_radio_australia_org_source() -> None:
+    seeds = [s for s in SOURCE_SEEDS if s.station_call_sign == "NOVA969"]
+    types = {s.source_type for s in seeds}
+    assert SourceType.RADIO_AUSTRALIA_ORG in types
+
+
+def test_nova969_radio_australia_is_priority_3() -> None:
+    seed = next(
+        s for s in SOURCE_SEEDS
+        if s.station_call_sign == "NOVA969" and s.source_type == SourceType.RADIO_AUSTRALIA_ORG
+    )
+    assert seed.priority == 3
+
+
+def test_nova969_radio_australia_url_correct() -> None:
+    seed = next(
+        s for s in SOURCE_SEEDS
+        if s.station_call_sign == "NOVA969" and s.source_type == SourceType.RADIO_AUSTRALIA_ORG
+    )
+    assert seed.base_url is not None
+    assert "radio-australia.org" in seed.base_url
+    assert "nova-969" in seed.base_url
+
+
+def test_kiisfm_has_radio_australia_org_source() -> None:
+    seeds = [s for s in SOURCE_SEEDS if s.station_call_sign == "KIISFM"]
+    types = {s.source_type for s in seeds}
+    assert SourceType.RADIO_AUSTRALIA_ORG in types
+
+
+def test_kiisfm_radio_australia_is_priority_1() -> None:
+    seed = next(
+        s for s in SOURCE_SEEDS
+        if s.station_call_sign == "KIISFM" and s.source_type == SourceType.RADIO_AUSTRALIA_ORG
+    )
+    assert seed.priority == 1
+
+
+def test_kiisfm_radio_australia_url_correct() -> None:
+    seed = next(
+        s for s in SOURCE_SEEDS
+        if s.station_call_sign == "KIISFM" and s.source_type == SourceType.RADIO_AUSTRALIA_ORG
+    )
+    assert seed.base_url is not None
+    assert "radio-australia.org" in seed.base_url
+    assert "kiis-1065" in seed.base_url
+
+
+def test_kiisfm_iheart_demoted_from_priority_1() -> None:
+    seed = next(
+        s for s in SOURCE_SEEDS
+        if s.station_call_sign == "KIISFM" and s.source_type == SourceType.IHEART
+    )
+    assert seed.priority > 1

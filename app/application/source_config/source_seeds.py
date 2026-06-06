@@ -40,7 +40,6 @@ SOURCE_SEEDS: tuple[SourceSeed, ...] = (
         ),
     ),
     # VAL-NOVA-RADOXO-001: radoxo.com/australia/nova-969/playlist UNVALIDATED.
-    # Parser unimplemented — run dry_run_nova_radoxo once to inspect HTML structure.
     SourceSeed(
         station_call_sign="NOVA969",
         source_type=SourceType.RADOXO,
@@ -53,6 +52,20 @@ SOURCE_SEEDS: tuple[SourceSeed, ...] = (
             "Run dry_run_nova_radoxo to confirm HTML structure and implement parser."
         ),
     ),
+    # VAL-NOVA-RAO-001: radio-australia.org weekly chart — confirmed SSR, parser validated
+    # 2026-06-06. NOTE: played_at is synthetic (collection time). Chart covers last 7 days.
+    SourceSeed(
+        station_call_sign="NOVA969",
+        source_type=SourceType.RADIO_AUSTRALIA_ORG,
+        name="Nova 96.9 Radio Australia Chart",
+        base_url="https://www.radio-australia.org/nova-969",
+        config={"station_slug": "nova-969", "chart_period_days": 7},
+        priority=3,
+        validation_note=(
+            "VALIDATED — SSR chart confirmed 2026-06-06. "
+            "played_at is synthetic (collection timestamp, not broadcast time)."
+        ),
+    ),
     SourceSeed(
         station_call_sign="NOVA969",
         source_type=SourceType.MANUAL_CSV,
@@ -62,17 +75,30 @@ SOURCE_SEEDS: tuple[SourceSeed, ...] = (
         priority=99,
         validation_note="Always available — manual fallback",
     ),
-    # --- KIIS-FM ---
-    # VAL-KIIS-001: iHeart station ID 2501 is UNVALIDATED
-    # VAL-KIIS-003: HTTP 204 behavior UNCONFIRMED — guard implemented regardless
+    # --- KIIS-FM 106.5 FM Sydney ---
+    # VAL-KIIS-RAO-001: radio-australia.org/kiis-1065 weekly chart — SSR confirmed 2026-06-06.
+    # played_at is synthetic (collection time). Chart covers last 7 days.
+    SourceSeed(
+        station_call_sign="KIISFM",
+        source_type=SourceType.RADIO_AUSTRALIA_ORG,
+        name="KIIS-FM 106.5 Radio Australia Chart",
+        base_url="https://www.radio-australia.org/kiis-1065",
+        config={"station_slug": "kiis-1065", "chart_period_days": 7},
+        priority=1,
+        validation_note=(
+            "VALIDATED — SSR chart confirmed 2026-06-06. "
+            "played_at is synthetic (collection timestamp, not broadcast time)."
+        ),
+    ),
+    # iHeart v3 API is entirely dead (404). Kept at priority 2 for reference.
     SourceSeed(
         station_call_sign="KIISFM",
         source_type=SourceType.IHEART,
         name="KIIS-FM iHeart Now Playing",
         base_url="https://api.iheart.com/api/v3/live-meta/stream",
         config={"station_id": "2501"},
-        priority=1,
-        validation_note="UNVALIDATED — VAL-KIIS-001 must confirm station_id=2501 before Pass 7",
+        priority=2,
+        validation_note="FAILED — iHeart v3 API dead (404). Demoted; kept for reference only.",
     ),
     SourceSeed(
         station_call_sign="KIISFM",

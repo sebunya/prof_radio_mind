@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Listen to Nova 96.9 Live | Sydney's Hit Music Station</title>
+</head>
+<body>
+  <div class="page-layout__main">
+    <!-- live recently-played section — CSR only, always empty in static HTML -->
+    <div class="latest-song"></div>
+    <div class="previous-songs"></div>
+
+    <!-- weekly/monthly chart — SSR rendered, always present in static HTML -->
+    <div class="radio-songs__tabs">
+      <a href="#top-songs-7" class="radio-songs__tabs--active">Last 7 days</a>
+      <a href="#top-songs-30">Last 30 days</a>
+    </div>
+
+    <div class="radio-songs__list radio-songs__list--active" data-period="7">
+      <ol class="radio-songs__ranking">
+        <li class="radio-songs__item">
+          <span class="radio-songs__rank">1</span>
+          <img alt="Josh Fawaz - I Like That" class="radio-songs__artwork"
+               src="https://example.com/art/1.jpg" width="60" height="60"/>
+          <div class="radio-songs__details">
+            <span class="radio-songs__title-text">I Like That</span>
+            <span class="radio-songs__artist">Josh Fawaz</span>
+          </div>
+        </li>
+        <li class="radio-songs__item">
+          <span class="radio-songs__rank">2</span>
+          <img alt="Tame Impala - Lucidity" class="radio-songs__artwork"
+               src="https://example.com/art/2.jpg" width="60" height="60"/>
+          <div class="radio-songs__details">
+            <span class="radio-songs__title-text">Lucidity</span>
+            <span class="radio-songs__artist">Tame Impala</span>
+          </div>
+        </li>
+        <li class="radio-songs__item">
+          <span class="radio-songs__rank">3</span>
+          <img alt="Ariana - I Hate You" class="radio-songs__artwork"
+               src="https://example.com/art/3.jpg" width="60" height="60"/>
+          <div class="radio-songs__details">
+            <span class="radio-songs__title-text">I Hate You</span>
+            <span class="radio-songs__artist">Ariana</span>
+          </div>
+        </li>
+        <li class="radio-songs__item">
+          <span class="radio-songs__rank">4</span>
+          <img alt="Sam Fender - Rein Me In" class="radio-songs__artwork"
+               src="https://example.com/art/4.jpg" width="60" height="60"/>
+          <div class="radio-songs__details">
+            <span class="radio-songs__title-text">Rein Me In</span>
+            <span class="radio-songs__artist">Sam Fender</span>
+          </div>
+        </li>
+        <li class="radio-songs__item">
+          <span class="radio-songs__rank">5</span>
+          <img alt="Sabrina Carpenter - Espresso" class="radio-songs__artwork"
+               src="https://example.com/art/5.jpg" width="60" height="60"/>
+          <div class="radio-songs__details">
+            <span class="radio-songs__title-text">Espresso</span>
+            <span class="radio-songs__artist">Sabrina Carpenter</span>
+          </div>
+        </li>
+      </ol>
+    </div>
+
+    <div class="radio-songs__list" data-period="30">
+      <ol class="radio-songs__ranking">
+        <li class="radio-songs__item">
+          <span class="radio-songs__rank">1</span>
+          <img alt="Tame Impala - Lucidity" class="radio-songs__artwork"
+               src="https://example.com/art/m1.jpg" width="60" height="60"/>
+          <div class="radio-songs__details">
+            <span class="radio-songs__title-text">Lucidity</span>
+            <span class="radio-songs__artist">Tame Impala</span>
+          </div>
+        </li>
+      </ol>
+    </div>
+  </div>
+</body>
+</html>
