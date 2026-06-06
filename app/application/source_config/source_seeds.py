@@ -26,8 +26,8 @@ class SourceSeed:
 
 SOURCE_SEEDS: tuple[SourceSeed, ...] = (
     # --- Nova 96.9 ---
-    # VAL-NOVA-001: URL corrected to radiowavemonitor.com (same domain as KIIS1027).
-    # Previous base_url (radiowave.com.au) was wrong. Parser selectors still unvalidated.
+    # VAL-NOVA-001: URL corrected to radiowavemonitor.com (confirmed IDDS=11129).
+    # Strategy 3 (card grid) confirmed working on real HTML 2026-06-06.
     SourceSeed(
         station_call_sign="NOVA969",
         source_type=SourceType.RADIOWAVE,
@@ -35,7 +35,23 @@ SOURCE_SEEDS: tuple[SourceSeed, ...] = (
         base_url="https://www.radiowavemonitor.com/pub_charts/diaries.aspx",
         config={"idds": "11129"},
         priority=1,
-        validation_note="URL corrected to radiowavemonitor.com. Parser selectors unvalidated.",
+        validation_note=(
+            "URL confirmed. Card-grid parser (Strategy 3) confirmed on real HTML 2026-06-06."
+        ),
+    ),
+    # VAL-NOVA-RADOXO-001: radoxo.com/australia/nova-969/playlist UNVALIDATED.
+    # Parser unimplemented — run dry_run_nova_radoxo once to inspect HTML structure.
+    SourceSeed(
+        station_call_sign="NOVA969",
+        source_type=SourceType.RADOXO,
+        name="Nova 96.9 Radoxo Playlist",
+        base_url="https://radoxo.com/australia/nova-969/playlist",
+        config={"station_slug": "nova-969"},
+        priority=2,
+        validation_note=(
+            "UNVALIDATED — VAL-NOVA-RADOXO-001 required. "
+            "Run dry_run_nova_radoxo to confirm HTML structure and implement parser."
+        ),
     ),
     SourceSeed(
         station_call_sign="NOVA969",
@@ -82,20 +98,25 @@ SOURCE_SEEDS: tuple[SourceSeed, ...] = (
             "to inspect HTML structure and confirm parser selectors."
         ),
     ),
-    # VAL-CAPUK-ORB-001: Online Radio Box candidate demoted to priority 2
+    # VAL-CAPUK-ORB-001: Online Radio Box playlist URL confirmed 2026-06-06.
+    # URL updated to include /playlist/ path as provided by user.
     SourceSeed(
         station_call_sign="CAPITALFM",
         source_type=SourceType.ONLINE_RADIO_BOX,
-        name="Capital FM UK Online Radio Box",
-        base_url="https://onlineradiobox.com/uk/capitalfmuk/",
+        name="Capital FM UK Online Radio Box Playlist",
+        base_url="https://onlineradiobox.com/uk/capitalfmuk/playlist/",
         config={
             "station_slug": "capitalfmuk",
             "market": "uk",
             "city": "London",
             "country_code": "GB",
+            "cs": "uk.capitalfmuk",
         },
         priority=2,
-        validation_note="UNVALIDATED — VAL-CAPUK-ORB-001. Demoted to priority 2.",
+        validation_note=(
+            "UNVALIDATED — VAL-CAPUK-ORB-001. URL updated to playlist path. "
+            "Parser selectors require dry-run confirmation."
+        ),
     ),
     SourceSeed(
         station_call_sign="CAPITALFM",

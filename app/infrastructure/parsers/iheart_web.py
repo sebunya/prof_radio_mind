@@ -1,14 +1,13 @@
 """iHeart web recently-played page parser.
 
-Parses https://kiisfm.iheart.com/music/recently-played/ (and equivalent pages
-for other iHeart stations) into a list of track records.
-
 Strategy 1: __NEXT_DATA__ JSON embedded in <script id="__NEXT_DATA__"> (Next.js SSR).
             Recursively searches for recentlyPlayedSongs / songs / tracks keys.
-Strategy 2: CSS selectors (TBD — update after running dry_run_kiis_iheart_web
-            and inspecting the raw HTML).
-
-Returns an empty list when the page is CSR-only (skeleton HTML, no SSR data).
+Strategy 2: figcaption CSS selectors — confirmed on real kiisfm.iheart.com HTML (2026-06-06).
+            Each song is a <figcaption> with:
+              a.track-title span  → title
+              a.track-artist span → artist
+              time.track-time[datetime]       → ISO 8601 (e.g. "2026-06-05T11:50:33")
+              time.track-time[data-timezone]  → IANA tz (e.g. "America/Los_Angeles")
 """
 
 from __future__ import annotations
@@ -18,6 +17,7 @@ import logging
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from bs4 import BeautifulSoup, Tag
 
@@ -65,7 +65,7 @@ def _extract_artist(item: dict) -> str:
     return str(raw).strip()
 
 
-def _extract_played_at(item: dict) -> datetime:
+def _extract_played_at_from_dict(item: dict) -> datetime:
     ts = (
         item.get("startTime")
         or item.get("playedAt")
@@ -73,7 +73,6 @@ def _extract_played_at(item: dict) -> datetime:
         or item.get("airtime")
     )
     if isinstance(ts, (int, float)):
-        # Unix timestamp — milliseconds if > 1e10, else seconds
         seconds = ts / 1000 if ts > 1_000_000_000_000 else ts
         return datetime.fromtimestamp(seconds, tz=UTC)
     if isinstance(ts, str):
@@ -112,8 +111,60 @@ def _try_next_data(soup: BeautifulSoup) -> list[IHeartWebParseResult] | None:
         results.append(IHeartWebParseResult(
             title=title,
             artist=artist,
-            played_at=_extract_played_at(item),
+            played_at=_extract_played_at_from_dict(item),
         ))
+
+    return results if results else None
+
+
+def _parse_figcaption_time(time_el: Tag | None) -> datetime:
+    """Parse <time class="track-time" datetime="ISO8601" data-timezone="..."> to UTC."""
+    if not isinstance(time_el, Tag):
+        return datetime.now(tz=UTC)
+    dt_str = str(time_el.get("datetime") or "")
+    tz_name = str(time_el.get("data-timezone") or "UTC")
+    if not dt_str:
+        return datetime.now(tz=UTC)
+    try:
+        dt_naive = datetime.fromisoformat(dt_str)
+        tz = ZoneInfo(tz_name)
+        return datetime(
+            dt_naive.year, dt_naive.month, dt_naive.day,
+            dt_naive.hour, dt_naive.minute, dt_naive.second,
+            tzinfo=tz,
+        ).astimezone(UTC)
+    except (ValueError, ZoneInfoNotFoundError):
+        logger.debug("iheart_web: cannot parse datetime %r tz %r", dt_str, tz_name)
+        return datetime.now(tz=UTC)
+
+
+def _try_figcaption(soup: BeautifulSoup) -> list[IHeartWebParseResult] | None:
+    """Strategy 2: figcaption CSS selectors (confirmed on real iHeart HTML, 2026-06-06)."""
+    figs = soup.select("figcaption")
+    if not figs:
+        return None
+    if not any(isinstance(fig, Tag) and fig.select_one("a.track-title") for fig in figs):
+        return None
+
+    results: list[IHeartWebParseResult] = []
+    for fig in figs:
+        if not isinstance(fig, Tag):
+            continue
+        title_el = fig.select_one("a.track-title span")
+        artist_el = fig.select_one("a.track-artist span")
+        if not title_el or not artist_el:
+            continue
+
+        title = title_el.get_text(strip=True)
+        artist = artist_el.get_text(strip=True)
+        if not title or not artist:
+            continue
+
+        time_el = fig.select_one("time.track-time")
+        played_at = _parse_figcaption_time(
+            time_el if isinstance(time_el, Tag) else None
+        )
+        results.append(IHeartWebParseResult(title=title, artist=artist, played_at=played_at))
 
     return results if results else None
 
@@ -124,8 +175,8 @@ def parse_iheart_web_recently_played(
 ) -> list[IHeartWebParseResult]:
     """Parse iHeart recently-played web page into track records.
 
-    Returns an empty list when the page is CSR-only or structures are unknown.
-    Caller should save raw HTML via the dry-run script if this returns empty.
+    Tries __NEXT_DATA__ JSON first, then figcaption CSS selectors.
+    Returns an empty list when no known structure is found.
     """
     if http_status is not None and http_status >= 400:
         logger.warning("iheart_web: HTTP %s — returning empty", http_status)
@@ -138,10 +189,10 @@ def parse_iheart_web_recently_played(
         logger.info("iheart_web: __NEXT_DATA__ strategy returned %d tracks", len(results))
         return results
 
-    # CSS strategy: TBD — run dry_run_kiis_iheart_web to obtain real HTML,
-    # then add selectors here.
-    logger.info(
-        "iheart_web: page appears CSR-only or structure unknown — "
-        "run dry_run_kiis_iheart_web and inspect /tmp/kiis_iheart_web_raw.html"
-    )
+    results = _try_figcaption(soup)
+    if results is not None:
+        logger.info("iheart_web: figcaption strategy returned %d tracks", len(results))
+        return results
+
+    logger.info("iheart_web: no known structure found in HTML")
     return []

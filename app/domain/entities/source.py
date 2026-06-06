@@ -15,6 +15,7 @@ class SourceType(StrEnum):
     HEART_LAST_PLAYED = "heart_last_played"
     IHEART_WEB = "iheart_web"
     UKRADIOLIVE = "ukradiolive"
+    RADOXO = "radoxo"
 
 
 @dataclass

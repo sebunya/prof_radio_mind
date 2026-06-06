@@ -213,6 +213,7 @@ def test_aspnet_parser_ignores_pagination_table() -> None:
 
 
 def test_aspnet_parser_handles_12h_time_format() -> None:
+
     html = b"""
     <html><body>
     <table>
@@ -234,3 +235,91 @@ def test_aspnet_parser_handles_12h_time_format() -> None:
     # But we assert timezone is set and hours are reasonable
     for ev in result.play_events:
         assert ev.played_at.tzinfo is not None
+
+
+# ---------------------------------------------------------------------------
+# Strategy 3: album-art card grid (div.article_twenty_one)
+# ---------------------------------------------------------------------------
+
+_CARD_FIXTURE = (
+    Path(__file__).parent.parent.parent / "fixtures/html/radiowave_nova969_card.html"
+)
+
+
+@pytest.fixture
+def card_html() -> bytes:
+    return _CARD_FIXTURE.read_bytes()
+
+
+@pytest.fixture
+def card_result(card_html: bytes) -> RadiowaveParseResult:
+    return parse_radiowave_diary(
+        card_html,
+        source_id=uuid.uuid4(),
+        station_id=uuid.uuid4(),
+        collector_run_id=uuid.uuid4(),
+    )
+
+
+def test_card_parser_extracts_five_events(card_result: RadiowaveParseResult) -> None:
+    assert len(card_result.play_events) == 5
+
+
+def test_card_parser_correct_first_title(card_result: RadiowaveParseResult) -> None:
+    assert card_result.play_events[0].raw_title == "GIVES YOU HELL"
+
+
+def test_card_parser_correct_first_artist(card_result: RadiowaveParseResult) -> None:
+    assert card_result.play_events[0].raw_artist == "ALL-AMERICAN REJECTS"
+
+
+def test_card_parser_correct_second_title(card_result: RadiowaveParseResult) -> None:
+    assert card_result.play_events[1].raw_title == "FEVER DREAM"
+
+
+def test_card_parser_correct_second_artist(card_result: RadiowaveParseResult) -> None:
+    assert card_result.play_events[1].raw_artist == "ALEX WARREN"
+
+
+def test_card_parser_played_at_has_timezone(card_result: RadiowaveParseResult) -> None:
+    for ev in card_result.play_events:
+        assert ev.played_at.tzinfo is not None
+
+
+def test_card_parser_first_event_correct_utc(card_result: RadiowaveParseResult) -> None:
+    # 6/5/2026 9:50 PM AEST (UTC+10) → 6/5/2026 11:50 UTC
+    ev = card_result.play_events[0]
+    assert ev.played_at.hour == 11
+    assert ev.played_at.minute == 50
+
+
+def test_card_parser_no_drift(card_result: RadiowaveParseResult) -> None:
+    assert not card_result.drift_detected
+
+
+def test_card_parser_no_source_event_id(card_result: RadiowaveParseResult) -> None:
+    for ev in card_result.play_events:
+        assert ev.source_event_id is None
+
+
+def test_card_parser_nbsp_in_time_handled() -> None:
+    html = b"""
+    <html><body>
+    <div class="article_twenty_one">
+      <p class="article_twenty_one_content">
+        <span style="font-size: 16px;">TEST SONG</span>
+        <span style="color: rgb(0, 0, 0);"><span style="font-size: 14px;">TEST ARTIST</span></span>
+        <span style="font-size: 12px;">6/5/2026\xc2\xa0 9:50:00 PM</span>
+      </p>
+    </div>
+    </body></html>
+    """
+    result = parse_radiowave_diary(
+        html,
+        source_id=uuid.uuid4(),
+        station_id=uuid.uuid4(),
+        collector_run_id=uuid.uuid4(),
+    )
+    assert len(result.play_events) == 1
+    assert result.play_events[0].raw_title == "TEST SONG"
+    assert result.play_events[0].played_at.tzinfo is not None

@@ -288,3 +288,47 @@ def test_nova_radiowave_url_corrected() -> None:
     assert seed.base_url is not None
     assert "radiowavemonitor.com" in seed.base_url
     assert "radiowave.com.au" not in (seed.base_url or "")
+
+
+# --- EXTRACT-3 update: additional fallback sources ---
+
+def test_radoxo_source_type_parses() -> None:
+    assert SourceType("radoxo") == SourceType.RADOXO
+    assert SourceType.RADOXO.value == "radoxo"
+
+
+def test_nova969_has_radoxo_fallback() -> None:
+    seeds = [s for s in SOURCE_SEEDS if s.station_call_sign == "NOVA969"]
+    types = {s.source_type for s in seeds}
+    assert SourceType.RADOXO in types
+
+
+def test_nova969_radoxo_has_correct_url() -> None:
+    seed = next(
+        s for s in SOURCE_SEEDS
+        if s.station_call_sign == "NOVA969" and s.source_type == SourceType.RADOXO
+    )
+    assert seed.base_url is not None
+    assert "radoxo.com" in seed.base_url
+    assert "nova-969" in seed.base_url
+
+
+def test_nova969_radoxo_is_lower_priority_than_radiowave() -> None:
+    rw = next(
+        s for s in SOURCE_SEEDS
+        if s.station_call_sign == "NOVA969" and s.source_type == SourceType.RADIOWAVE
+    )
+    radoxo = next(
+        s for s in SOURCE_SEEDS
+        if s.station_call_sign == "NOVA969" and s.source_type == SourceType.RADOXO
+    )
+    assert radoxo.priority > rw.priority
+
+
+def test_capitalfm_online_radio_box_uses_playlist_url() -> None:
+    seed = next(
+        s for s in SOURCE_SEEDS
+        if s.station_call_sign == "CAPITALFM" and s.source_type == SourceType.ONLINE_RADIO_BOX
+    )
+    assert seed.base_url is not None
+    assert "playlist" in seed.base_url

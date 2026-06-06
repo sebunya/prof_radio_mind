@@ -1,13 +1,12 @@
 """Radiowave diary HTML parser.
 
-Two-strategy parser:
+Three-strategy parser:
   Strategy 1 (CSS): Selects tr.diary-row with td.diary-time/artist/title/label.
-                    Handles synthetic fixtures and any site that uses these classes.
-  Strategy 2 (Table): Discovers the diary table by matching column header keywords
-                    (time, artist, title). Handles ASP.NET GridView, Bootstrap
-                    tables, and any rendering without custom CSS classes.
+  Strategy 2 (Table): Header-based table detection (ASP.NET GridView, Bootstrap, etc.)
+  Strategy 3 (Cards): Album-art card grid (div.article_twenty_one) — real
+                    radiowavemonitor.com layout confirmed 2026-06-06.
 
-Both strategies use the same timezone-aware HH:MM → UTC conversion.
+All strategies produce timezone-aware UTC datetimes.
 """
 
 from __future__ import annotations
@@ -266,6 +265,107 @@ def _parse_table_by_headers(
 
 
 # ---------------------------------------------------------------------------
+# Strategy 3: album-art card grid (div.article_twenty_one)
+# ---------------------------------------------------------------------------
+
+def _parse_card_time(time_str: str, station_timezone: ZoneInfo = _SYDNEY) -> datetime:
+    """Parse radiowavemonitor.com card datetime string.
+
+    Format: 'M/D/YYYY  H:MM:SS AM/PM' (may contain NBSP between date and time).
+    """
+    normalized = re.sub(r"[\s\xa0]+", " ", time_str).strip()
+    for fmt in ("%m/%d/%Y %I:%M:%S %p", "%m/%d/%Y %I:%M %p"):
+        try:
+            dt_naive = datetime.strptime(normalized.upper(), fmt)
+            return datetime(
+                dt_naive.year, dt_naive.month, dt_naive.day,
+                dt_naive.hour, dt_naive.minute, dt_naive.second,
+                tzinfo=station_timezone,
+            ).astimezone(UTC)
+        except ValueError:
+            pass
+    raise ValueError(f"Cannot parse radiowave card time: {time_str!r}")
+
+
+def _parse_card_grid(
+    soup: BeautifulSoup,
+    source_id: uuid.UUID,
+    station_id: uuid.UUID,
+    collector_run_id: uuid.UUID,
+    expected_min_rows: int,
+    station_timezone: ZoneInfo,
+) -> RadiowaveParseResult | None:
+    """Strategy 3: album-art card grid (div.article_twenty_one).
+
+    Real radiowavemonitor.com layout uses card divs instead of any table:
+      div.article_twenty_one > p.article_twenty_one_content
+        span[style*="16px"]                               → title (uppercase)
+        span[style*="rgb(0, 0, 0)"] > span[style*="14px"] → artist
+        span[style*="12px"]                               → datetime string
+    """
+    cards = soup.select("div.article_twenty_one")
+    if not cards:
+        return None
+
+    play_events: list[PlayEvent] = []
+    parse_errors: list[str] = []
+
+    for card in cards:
+        if not isinstance(card, Tag):
+            continue
+        p = card.select_one("p.article_twenty_one_content")
+        if not p:
+            continue
+
+        title_el = p.select_one('span[style*="16px"]')
+        artist_outer = p.select_one('span[style*="rgb(0, 0, 0)"]')
+        artist_el = (
+            artist_outer.select_one('span[style*="14px"]')
+            if isinstance(artist_outer, Tag)
+            else None
+        )
+        time_el = p.select_one('span[style*="12px"]')
+
+        if not title_el or not artist_el or not time_el:
+            parse_errors.append("Card missing required spans")
+            continue
+
+        title = title_el.get_text(strip=True)
+        artist = artist_el.get_text(strip=True)
+        time_text = time_el.get_text(separator=" ", strip=True)
+
+        if not title or not artist:
+            continue
+
+        try:
+            played_at = _parse_card_time(time_text, station_timezone)
+        except ValueError as exc:
+            parse_errors.append(f"Card time parse error: {exc}")
+            continue
+
+        play_events.append(
+            PlayEvent.create(
+                station_id=station_id,
+                source_id=source_id,
+                collector_run_id=collector_run_id,
+                played_at=played_at,
+                raw_artist=artist,
+                raw_title=title,
+                source_event_id=None,
+                raw_label=None,
+            )
+        )
+
+    drift_detected, drift_note = _drift_check(len(cards), len(play_events), expected_min_rows)
+    return RadiowaveParseResult(
+        play_events=play_events,
+        drift_detected=drift_detected,
+        drift_note=drift_note,
+        parse_errors=parse_errors,
+    )
+
+
+# ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
 
@@ -280,10 +380,10 @@ def parse_radiowave_diary(
 ) -> RadiowaveParseResult:
     """Parse Radiowave diary HTML into PlayEvents.
 
-    Tries two strategies in order:
+    Tries three strategies in order:
       1. CSS class selectors (tr.diary-row etc.)
-      2. Column-header table detection (handles ASP.NET GridView and any
-         site without custom CSS classes)
+      2. Column-header table detection (ASP.NET GridView, Bootstrap tables)
+      3. Album-art card grid (div.article_twenty_one — real radiowavemonitor.com)
 
     Args:
         html: Raw HTML bytes or string from the diary page.
@@ -318,7 +418,14 @@ def parse_radiowave_diary(
     if result is not None:
         return result
 
+    # Strategy 3: album-art card grid (real radiowavemonitor.com layout)
+    result = _parse_card_grid(
+        soup, source_id, station_id, collector_run_id, expected_min_rows, station_timezone,
+    )
+    if result is not None:
+        return result
+
     return RadiowaveParseResult(
         play_events=[],
-        parse_errors=["No diary table found — neither tr.diary-row CSS nor header-matched table"],
+        parse_errors=["No diary table found — tried CSS rows, header table, and card grid"],
     )
