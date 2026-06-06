@@ -21,7 +21,7 @@ def test_station_create_assigns_uuid() -> None:
 
 def test_source_type_enum_values() -> None:
     assert SourceType.RADIOWAVE == "radiowave"
-    assert SourceType.IHEART == "iheart"
+    assert SourceType.IHEART_WEB == "iheart_web"
     assert SourceType.MANUAL_CSV == "manual_csv"
 
 

@@ -13,21 +13,18 @@ class Settings(BaseSettings):
 
     # Scheduler gating
     scheduler_enabled: bool = False
-    enable_nova_collector: bool = False
-    enable_kiis_collector: bool = False
-    enable_capital_collector: bool = False
+    # Nova 96.9 collectors
+    enable_nova_collector: bool = False          # Radiowave diary (primary)
+    enable_nova_radoxo_collector: bool = False   # radoxo.com playlist (secondary)
+    enable_nova_radio_australia_collector: bool = False  # radio-australia.org chart (tertiary)
+    # Capital FM UK collectors
+    enable_capital_collector: bool = False               # Online Radio Box (primary)
+    enable_capital_ukradiolive_collector: bool = False   # ukradiolive.com (secondary)
+    # KIIS-FM 102.7 Los Angeles collectors
+    enable_kiis_iheart_web_collector: bool = False   # iHeart web recently-played (primary)
+    enable_kiis_radiowave_collector: bool = False    # Radiowave diary (secondary)
+    # Nightly automation
     enable_nightly_reconciliation: bool = False
-    # Extracted collector flags (EXTRACT-1B) — all disabled by default
-    enable_bbc_radio1_collector: bool = False
-    enable_heart_collector: bool = False
-    enable_z100_collector: bool = False
-    enable_wksc_collector: bool = False
-    enable_iheart_top_songs: bool = False
-    # KIIS-FM 102.7 Los Angeles Radiowave diary (EXTRACT-3) — disabled by default
-    enable_kiis_radiowave_collector: bool = False
-    # iHeart recently-played batch fallback (EXTRACT-4): covers KIISFM, Z100, WKSC
-    enable_iheart_recently_played: bool = False
-    # Nightly report generation — builds DailyReport records for all active stations
     enable_nightly_report_generation: bool = False
 
     # Security

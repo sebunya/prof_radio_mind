@@ -4,23 +4,19 @@ NO DATABASE WRITES. NO DISK WRITES BY DEFAULT. NO SCHEDULER. NO GLOBAL ENABLE.
 This tool is for live endpoint validation only. It calls fetch_raw() + parse()
 directly on each collector, bypassing run() (which writes raw payloads to disk).
 
-─── COMPLIANCE STATUS (2026-06-05) ────────────────────────────────────────────
+─── STATIONS AND SOURCES ──────────────────────────────────────────────────────
 
-robots.txt checks — REQUIRED before production enablement of T2 sources:
+  Station     Source                  robots.txt     Status
+  ─────────────────────────────────────────────────────────
+  NOVA969     radiowave               PENDING        VAL-NOVA-001
+  NOVA969     radoxo                  PENDING        VAL-NOVA-RADOXO-001
+  NOVA969     radio_australia_org     PENDING        VAL-NOVA-RAO-001
+  CAPITALFM   online_radio_box        PENDING        VAL-CAPUK-ORB-001
+  CAPITALFM   ukradiolive             PENDING        VAL-CAPUK-URL-001
+  KIIS1027    iheart_web              PENDING        VAL-KIIS1027-WEB-001
+  KIIS1027    radiowave               PENDING        VAL-KIIS-RAD-001 (FAILED)
 
-  Source                    Domain                   robots.txt     Status
-  ─────────────────────────────────────────────────────────────────────────
-  NOVA969   / radiowave     radiowave.com.au         NOT CHECKED    PENDING
-  KIIS1027  / radiowave     radiowavemonitor.com     NOT CHECKED    PENDING
-  CAPITALFM / online_radio  onlineradiobox.com       NOT CHECKED    PENDING
-  HEARTFMUK / heart_html    heart.co.uk              NOT CHECKED    PENDING
-
-  T1 API sources (BBC RMS, iHeart) have no robots.txt — ToS review only.
-  T3 ICY stream sources not included — stream URLs unknown (run D8 first).
-
-ToS reviews — PENDING for all sources (VAL-BBC1-006, VAL-HEARTFM-007, etc.).
-
-These PENDING statuses mean NO SOURCE IS APPROVED for production enablement.
+PENDING statuses mean NO SOURCE IS APPROVED for production enablement.
 The diagnostic is a one-shot read-only probe for developer validation only.
 See docs/passes/COMPLIANCE-AND-RETENTION-GUARDRAILS.md §2, §3, §6.
 
@@ -46,7 +42,7 @@ only to T2 HTML sources. T1 API sources are unaffected.
   docker exec rmias-app-1 python -m app.tools.diagnose_sources
 
   # Single station
-  docker exec rmias-app-1 python -m app.tools.diagnose_sources --station BBCRADIO1
+  docker exec rmias-app-1 python -m app.tools.diagnose_sources --station NOVA969
 
   # Save raw response bytes to a directory (still no DB writes)
   docker exec rmias-app-1 python -m app.tools.diagnose_sources --save-payloads /tmp/diag
@@ -117,136 +113,112 @@ class DiagResult:
 
 
 def _build_catalogue() -> list[DiagSource]:
-    """Return the list of sources to probe.
-
-    ICY stream sources are omitted — stream URLs are not yet discovered.
-    Run D8 (stream URL discovery) first, then add them here.
-
-    iHeart corrected station IDs:
-      WHTZ  seed=614  corrected=1469  (from v2 /api/v2/station/id/614 → search)
-      WKSC  seed=821  corrected=849   (from v2 station search)
-    The v3 live-meta API is unavailable for all IDs — expected to return 404.
-    """
-    from app.infrastructure.collectors.bbc_radio_1 import BBCRadio1Collector
-    from app.infrastructure.collectors.heart_radio import HeartRadioCollector
-    from app.infrastructure.collectors.iheart_now_playing import IHeartNowPlayingCollector
+    """Return the list of sources to probe."""
+    from app.infrastructure.collectors.capital_ukradiolive import CapitalUKRadioLiveCollector
+    from app.infrastructure.collectors.kiis_iheart_web import KIISIHeartWebCollector
     from app.infrastructure.collectors.kiis_radiowave import KIISRadiowaveCollector
+    from app.infrastructure.collectors.nova_radoxo import NovaRadoxoCollector
     from app.infrastructure.collectors.nova_radiowave import NovaRadiowaveCollector
     from app.infrastructure.collectors.online_radio_box import OnlineRadioBoxCollector
+    from app.infrastructure.collectors.radio_australia_org import RadioAustraliaOrgCollector
 
     return [
+        # --- Nova 96.9 ---
         DiagSource(
             station_call_sign="NOVA969",
-            source_label="radiowave (radiowave.com.au)",
+            source_label="radiowave (radiowavemonitor.com IDDS=11129)",
             seed_id_suffix="radiowave",
             collector_cls=NovaRadiowaveCollector,
-            collector_kwargs={"base_url": "https://www.radiowave.com.au/diary", "idds": "11129"},
-            display_url="https://www.radiowave.com.au/diary?idds=11129",
-            robots_txt_status="PENDING — https://www.radiowave.com.au/robots.txt not yet checked",
+            collector_kwargs={},
+            display_url="https://www.radiowavemonitor.com/pub_charts/diaries.aspx?IDDS=11129",
+            robots_txt_status="PENDING — https://www.radiowavemonitor.com/robots.txt not checked",
             compliance_note=(
-                "T2 public HTML diary. VAL-NOVA-001 UNVALIDATED (domain discrepancy: "
-                "collector uses radiowave.com.au; D5 diagnostic incorrectly tested "
-                "radiowavemonitor.com). robots.txt + ToS review required before production."
+                "T2 public HTML diary. VAL-NOVA-001: URL corrected to radiowavemonitor.com. "
+                "Card-grid parser (Strategy 3) confirmed on real HTML 2026-06-06. "
+                "robots.txt + ToS review required before production enablement."
             ),
         ),
         DiagSource(
-            station_call_sign="KIISFM",
-            source_label="iheart v3 (expected: 404 — API unavailable)",
-            seed_id_suffix="iheart",
-            collector_cls=IHeartNowPlayingCollector,
-            collector_kwargs={"iheart_station_id": "2501"},
-            display_url="https://api.iheart.com/api/v3/live-meta/stream/2501/currentTrack",
-            robots_txt_status="N/A — JSON API endpoint (no robots.txt applicable)",
+            station_call_sign="NOVA969",
+            source_label="radoxo (radoxo.com/australia/nova-969/playlist)",
+            seed_id_suffix="radoxo",
+            collector_cls=NovaRadoxoCollector,
+            collector_kwargs={},
+            display_url="https://radoxo.com/australia/nova-969/playlist",
+            robots_txt_status="PENDING — https://radoxo.com/robots.txt not yet checked",
             compliance_note=(
-                "T1 iHeart v3 live-meta API. Known-unavailable (404 for all station IDs). "
-                "Seeded station_id=2501. This probe is expected to fail — confirms API is gone."
+                "T2 public HTML. VAL-NOVA-RADOXO-001: li.playlist-track + data-ts "
+                "Unix timestamps confirmed 2026-06-06. 86+ tracks/day. "
+                "robots.txt + ToS review required."
+            ),
+        ),
+        DiagSource(
+            station_call_sign="NOVA969",
+            source_label="radio_australia_org (radio-australia.org/nova-969)",
+            seed_id_suffix="radio_australia_org",
+            collector_cls=RadioAustraliaOrgCollector,
+            collector_kwargs={"url": "https://www.radio-australia.org/nova-969"},
+            display_url="https://www.radio-australia.org/nova-969",
+            robots_txt_status="PENDING — https://www.radio-australia.org/robots.txt not checked",
+            compliance_note=(
+                "T2 SSR chart. VAL-NOVA-RAO-001: confirmed 2026-06-06. "
+                "played_at is synthetic (collection timestamp, not broadcast time). "
+                "robots.txt + ToS review required."
+            ),
+        ),
+        # --- Capital FM UK ---
+        DiagSource(
+            station_call_sign="CAPITALFM",
+            source_label="online_radio_box (onlineradiobox.com)",
+            seed_id_suffix="online_radio_box",
+            collector_cls=OnlineRadioBoxCollector,
+            collector_kwargs={"base_url": "https://onlineradiobox.com/uk/capitalfmuk/playlist/"},
+            display_url="https://onlineradiobox.com/uk/capitalfmuk/playlist/",
+            robots_txt_status="PENDING — https://onlineradiobox.com/robots.txt not yet checked",
+            compliance_note=(
+                "T2 public HTML. VAL-CAPUK-ORB-001 UNVALIDATED. URL updated to playlist path. "
+                "robots.txt + ToS review required."
             ),
         ),
         DiagSource(
             station_call_sign="CAPITALFM",
-            source_label="online_radio_box",
-            seed_id_suffix="online_radio_box",
-            collector_cls=OnlineRadioBoxCollector,
-            collector_kwargs={"base_url": "https://onlineradiobox.com/uk/capitalfmuk/"},
-            display_url="https://onlineradiobox.com/uk/capitalfmuk/",
-            robots_txt_status="PENDING — https://onlineradiobox.com/robots.txt not yet checked",
-            compliance_note=(
-                "T2 public HTML. VAL-CAPUK-ORB-001 UNVALIDATED. robots.txt + ToS review "
-                "required. Parser status unknown against live page."
-            ),
-        ),
-        DiagSource(
-            station_call_sign="BBCRADIO1",
-            source_label="bbc_sounds (rms.api.bbc.co.uk)",
-            seed_id_suffix="bbc_sounds",
-            collector_cls=BBCRadio1Collector,
+            source_label="ukradiolive (ukradiolive.com/capital-fm/playlist)",
+            seed_id_suffix="ukradiolive",
+            collector_cls=CapitalUKRadioLiveCollector,
             collector_kwargs={},
-            display_url="https://rms.api.bbc.co.uk/v2/services/bbc_radio_one/segments/latest",
-            robots_txt_status="N/A — official BBC API (no robots.txt applicable)",
+            display_url="https://ukradiolive.com/capital-fm/playlist",
+            robots_txt_status="PENDING — https://ukradiolive.com/robots.txt not yet checked",
             compliance_note=(
-                "T1 official BBC RMS API. VAL-BBC1-001 PASSED (endpoint reachable). "
-                "Production enablement blocked pending manual ToS review (VAL-BBC1-006). "
-                "Diagnostic only — no production enablement without VAL-BBC1-006 PASS."
+                "T2 public HTML. VAL-CAPUK-URL-001: plist-item parser confirmed on real HTML "
+                "2026-06-06. robots.txt + ToS review required."
             ),
         ),
+        # --- KIIS-FM 102.7 Los Angeles ---
         DiagSource(
-            station_call_sign="HEARTFMUK",
-            source_label="heart_last_played (heart.co.uk)",
-            seed_id_suffix="heart_last_played",
-            collector_cls=HeartRadioCollector,
-            collector_kwargs={"base_url": "https://www.heart.co.uk/radio/last-played-songs/"},
-            display_url="https://www.heart.co.uk/radio/last-played-songs/",
-            robots_txt_status="PENDING — https://www.heart.co.uk/robots.txt not yet checked",
+            station_call_sign="KIIS1027",
+            source_label="iheart_web (kiisfm.iheart.com/music/recently-played/)",
+            seed_id_suffix="iheart_web",
+            collector_cls=KIISIHeartWebCollector,
+            collector_kwargs={},
+            display_url="https://kiisfm.iheart.com/music/recently-played/",
+            robots_txt_status="PENDING — https://kiisfm.iheart.com/robots.txt not yet checked",
             compliance_note=(
-                "T2 public HTML. VAL-HEARTFM-002: selector drift repaired 2026-06-05. "
-                "Parser now tries __NEXT_DATA__ JSON → new CSS (last_played_songs / "
-                "song_wrapper) → old CSS fallback. Awaiting live re-validation. "
-                "robots.txt + ToS check still pending."
-            ),
-        ),
-        DiagSource(
-            station_call_sign="WHTZ",
-            source_label="iheart v3 corrected id=1469 (expected: 404)",
-            seed_id_suffix="iheart",
-            collector_cls=IHeartNowPlayingCollector,
-            collector_kwargs={"iheart_station_id": "1469"},
-            display_url="https://api.iheart.com/api/v3/live-meta/stream/1469/currentTrack",
-            robots_txt_status="N/A — JSON API endpoint",
-            compliance_note=(
-                "T1 iHeart v3 live-meta API. Seeded station_id=614; corrected to 1469 "
-                "via live iHeart v2 station search. v3 API known-unavailable; expected 404."
-            ),
-        ),
-        DiagSource(
-            station_call_sign="WKSC",
-            source_label="iheart v3 corrected id=849 (expected: 404)",
-            seed_id_suffix="iheart",
-            collector_cls=IHeartNowPlayingCollector,
-            collector_kwargs={"iheart_station_id": "849"},
-            display_url="https://api.iheart.com/api/v3/live-meta/stream/849/currentTrack",
-            robots_txt_status="N/A — JSON API endpoint",
-            compliance_note=(
-                "T1 iHeart v3 live-meta API. Seeded station_id=821; corrected to 849 "
-                "via live iHeart v2 station search. v3 API known-unavailable; expected 404."
+                "T2 public station website. VAL-KIIS1027-WEB-001: figcaption parser confirmed "
+                "on real HTML 2026-06-06. robots.txt + ToS review required."
             ),
         ),
         DiagSource(
             station_call_sign="KIIS1027",
-            source_label="radiowave_monitor (radiowavemonitor.com)",
+            source_label="radiowave (radiowavemonitor.com IDDS=5080)",
             seed_id_suffix="radiowave",
             collector_cls=KIISRadiowaveCollector,
-            collector_kwargs={
-                "base_url": "https://www.radiowavemonitor.com/pub_charts/diaries.aspx",
-                "idds": "5080",
-            },
+            collector_kwargs={},
             display_url="https://www.radiowavemonitor.com/pub_charts/diaries.aspx?IDDS=5080",
-            robots_txt_status=(
-                "PENDING — https://www.radiowavemonitor.com/robots.txt not yet checked"
-            ),
+            robots_txt_status="PENDING — https://www.radiowavemonitor.com/robots.txt not checked",
             compliance_note=(
                 "T2 public HTML diary. VAL-KIIS-RAD-001 FAILED (0 tr.diary-row rows). "
-                "IDDS=5080 UNVALIDATED — radiowavemonitor.com may not track US stations. "
-                "robots.txt + ToS check pending."
+                "IDDS=5080 may not be tracked by radiowavemonitor.com. "
+                "robots.txt + ToS check pending. Selector fix required."
             ),
         ),
     ]

@@ -10,36 +10,28 @@ from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 
 from app.core.settings import settings
-from app.infrastructure.collectors.bbc_radio_1 import BBCRadio1Collector
-from app.infrastructure.collectors.heart_radio import HeartRadioCollector
-from app.infrastructure.collectors.iheart_now_playing import IHeartNowPlayingCollector
-from app.infrastructure.collectors.iheart_recently_played import IHeartRecentlyPlayedCollector
-from app.infrastructure.collectors.iheart_top_songs import IHeartTopSongsCollector
-from app.infrastructure.collectors.kiis_iheart import KIISIHeartCollector
+from app.infrastructure.collectors.capital_ukradiolive import CapitalUKRadioLiveCollector
+from app.infrastructure.collectors.kiis_iheart_web import KIISIHeartWebCollector
 from app.infrastructure.collectors.kiis_radiowave import KIISRadiowaveCollector
+from app.infrastructure.collectors.nova_radoxo import NovaRadoxoCollector
 from app.infrastructure.collectors.nova_radiowave import NovaRadiowaveCollector
 from app.infrastructure.collectors.online_radio_box import OnlineRadioBoxCollector
+from app.infrastructure.collectors.radio_australia_org import RadioAustraliaOrgCollector
 
 logger = logging.getLogger(__name__)
 
 # Deterministic IDs — must match app.application.seeder._NS derivation exactly.
 _NS = uuid.NAMESPACE_DNS
 _NOVA_STATION_ID = uuid.uuid5(_NS, "station.NOVA969")
-_NOVA_SOURCE_ID = uuid.uuid5(_NS, "source.NOVA969.radiowave")
-_KIIS_STATION_ID = uuid.uuid5(_NS, "station.KIISFM")
-_KIIS_SOURCE_ID = uuid.uuid5(_NS, "source.KIISFM.iheart")
+_NOVA_RADIOWAVE_SOURCE_ID = uuid.uuid5(_NS, "source.NOVA969.radiowave")
+_NOVA_RADOXO_SOURCE_ID = uuid.uuid5(_NS, "source.NOVA969.radoxo")
+_NOVA_RAO_SOURCE_ID = uuid.uuid5(_NS, "source.NOVA969.radio_australia_org")
 _CAPITAL_STATION_ID = uuid.uuid5(_NS, "station.CAPITALFM")
 _CAPITAL_SOURCE_ID = uuid.uuid5(_NS, "source.CAPITALFM.online_radio_box")
-_BBC1_STATION_ID = uuid.uuid5(_NS, "station.BBCRADIO1")
-_BBC1_SOURCE_ID = uuid.uuid5(_NS, "source.BBCRADIO1.bbc_sounds")
-_HEARTFM_STATION_ID = uuid.uuid5(_NS, "station.HEARTFMUK")
-_HEARTFM_SOURCE_ID = uuid.uuid5(_NS, "source.HEARTFMUK.heart_last_played")
-_Z100_STATION_ID = uuid.uuid5(_NS, "station.WHTZ")
-_Z100_SOURCE_ID = uuid.uuid5(_NS, "source.WHTZ.iheart")
-_WKSC_STATION_ID = uuid.uuid5(_NS, "station.WKSC")
-_WKSC_SOURCE_ID = uuid.uuid5(_NS, "source.WKSC.iheart")
+_CAPITAL_UKRADIOLIVE_SOURCE_ID = uuid.uuid5(_NS, "source.CAPITALFM.ukradiolive")
 _KIIS1027_STATION_ID = uuid.uuid5(_NS, "station.KIIS1027")
 _KIIS1027_RADIOWAVE_SOURCE_ID = uuid.uuid5(_NS, "source.KIIS1027.radiowave")
+_KIIS1027_IHEART_WEB_SOURCE_ID = uuid.uuid5(_NS, "source.KIIS1027.iheart_web")
 
 _scheduler: AsyncIOScheduler | None = None
 _CAPITAL_FAILURES = 0
@@ -122,10 +114,13 @@ async def _persist_result(result: object) -> None:
         logger.error("persist_result_failed error=%s run_id=%s", exc, result.collector_run.id)
 
 
+# ─── Nova 96.9 ───────────────────────────────────────────────────────────────
+
+
 async def job_collect_nova_diary() -> None:
     """Collect Nova 96.9 Radiowave diary for the previous day (runs daily 16:00 UTC)."""
     collector = NovaRadiowaveCollector(
-        source_id=_NOVA_SOURCE_ID,
+        source_id=_NOVA_RADIOWAVE_SOURCE_ID,
         station_id=_NOVA_STATION_ID,
         storage_root=settings.raw_payload_storage_path,
     )
@@ -139,21 +134,42 @@ async def job_collect_nova_diary() -> None:
     await _persist_result(result)
 
 
-async def job_collect_kiis_now_playing() -> None:
-    """Poll KIIS-FM iHeart now-playing endpoint (runs every 5 minutes)."""
-    collector = KIISIHeartCollector(
-        source_id=_KIIS_SOURCE_ID,
-        station_id=_KIIS_STATION_ID,
+async def job_collect_nova_radoxo() -> None:
+    """Collect Nova 96.9 radoxo.com full-day playlist (runs every 4 hours)."""
+    collector = NovaRadoxoCollector(
+        source_id=_NOVA_RADOXO_SOURCE_ID,
+        station_id=_NOVA_STATION_ID,
         storage_root=settings.raw_payload_storage_path,
     )
     result = await collector.run()
-    logger.debug(
-        "kiis_now_playing status=%s plays=%d no_tracks=%d",
+    logger.info(
+        "nova_radoxo_collected status=%s plays=%d no_tracks=%d",
         result.collector_run.status.value,
         len(result.play_events),
         len(result.no_track_events),
     )
     await _persist_result(result)
+
+
+async def job_collect_nova_radio_australia() -> None:
+    """Collect Nova 96.9 weekly chart from radio-australia.org (runs daily 08:00 UTC)."""
+    collector = RadioAustraliaOrgCollector(
+        source_id=_NOVA_RAO_SOURCE_ID,
+        station_id=_NOVA_STATION_ID,
+        url="https://www.radio-australia.org/nova-969",
+        storage_root=settings.raw_payload_storage_path,
+    )
+    result = await collector.run()
+    logger.info(
+        "nova_radio_australia_collected status=%s plays=%d no_tracks=%d",
+        result.collector_run.status.value,
+        len(result.play_events),
+        len(result.no_track_events),
+    )
+    await _persist_result(result)
+
+
+# ─── Capital FM UK ────────────────────────────────────────────────────────────
 
 
 async def job_collect_capital_now_playing() -> None:
@@ -170,7 +186,6 @@ async def job_collect_capital_now_playing() -> None:
         result = await collector.run()
         status_val = result.collector_run.status
 
-        # MONITOR Log for tracking runs
         logger.info(
             "[MONITOR] capital_now_playing status=%s plays=%d no_tracks=%d",
             status_val.value,
@@ -186,7 +201,7 @@ async def job_collect_capital_now_playing() -> None:
                 _CAPITAL_FAILURES,
             )
         else:
-            _CAPITAL_FAILURES = 0  # reset consecutive failure count
+            _CAPITAL_FAILURES = 0
 
         await _persist_result(result)
 
@@ -213,6 +228,68 @@ async def job_collect_capital_now_playing() -> None:
                 )
             except Exception as e:
                 logger.error("Failed to pause scheduler job: %s", e)
+
+
+async def job_collect_capital_ukradiolive() -> None:
+    """Scrape Capital FM ukradiolive.com playlist (runs every 15 minutes)."""
+    collector = CapitalUKRadioLiveCollector(
+        source_id=_CAPITAL_UKRADIOLIVE_SOURCE_ID,
+        station_id=_CAPITAL_STATION_ID,
+        storage_root=settings.raw_payload_storage_path,
+    )
+    result = await collector.run()
+    logger.info(
+        "capital_ukradiolive_collected status=%s plays=%d no_tracks=%d",
+        result.collector_run.status.value,
+        len(result.play_events),
+        len(result.no_track_events),
+    )
+    await _persist_result(result)
+
+
+# ─── KIIS-FM 102.7 Los Angeles ────────────────────────────────────────────────
+
+
+async def job_collect_kiis1027_radiowave() -> None:
+    """Collect KIIS-FM 102.7 Radiowave Monitor diary for yesterday (runs daily 09:00 UTC)."""
+    from datetime import UTC, datetime, timedelta
+
+    diary_date = datetime.now(tz=UTC).date() - timedelta(days=1)
+    collector = KIISRadiowaveCollector(
+        source_id=_KIIS1027_RADIOWAVE_SOURCE_ID,
+        station_id=_KIIS1027_STATION_ID,
+        diary_date=diary_date,
+        storage_root=settings.raw_payload_storage_path,
+    )
+    result = await collector.run()
+    logger.info(
+        "kiis1027_radiowave_collected date=%s status=%s plays=%d no_tracks=%d",
+        diary_date,
+        result.collector_run.status.value,
+        len(result.play_events),
+        len(result.no_track_events),
+    )
+    await _persist_result(result)
+
+
+async def job_collect_kiis_iheart_web() -> None:
+    """Scrape KIIS-FM 102.7 iHeart recently-played page (runs every 15 minutes)."""
+    collector = KIISIHeartWebCollector(
+        source_id=_KIIS1027_IHEART_WEB_SOURCE_ID,
+        station_id=_KIIS1027_STATION_ID,
+        storage_root=settings.raw_payload_storage_path,
+    )
+    result = await collector.run()
+    logger.info(
+        "kiis_iheart_web_collected status=%s plays=%d no_tracks=%d",
+        result.collector_run.status.value,
+        len(result.play_events),
+        len(result.no_track_events),
+    )
+    await _persist_result(result)
+
+
+# ─── Nightly automation ───────────────────────────────────────────────────────
 
 
 async def job_nightly_reconciliation() -> None:
@@ -285,94 +362,6 @@ async def job_nightly_reconciliation() -> None:
         logger.error("nightly_reconciliation_failed error=%s", exc)
 
     logger.info("nightly_reconciliation completed total_dupes=%d", total_dupes)
-
-
-async def job_collect_bbc_radio1() -> None:
-    """Poll BBC Radio 1 RMS API for current segment (runs every 5 minutes)."""
-    collector = BBCRadio1Collector(
-        source_id=_BBC1_SOURCE_ID,
-        station_id=_BBC1_STATION_ID,
-        storage_root=settings.raw_payload_storage_path,
-    )
-    result = await collector.run()
-    logger.info(
-        "bbc_radio1_collected status=%s plays=%d no_tracks=%d",
-        result.collector_run.status.value,
-        len(result.play_events),
-        len(result.no_track_events),
-    )
-    await _persist_result(result)
-
-
-async def job_collect_heart_fm() -> None:
-    """Scrape Heart FM last-played-songs page (runs every 5 minutes)."""
-    collector = HeartRadioCollector(
-        source_id=_HEARTFM_SOURCE_ID,
-        station_id=_HEARTFM_STATION_ID,
-        storage_root=settings.raw_payload_storage_path,
-    )
-    result = await collector.run()
-    logger.info(
-        "heart_fm_collected status=%s plays=%d no_tracks=%d",
-        result.collector_run.status.value,
-        len(result.play_events),
-        len(result.no_track_events),
-    )
-    await _persist_result(result)
-
-
-async def job_collect_z100_now_playing() -> None:
-    """Poll Z100 iHeart now-playing endpoint (runs every 5 minutes)."""
-    collector = IHeartNowPlayingCollector(
-        source_id=_Z100_SOURCE_ID,
-        station_id=_Z100_STATION_ID,
-        iheart_station_id="1469",
-        storage_root=settings.raw_payload_storage_path,
-    )
-    result = await collector.run()
-    logger.info(
-        "z100_now_playing status=%s plays=%d no_tracks=%d",
-        result.collector_run.status.value,
-        len(result.play_events),
-        len(result.no_track_events),
-    )
-    await _persist_result(result)
-
-
-async def job_collect_wksc_now_playing() -> None:
-    """Poll WKSC 103.5 iHeart now-playing endpoint (runs every 5 minutes)."""
-    collector = IHeartNowPlayingCollector(
-        source_id=_WKSC_SOURCE_ID,
-        station_id=_WKSC_STATION_ID,
-        iheart_station_id="849",
-        storage_root=settings.raw_payload_storage_path,
-    )
-    result = await collector.run()
-    logger.info(
-        "wksc_now_playing status=%s plays=%d no_tracks=%d",
-        result.collector_run.status.value,
-        len(result.play_events),
-        len(result.no_track_events),
-    )
-    await _persist_result(result)
-
-
-async def job_collect_kiis_top_songs() -> None:
-    """Collect KIIS-FM iHeart top songs chart (runs daily 00:00 UTC)."""
-    collector = IHeartTopSongsCollector(
-        source_id=_KIIS_SOURCE_ID,
-        station_id=_KIIS_STATION_ID,
-        iheart_station_id="2501",
-        storage_root=settings.raw_payload_storage_path,
-    )
-    result = await collector.run()
-    logger.info(
-        "kiis_top_songs status=%s plays=%d no_tracks=%d",
-        result.collector_run.status.value,
-        len(result.play_events),
-        len(result.no_track_events),
-    )
-    await _persist_result(result)
 
 
 async def job_generate_nightly_reports() -> None:
@@ -477,55 +466,7 @@ async def job_generate_nightly_reports() -> None:
     )
 
 
-async def job_collect_iheart_recently_played() -> None:
-    """Hourly batch fallback for all iHeart stations (KIISFM, Z100, WKSC).
-
-    Catches short tracks missed by the 5-minute now-playing poll.
-    Deduplication is handled by source_event_id check in _persist_result.
-    """
-    for station_id, source_id, iheart_station_id in (
-        (_KIIS_STATION_ID, _KIIS_SOURCE_ID, "2501"),
-        (_Z100_STATION_ID, _Z100_SOURCE_ID, "1469"),
-        (_WKSC_STATION_ID, _WKSC_SOURCE_ID, "849"),
-    ):
-        collector = IHeartRecentlyPlayedCollector(
-            source_id=source_id,
-            station_id=station_id,
-            iheart_station_id=iheart_station_id,
-            storage_root=settings.raw_payload_storage_path,
-        )
-        result = await collector.run()
-        logger.info(
-            "iheart_recently_played_collected station_id=%s iheart_id=%s "
-            "status=%s plays=%d",
-            station_id,
-            iheart_station_id,
-            result.collector_run.status.value,
-            len(result.play_events),
-        )
-        await _persist_result(result)
-
-
-async def job_collect_kiis1027_radiowave() -> None:
-    """Collect KIIS-FM 102.7 Radiowave Monitor diary for yesterday (runs daily 09:00 UTC)."""
-    from datetime import UTC, datetime, timedelta
-
-    diary_date = datetime.now(tz=UTC).date() - timedelta(days=1)
-    collector = KIISRadiowaveCollector(
-        source_id=_KIIS1027_RADIOWAVE_SOURCE_ID,
-        station_id=_KIIS1027_STATION_ID,
-        diary_date=diary_date,
-        storage_root=settings.raw_payload_storage_path,
-    )
-    result = await collector.run()
-    logger.info(
-        "kiis1027_radiowave_collected date=%s status=%s plays=%d no_tracks=%d",
-        diary_date,
-        result.collector_run.status.value,
-        len(result.play_events),
-        len(result.no_track_events),
-    )
-    await _persist_result(result)
+# ─── Scheduler builder ────────────────────────────────────────────────────────
 
 
 def build_scheduler() -> AsyncIOScheduler:
@@ -534,7 +475,7 @@ def build_scheduler() -> AsyncIOScheduler:
     sched = AsyncIOScheduler(timezone="UTC")
     _scheduler = sched
 
-    # Nova Radiowave diary — 16:00 UTC daily (02:00 AEST)
+    # Nova 96.9 — Radiowave diary (primary): 16:00 UTC daily (02:00 AEST)
     if settings.enable_nova_collector:
         sched.add_job(
             job_collect_nova_diary,
@@ -548,21 +489,35 @@ def build_scheduler() -> AsyncIOScheduler:
     else:
         logger.info("Scheduler skipped job: Nova 96.9 Radiowave diary (disabled)")
 
-    # KIIS iHeart now-playing — every 5 minutes
-    if settings.enable_kiis_collector:
+    # Nova 96.9 — radoxo.com playlist (secondary): every 4 hours
+    if settings.enable_nova_radoxo_collector:
         sched.add_job(
-            job_collect_kiis_now_playing,
-            IntervalTrigger(minutes=5),
-            id="kiis_now_playing",
-            name="KIIS-FM iHeart now-playing poll",
+            job_collect_nova_radoxo,
+            IntervalTrigger(hours=4),
+            id="nova_radoxo_playlist",
+            name="Nova 96.9 radoxo.com playlist",
             replace_existing=True,
-            misfire_grace_time=60,
+            misfire_grace_time=600,
         )
-        logger.info("Scheduler registered job: KIIS-FM iHeart now-playing poll")
+        logger.info("Scheduler registered job: Nova 96.9 radoxo.com playlist")
     else:
-        logger.info("Scheduler skipped job: KIIS-FM iHeart now-playing poll (disabled)")
+        logger.info("Scheduler skipped job: Nova 96.9 radoxo playlist (disabled)")
 
-    # Capital FM Online Radio Box now-playing — every 15 minutes (low frequency)
+    # Nova 96.9 — radio-australia.org chart (tertiary): 08:00 UTC daily
+    if settings.enable_nova_radio_australia_collector:
+        sched.add_job(
+            job_collect_nova_radio_australia,
+            CronTrigger(hour=8, minute=0, timezone="UTC"),
+            id="nova_radio_australia_chart",
+            name="Nova 96.9 radio-australia.org weekly chart",
+            replace_existing=True,
+            misfire_grace_time=3600,
+        )
+        logger.info("Scheduler registered job: Nova 96.9 radio-australia.org chart")
+    else:
+        logger.info("Scheduler skipped job: Nova 96.9 radio-australia chart (disabled)")
+
+    # Capital FM — Online Radio Box (primary): every 15 minutes
     if settings.enable_capital_collector:
         sched.add_job(
             job_collect_capital_now_playing,
@@ -574,10 +529,21 @@ def build_scheduler() -> AsyncIOScheduler:
         )
         logger.info("Scheduler registered job: Capital FM Online Radio Box now-playing poll")
     else:
-        logger.info(
-            "Scheduler skipped job: Capital FM Online Radio Box "
-            "now-playing poll (disabled)"
+        logger.info("Scheduler skipped job: Capital FM Online Radio Box poll (disabled)")
+
+    # Capital FM — ukradiolive.com (secondary): every 15 minutes
+    if settings.enable_capital_ukradiolive_collector:
+        sched.add_job(
+            job_collect_capital_ukradiolive,
+            IntervalTrigger(minutes=15),
+            id="capital_ukradiolive_playlist",
+            name="Capital FM ukradiolive.com playlist",
+            replace_existing=True,
+            misfire_grace_time=60,
         )
+        logger.info("Scheduler registered job: Capital FM ukradiolive.com playlist")
+    else:
+        logger.info("Scheduler skipped job: Capital FM ukradiolive playlist (disabled)")
 
     # Nightly reconciliation — 17:00 UTC daily (03:00 AEST)
     if settings.enable_nightly_reconciliation:
@@ -607,91 +573,21 @@ def build_scheduler() -> AsyncIOScheduler:
     else:
         logger.info("Scheduler skipped job: Nightly report generation (disabled)")
 
-    # BBC Radio 1 RMS API now-playing — every 5 minutes
-    if settings.enable_bbc_radio1_collector:
+    # KIIS-FM 102.7 — iHeart web recently-played (primary): every 15 minutes
+    if settings.enable_kiis_iheart_web_collector:
         sched.add_job(
-            job_collect_bbc_radio1,
-            IntervalTrigger(minutes=5),
-            id="bbc_radio1_now_playing",
-            name="BBC Radio 1 RMS API poll",
+            job_collect_kiis_iheart_web,
+            IntervalTrigger(minutes=15),
+            id="kiis_iheart_web_playlist",
+            name="KIIS-FM 102.7 iHeart recently-played",
             replace_existing=True,
             misfire_grace_time=60,
         )
-        logger.info("Scheduler registered job: BBC Radio 1 RMS API poll")
+        logger.info("Scheduler registered job: KIIS-FM 102.7 iHeart recently-played")
     else:
-        logger.info("Scheduler skipped job: BBC Radio 1 (disabled)")
+        logger.info("Scheduler skipped job: KIIS-FM 102.7 iHeart web (disabled)")
 
-    # Heart FM last-played scrape — every 5 minutes
-    if settings.enable_heart_collector:
-        sched.add_job(
-            job_collect_heart_fm,
-            IntervalTrigger(minutes=5),
-            id="heart_fm_last_played",
-            name="Heart FM last-played scrape",
-            replace_existing=True,
-            misfire_grace_time=60,
-        )
-        logger.info("Scheduler registered job: Heart FM last-played scrape")
-    else:
-        logger.info("Scheduler skipped job: Heart FM (disabled)")
-
-    # Z100 (WHTZ) iHeart now-playing — every 5 minutes
-    if settings.enable_z100_collector:
-        sched.add_job(
-            job_collect_z100_now_playing,
-            IntervalTrigger(minutes=5),
-            id="z100_now_playing",
-            name="Z100 iHeart now-playing poll",
-            replace_existing=True,
-            misfire_grace_time=60,
-        )
-        logger.info("Scheduler registered job: Z100 iHeart now-playing poll")
-    else:
-        logger.info("Scheduler skipped job: Z100 (disabled)")
-
-    # WKSC 103.5 iHeart now-playing — every 5 minutes
-    if settings.enable_wksc_collector:
-        sched.add_job(
-            job_collect_wksc_now_playing,
-            IntervalTrigger(minutes=5),
-            id="wksc_now_playing",
-            name="WKSC 103.5 iHeart now-playing poll",
-            replace_existing=True,
-            misfire_grace_time=60,
-        )
-        logger.info("Scheduler registered job: WKSC 103.5 iHeart now-playing poll")
-    else:
-        logger.info("Scheduler skipped job: WKSC (disabled)")
-
-    # KIIS-FM iHeart top songs — daily 00:00 UTC
-    if settings.enable_iheart_top_songs:
-        sched.add_job(
-            job_collect_kiis_top_songs,
-            CronTrigger(hour=0, minute=0, timezone="UTC"),
-            id="kiis_top_songs_daily",
-            name="KIIS-FM iHeart top songs chart",
-            replace_existing=True,
-            misfire_grace_time=3600,
-        )
-        logger.info("Scheduler registered job: KIIS-FM iHeart top songs chart")
-    else:
-        logger.info("Scheduler skipped job: KIIS-FM top songs (disabled)")
-
-    # iHeart recently-played batch fallback — hourly (KIISFM, Z100, WKSC)
-    if settings.enable_iheart_recently_played:
-        sched.add_job(
-            job_collect_iheart_recently_played,
-            IntervalTrigger(hours=1),
-            id="iheart_recently_played_hourly",
-            name="iHeart recently-played batch fallback",
-            replace_existing=True,
-            misfire_grace_time=300,
-        )
-        logger.info("Scheduler registered job: iHeart recently-played batch fallback")
-    else:
-        logger.info("Scheduler skipped job: iHeart recently-played (disabled)")
-
-    # KIIS-FM 102.7 Los Angeles Radiowave diary — daily 09:00 UTC (01:00 AM Pacific)
+    # KIIS-FM 102.7 — Radiowave diary (secondary): 09:00 UTC daily (01:00 AM Pacific)
     if settings.enable_kiis_radiowave_collector:
         sched.add_job(
             job_collect_kiis1027_radiowave,

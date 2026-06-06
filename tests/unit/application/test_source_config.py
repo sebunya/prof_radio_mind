@@ -16,23 +16,19 @@ from app.application.validation.base import (
 from app.domain.entities.source import SourceType
 
 
-def test_station_seeds_has_eight_stations() -> None:
-    assert len(STATION_SEEDS) == 8
+def test_station_seeds_has_three_stations() -> None:
+    assert len(STATION_SEEDS) == 3
 
 
 def test_station_seeds_call_signs() -> None:
     call_signs = {s.call_sign for s in STATION_SEEDS}
-    assert call_signs == {
-        "NOVA969", "KIISFM", "CAPITALFM",
-        "BBCRADIO1", "HEARTFMUK", "WHTZ", "WKSC",
-        "KIIS1027",
-    }
+    assert call_signs == {"NOVA969", "CAPITALFM", "KIIS1027"}
 
 
 def test_station_seeds_countries() -> None:
-    au_stations = {"NOVA969", "KIISFM"}
-    gb_stations = {"CAPITALFM", "BBCRADIO1", "HEARTFMUK"}
-    us_stations = {"WHTZ", "WKSC", "KIIS1027"}
+    au_stations = {"NOVA969"}
+    gb_stations = {"CAPITALFM"}
+    us_stations = {"KIIS1027"}
     for seed in STATION_SEEDS:
         if seed.call_sign in au_stations:
             assert seed.country_code == "AU"
@@ -58,22 +54,8 @@ def test_nova_radiowave_idds_config() -> None:
     assert seed.config.get("idds") == "11129"
 
 
-def test_kiis_iheart_station_id_config() -> None:
-    seed = next(
-        s
-        for s in SOURCE_SEEDS
-        if s.station_call_sign == "KIISFM" and s.source_type == SourceType.IHEART
-    )
-    assert seed.config is not None
-    assert seed.config.get("station_id") == "2501"
-
-
 def test_all_stations_have_manual_csv_fallback() -> None:
-    for station_call_sign in (
-        "NOVA969", "KIISFM", "CAPITALFM",
-        "BBCRADIO1", "HEARTFMUK", "WHTZ", "WKSC",
-        "KIIS1027",
-    ):
+    for station_call_sign in ("NOVA969", "CAPITALFM", "KIIS1027"):
         manual = [
             s
             for s in SOURCE_SEEDS
@@ -111,128 +93,7 @@ def test_source_validation_adapter_is_abstract() -> None:
         SourceValidationAdapter()  # type: ignore[abstract]
 
 
-# --- EXTRACT-2: new source type values ---
-
-def test_bbc_sounds_source_type_parses() -> None:
-    assert SourceType("bbc_sounds") == SourceType.BBC_SOUNDS
-    assert SourceType.BBC_SOUNDS.value == "bbc_sounds"
-
-
-def test_heart_last_played_source_type_parses() -> None:
-    assert SourceType("heart_last_played") == SourceType.HEART_LAST_PLAYED
-    assert SourceType.HEART_LAST_PLAYED.value == "heart_last_played"
-
-
-def test_bbc_radio1_has_bbc_sounds_source() -> None:
-    seeds = [s for s in SOURCE_SEEDS if s.station_call_sign == "BBCRADIO1"]
-    types = {s.source_type for s in seeds}
-    assert SourceType.BBC_SOUNDS in types
-
-
-def test_heartfmuk_has_heart_last_played_source() -> None:
-    seeds = [s for s in SOURCE_SEEDS if s.station_call_sign == "HEARTFMUK"]
-    types = {s.source_type for s in seeds}
-    assert SourceType.HEART_LAST_PLAYED in types
-
-
-def test_z100_iheart_station_id_config() -> None:
-    seed = next(
-        s for s in SOURCE_SEEDS
-        if s.station_call_sign == "WHTZ" and s.source_type == SourceType.IHEART
-    )
-    assert seed.config is not None
-    assert seed.config.get("station_id") == "1469"  # corrected from 614 per live v2 search
-
-
-def test_wksc_iheart_station_id_config() -> None:
-    seed = next(
-        s for s in SOURCE_SEEDS
-        if s.station_call_sign == "WKSC" and s.source_type == SourceType.IHEART
-    )
-    assert seed.config is not None
-    assert seed.config.get("station_id") == "849"  # corrected from 821 per live v2 search
-
-
-# --- EXTRACT-2: UUID match — seeder derivation must match scheduler constants ---
-
-def test_bbcradio1_station_uuid_matches_scheduler() -> None:
-    from app.application.seeder import station_id_for
-    from app.infrastructure.scheduler.scheduler import _BBC1_STATION_ID
-    assert station_id_for("BBCRADIO1") == _BBC1_STATION_ID
-
-
-def test_bbcradio1_source_uuid_matches_scheduler() -> None:
-    from app.application.seeder import source_id_for
-    from app.infrastructure.scheduler.scheduler import _BBC1_SOURCE_ID
-    assert source_id_for("BBCRADIO1", "bbc_sounds") == _BBC1_SOURCE_ID
-
-
-def test_heartfmuk_station_uuid_matches_scheduler() -> None:
-    from app.application.seeder import station_id_for
-    from app.infrastructure.scheduler.scheduler import _HEARTFM_STATION_ID
-    assert station_id_for("HEARTFMUK") == _HEARTFM_STATION_ID
-
-
-def test_heartfmuk_source_uuid_matches_scheduler() -> None:
-    from app.application.seeder import source_id_for
-    from app.infrastructure.scheduler.scheduler import _HEARTFM_SOURCE_ID
-    assert source_id_for("HEARTFMUK", "heart_last_played") == _HEARTFM_SOURCE_ID
-
-
-def test_whtz_station_uuid_matches_scheduler() -> None:
-    from app.application.seeder import station_id_for
-    from app.infrastructure.scheduler.scheduler import _Z100_STATION_ID
-    assert station_id_for("WHTZ") == _Z100_STATION_ID
-
-
-def test_whtz_source_uuid_matches_scheduler() -> None:
-    from app.application.seeder import source_id_for
-    from app.infrastructure.scheduler.scheduler import _Z100_SOURCE_ID
-    assert source_id_for("WHTZ", "iheart") == _Z100_SOURCE_ID
-
-
-def test_wksc_station_uuid_matches_scheduler() -> None:
-    from app.application.seeder import station_id_for
-    from app.infrastructure.scheduler.scheduler import _WKSC_STATION_ID
-    assert station_id_for("WKSC") == _WKSC_STATION_ID
-
-
-def test_wksc_source_uuid_matches_scheduler() -> None:
-    from app.application.seeder import source_id_for
-    from app.infrastructure.scheduler.scheduler import _WKSC_SOURCE_ID
-    assert source_id_for("WKSC", "iheart") == _WKSC_SOURCE_ID
-
-
-# --- EXTRACT-3: KIIS-FM 102.7 Los Angeles ---
-
-def test_kiis1027_has_radiowave_source() -> None:
-    seeds = [s for s in SOURCE_SEEDS if s.station_call_sign == "KIIS1027"]
-    types = {s.source_type for s in seeds}
-    assert SourceType.RADIOWAVE in types
-
-
-def test_kiis1027_radiowave_idds_config() -> None:
-    seed = next(
-        s for s in SOURCE_SEEDS
-        if s.station_call_sign == "KIIS1027" and s.source_type == SourceType.RADIOWAVE
-    )
-    assert seed.config is not None
-    assert seed.config.get("idds") == "5080"
-
-
-def test_kiis1027_station_uuid_matches_scheduler() -> None:
-    from app.application.seeder import station_id_for
-    from app.infrastructure.scheduler.scheduler import _KIIS1027_STATION_ID
-    assert station_id_for("KIIS1027") == _KIIS1027_STATION_ID
-
-
-def test_kiis1027_radiowave_source_uuid_matches_scheduler() -> None:
-    from app.application.seeder import source_id_for
-    from app.infrastructure.scheduler.scheduler import _KIIS1027_RADIOWAVE_SOURCE_ID
-    assert source_id_for("KIIS1027", "radiowave") == _KIIS1027_RADIOWAVE_SOURCE_ID
-
-
-# --- EXTRACT-3 update: new source types, corrected URLs ---
+# --- Source type enum values ---
 
 def test_iheart_web_source_type_parses() -> None:
     assert SourceType("iheart_web") == SourceType.IHEART_WEB
@@ -244,41 +105,17 @@ def test_ukradiolive_source_type_parses() -> None:
     assert SourceType.UKRADIOLIVE.value == "ukradiolive"
 
 
-def test_kiis1027_has_iheart_web_source() -> None:
-    seeds = [s for s in SOURCE_SEEDS if s.station_call_sign == "KIIS1027"]
-    types = {s.source_type for s in seeds}
-    assert SourceType.IHEART_WEB in types
+def test_radoxo_source_type_parses() -> None:
+    assert SourceType("radoxo") == SourceType.RADOXO
+    assert SourceType.RADOXO.value == "radoxo"
 
 
-def test_kiis1027_iheart_web_is_priority_1() -> None:
-    seed = next(
-        s for s in SOURCE_SEEDS
-        if s.station_call_sign == "KIIS1027" and s.source_type == SourceType.IHEART_WEB
-    )
-    assert seed.priority == 1
+def test_radio_australia_org_source_type_parses() -> None:
+    assert SourceType("radio_australia_org") == SourceType.RADIO_AUSTRALIA_ORG
+    assert SourceType.RADIO_AUSTRALIA_ORG.value == "radio_australia_org"
 
 
-def test_kiis1027_radiowave_demoted_to_priority_2() -> None:
-    seed = next(
-        s for s in SOURCE_SEEDS
-        if s.station_call_sign == "KIIS1027" and s.source_type == SourceType.RADIOWAVE
-    )
-    assert seed.priority == 2
-
-
-def test_capitalfm_has_ukradiolive_source() -> None:
-    seeds = [s for s in SOURCE_SEEDS if s.station_call_sign == "CAPITALFM"]
-    types = {s.source_type for s in seeds}
-    assert SourceType.UKRADIOLIVE in types
-
-
-def test_capitalfm_ukradiolive_is_priority_1() -> None:
-    seed = next(
-        s for s in SOURCE_SEEDS
-        if s.station_call_sign == "CAPITALFM" and s.source_type == SourceType.UKRADIOLIVE
-    )
-    assert seed.priority == 1
-
+# --- Nova 96.9 source coverage ---
 
 def test_nova_radiowave_url_corrected() -> None:
     seed = next(
@@ -287,14 +124,6 @@ def test_nova_radiowave_url_corrected() -> None:
     )
     assert seed.base_url is not None
     assert "radiowavemonitor.com" in seed.base_url
-    assert "radiowave.com.au" not in (seed.base_url or "")
-
-
-# --- EXTRACT-3 update: additional fallback sources ---
-
-def test_radoxo_source_type_parses() -> None:
-    assert SourceType("radoxo") == SourceType.RADOXO
-    assert SourceType.RADOXO.value == "radoxo"
 
 
 def test_nova969_has_radoxo_fallback() -> None:
@@ -333,22 +162,6 @@ def test_nova969_radoxo_is_lower_priority_than_radiowave() -> None:
     assert radoxo.priority > rw.priority
 
 
-def test_capitalfm_online_radio_box_uses_playlist_url() -> None:
-    seed = next(
-        s for s in SOURCE_SEEDS
-        if s.station_call_sign == "CAPITALFM" and s.source_type == SourceType.ONLINE_RADIO_BOX
-    )
-    assert seed.base_url is not None
-    assert "playlist" in seed.base_url
-
-
-# --- EXTRACT-3 update: radio-australia.org sources ---
-
-def test_radio_australia_org_source_type_parses() -> None:
-    assert SourceType("radio_australia_org") == SourceType.RADIO_AUSTRALIA_ORG
-    assert SourceType.RADIO_AUSTRALIA_ORG.value == "radio_australia_org"
-
-
 def test_nova969_has_radio_australia_org_source() -> None:
     seeds = [s for s in SOURCE_SEEDS if s.station_call_sign == "NOVA969"]
     types = {s.source_type for s in seeds}
@@ -373,33 +186,121 @@ def test_nova969_radio_australia_url_correct() -> None:
     assert "nova-969" in seed.base_url
 
 
-def test_kiisfm_has_radio_australia_org_source() -> None:
-    seeds = [s for s in SOURCE_SEEDS if s.station_call_sign == "KIISFM"]
+# --- Capital FM UK source coverage ---
+
+def test_capitalfm_has_ukradiolive_source() -> None:
+    seeds = [s for s in SOURCE_SEEDS if s.station_call_sign == "CAPITALFM"]
     types = {s.source_type for s in seeds}
-    assert SourceType.RADIO_AUSTRALIA_ORG in types
+    assert SourceType.UKRADIOLIVE in types
 
 
-def test_kiisfm_radio_australia_is_priority_1() -> None:
+def test_capitalfm_ukradiolive_is_priority_1() -> None:
     seed = next(
         s for s in SOURCE_SEEDS
-        if s.station_call_sign == "KIISFM" and s.source_type == SourceType.RADIO_AUSTRALIA_ORG
+        if s.station_call_sign == "CAPITALFM" and s.source_type == SourceType.UKRADIOLIVE
     )
     assert seed.priority == 1
 
 
-def test_kiisfm_radio_australia_url_correct() -> None:
+def test_capitalfm_online_radio_box_uses_playlist_url() -> None:
     seed = next(
         s for s in SOURCE_SEEDS
-        if s.station_call_sign == "KIISFM" and s.source_type == SourceType.RADIO_AUSTRALIA_ORG
+        if s.station_call_sign == "CAPITALFM" and s.source_type == SourceType.ONLINE_RADIO_BOX
     )
     assert seed.base_url is not None
-    assert "radio-australia.org" in seed.base_url
-    assert "kiis-1065" in seed.base_url
+    assert "playlist" in seed.base_url
 
 
-def test_kiisfm_iheart_demoted_from_priority_1() -> None:
+# --- KIIS-FM 102.7 Los Angeles source coverage ---
+
+def test_kiis1027_has_radiowave_source() -> None:
+    seeds = [s for s in SOURCE_SEEDS if s.station_call_sign == "KIIS1027"]
+    types = {s.source_type for s in seeds}
+    assert SourceType.RADIOWAVE in types
+
+
+def test_kiis1027_radiowave_idds_config() -> None:
     seed = next(
         s for s in SOURCE_SEEDS
-        if s.station_call_sign == "KIISFM" and s.source_type == SourceType.IHEART
+        if s.station_call_sign == "KIIS1027" and s.source_type == SourceType.RADIOWAVE
     )
-    assert seed.priority > 1
+    assert seed.config is not None
+    assert seed.config.get("idds") == "5080"
+
+
+def test_kiis1027_has_iheart_web_source() -> None:
+    seeds = [s for s in SOURCE_SEEDS if s.station_call_sign == "KIIS1027"]
+    types = {s.source_type for s in seeds}
+    assert SourceType.IHEART_WEB in types
+
+
+def test_kiis1027_iheart_web_is_priority_1() -> None:
+    seed = next(
+        s for s in SOURCE_SEEDS
+        if s.station_call_sign == "KIIS1027" and s.source_type == SourceType.IHEART_WEB
+    )
+    assert seed.priority == 1
+
+
+def test_kiis1027_radiowave_demoted_to_priority_2() -> None:
+    seed = next(
+        s for s in SOURCE_SEEDS
+        if s.station_call_sign == "KIIS1027" and s.source_type == SourceType.RADIOWAVE
+    )
+    assert seed.priority == 2
+
+
+# --- UUID match: seeder derivation must match scheduler constants ---
+
+def test_nova_station_uuid_matches_scheduler() -> None:
+    from app.application.seeder import station_id_for
+    from app.infrastructure.scheduler.scheduler import _NOVA_STATION_ID
+    assert station_id_for("NOVA969") == _NOVA_STATION_ID
+
+
+def test_nova_radiowave_source_uuid_matches_scheduler() -> None:
+    from app.application.seeder import source_id_for
+    from app.infrastructure.scheduler.scheduler import _NOVA_RADIOWAVE_SOURCE_ID
+    assert source_id_for("NOVA969", "radiowave") == _NOVA_RADIOWAVE_SOURCE_ID
+
+
+def test_nova_radoxo_source_uuid_matches_scheduler() -> None:
+    from app.application.seeder import source_id_for
+    from app.infrastructure.scheduler.scheduler import _NOVA_RADOXO_SOURCE_ID
+    assert source_id_for("NOVA969", "radoxo") == _NOVA_RADOXO_SOURCE_ID
+
+
+def test_nova_rao_source_uuid_matches_scheduler() -> None:
+    from app.application.seeder import source_id_for
+    from app.infrastructure.scheduler.scheduler import _NOVA_RAO_SOURCE_ID
+    assert source_id_for("NOVA969", "radio_australia_org") == _NOVA_RAO_SOURCE_ID
+
+
+def test_capital_station_uuid_matches_scheduler() -> None:
+    from app.application.seeder import station_id_for
+    from app.infrastructure.scheduler.scheduler import _CAPITAL_STATION_ID
+    assert station_id_for("CAPITALFM") == _CAPITAL_STATION_ID
+
+
+def test_capital_ukradiolive_source_uuid_matches_scheduler() -> None:
+    from app.application.seeder import source_id_for
+    from app.infrastructure.scheduler.scheduler import _CAPITAL_UKRADIOLIVE_SOURCE_ID
+    assert source_id_for("CAPITALFM", "ukradiolive") == _CAPITAL_UKRADIOLIVE_SOURCE_ID
+
+
+def test_kiis1027_station_uuid_matches_scheduler() -> None:
+    from app.application.seeder import station_id_for
+    from app.infrastructure.scheduler.scheduler import _KIIS1027_STATION_ID
+    assert station_id_for("KIIS1027") == _KIIS1027_STATION_ID
+
+
+def test_kiis1027_radiowave_source_uuid_matches_scheduler() -> None:
+    from app.application.seeder import source_id_for
+    from app.infrastructure.scheduler.scheduler import _KIIS1027_RADIOWAVE_SOURCE_ID
+    assert source_id_for("KIIS1027", "radiowave") == _KIIS1027_RADIOWAVE_SOURCE_ID
+
+
+def test_kiis1027_iheart_web_source_uuid_matches_scheduler() -> None:
+    from app.application.seeder import source_id_for
+    from app.infrastructure.scheduler.scheduler import _KIIS1027_IHEART_WEB_SOURCE_ID
+    assert source_id_for("KIIS1027", "iheart_web") == _KIIS1027_IHEART_WEB_SOURCE_ID

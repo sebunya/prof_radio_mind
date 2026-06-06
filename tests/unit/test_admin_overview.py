@@ -29,21 +29,18 @@ def test_overview_scheduler_disabled_by_default(client: TestClient) -> None:
 
 def test_overview_all_collectors_disabled_by_default(client: TestClient) -> None:
     body = client.get("/api/admin/overview").json()
-    # Original collectors
+    # Nova 96.9 collectors
     assert body["enable_nova_collector"] is False
-    assert body["enable_kiis_collector"] is False
+    assert body["enable_nova_radoxo_collector"] is False
+    assert body["enable_nova_radio_australia_collector"] is False
+    # Capital FM UK collectors
     assert body["enable_capital_collector"] is False
-    assert body["enable_nightly_reconciliation"] is False
-    # EXTRACT-1B / EXTRACT-2 collectors
-    assert body["enable_bbc_radio1_collector"] is False
-    assert body["enable_heart_collector"] is False
-    assert body["enable_z100_collector"] is False
-    assert body["enable_wksc_collector"] is False
-    assert body["enable_iheart_top_songs"] is False
-    # EXTRACT-3 / EXTRACT-4 collectors
+    assert body["enable_capital_ukradiolive_collector"] is False
+    # KIIS-FM 102.7 collectors
+    assert body["enable_kiis_iheart_web_collector"] is False
     assert body["enable_kiis_radiowave_collector"] is False
-    assert body["enable_iheart_recently_played"] is False
     # Nightly automation
+    assert body["enable_nightly_reconciliation"] is False
     assert body["enable_nightly_report_generation"] is False
 
 

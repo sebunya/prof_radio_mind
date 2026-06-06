@@ -77,43 +77,9 @@ SOURCE_SEEDS: tuple[SourceSeed, ...] = (
         priority=99,
         validation_note="Always available — manual fallback",
     ),
-    # --- KIIS-FM 106.5 FM Sydney ---
-    # VAL-KIIS-RAO-001: radio-australia.org/kiis-1065 weekly chart — SSR confirmed 2026-06-06.
-    # played_at is synthetic (collection time). Chart covers last 7 days.
-    SourceSeed(
-        station_call_sign="KIISFM",
-        source_type=SourceType.RADIO_AUSTRALIA_ORG,
-        name="KIIS-FM 106.5 Radio Australia Chart",
-        base_url="https://www.radio-australia.org/kiis-1065",
-        config={"station_slug": "kiis-1065", "chart_period_days": 7},
-        priority=1,
-        validation_note=(
-            "VALIDATED — SSR chart confirmed 2026-06-06. "
-            "played_at is synthetic (collection timestamp, not broadcast time)."
-        ),
-    ),
-    # iHeart v3 API is entirely dead (404). Kept at priority 2 for reference.
-    SourceSeed(
-        station_call_sign="KIISFM",
-        source_type=SourceType.IHEART,
-        name="KIIS-FM iHeart Now Playing",
-        base_url="https://api.iheart.com/api/v3/live-meta/stream",
-        config={"station_id": "2501"},
-        priority=2,
-        validation_note="FAILED — iHeart v3 API dead (404). Demoted; kept for reference only.",
-    ),
-    SourceSeed(
-        station_call_sign="KIISFM",
-        source_type=SourceType.MANUAL_CSV,
-        name="KIIS-FM Manual CSV Fallback",
-        base_url=None,
-        config=None,
-        priority=99,
-        validation_note="Always available — manual fallback",
-    ),
-    # --- Capital FM --- (EXTRACT-3 update)
+    # --- Capital FM UK ---
     # VAL-CAPUK-URL-001: ukradiolive.com/capital-fm/playlist confirmed reachable 2026-06-05.
-    # Parser selectors UNVALIDATED — run dry_run_capital_ukradiolive for raw HTML.
+    # Parser selectors confirmed on real HTML 2026-06-06.
     SourceSeed(
         station_call_sign="CAPITALFM",
         source_type=SourceType.UKRADIOLIVE,
@@ -122,12 +88,11 @@ SOURCE_SEEDS: tuple[SourceSeed, ...] = (
         config={"station_slug": "capital-fm"},
         priority=1,
         validation_note=(
-            "UNVALIDATED — VAL-CAPUK-URL-001 required. Run dry_run_capital_ukradiolive "
-            "to inspect HTML structure and confirm parser selectors."
+            "VALIDATED — plist-item parser confirmed on real HTML 2026-06-06. "
+            "Run dry_run_capital_ukradiolive to re-validate selectors."
         ),
     ),
     # VAL-CAPUK-ORB-001: Online Radio Box playlist URL confirmed 2026-06-06.
-    # URL updated to include /playlist/ path as provided by user.
     SourceSeed(
         station_call_sign="CAPITALFM",
         source_type=SourceType.ONLINE_RADIO_BOX,
@@ -155,94 +120,9 @@ SOURCE_SEEDS: tuple[SourceSeed, ...] = (
         priority=99,
         validation_note="Always available — manual fallback",
     ),
-    # --- BBC Radio 1 --- (EXTRACT-2)
-    # VAL-BBC1-001: BBC Sounds/RMS API reachability UNVALIDATED
-    # VAL-BBC1-006: BBC ToS for automated access UNCONFIRMED
-    SourceSeed(
-        station_call_sign="BBCRADIO1",
-        source_type=SourceType.BBC_SOUNDS,
-        name="BBC Radio 1 RMS API",
-        base_url="https://rms.api.bbc.co.uk/v2/services/bbc_radio_one/segments/latest",
-        config={"service_id": "bbc_radio_one"},
-        priority=1,
-        validation_note=(
-            "UNVALIDATED — VAL-BBC1-001 (live reachability) and VAL-BBC1-006 (ToS) required"
-        ),
-    ),
-    SourceSeed(
-        station_call_sign="BBCRADIO1",
-        source_type=SourceType.MANUAL_CSV,
-        name="BBC Radio 1 Manual CSV Fallback",
-        base_url=None,
-        config=None,
-        priority=99,
-        validation_note="Always available — manual fallback",
-    ),
-    # --- Heart FM UK --- (EXTRACT-2)
-    # VAL-HEARTFM-002: CSS selectors against live page UNVALIDATED (synthetic fixture only)
-    SourceSeed(
-        station_call_sign="HEARTFMUK",
-        source_type=SourceType.HEART_LAST_PLAYED,
-        name="Heart FM Last Played Page",
-        base_url="https://www.heart.co.uk/radio/",
-        config={"parser": "heart_last_played_css"},
-        priority=1,
-        validation_note="UNVALIDATED — VAL-HEARTFM-002 (live CSS selectors) required",
-    ),
-    SourceSeed(
-        station_call_sign="HEARTFMUK",
-        source_type=SourceType.MANUAL_CSV,
-        name="Heart FM UK Manual CSV Fallback",
-        base_url=None,
-        config=None,
-        priority=99,
-        validation_note="Always available — manual fallback",
-    ),
-    # --- Z100 New York (WHTZ) --- (EXTRACT-2)
-    # VAL-Z100-001: station_id corrected to 1469 per live iHeart v2 station search 2026-06-05.
-    # Original seeded value 614 was unverified. v3 API unavailable (404 all paths).
-    SourceSeed(
-        station_call_sign="WHTZ",
-        source_type=SourceType.IHEART,
-        name="Z100 iHeart Now Playing",
-        base_url="https://api.iheart.com/api/v3/live-meta/stream",
-        config={"station_id": "1469"},
-        priority=1,
-        validation_note="ID corrected 614→1469 (live v2 search). v3 API unavailable; FAILED.",
-    ),
-    SourceSeed(
-        station_call_sign="WHTZ",
-        source_type=SourceType.MANUAL_CSV,
-        name="Z100 Manual CSV Fallback",
-        base_url=None,
-        config=None,
-        priority=99,
-        validation_note="Always available — manual fallback",
-    ),
-    # --- WKSC 103.5 Chicago --- (EXTRACT-2)
-    # VAL-WKSC-001: station_id corrected to 849 per live iHeart v2 station search 2026-06-05.
-    # Original seeded value 821 was unverified. v3 API unavailable (404 all paths).
-    SourceSeed(
-        station_call_sign="WKSC",
-        source_type=SourceType.IHEART,
-        name="WKSC 103.5 iHeart Now Playing",
-        base_url="https://api.iheart.com/api/v3/live-meta/stream",
-        config={"station_id": "849"},
-        priority=1,
-        validation_note="ID corrected 821→849 (live v2 search). v3 API unavailable; FAILED.",
-    ),
-    SourceSeed(
-        station_call_sign="WKSC",
-        source_type=SourceType.MANUAL_CSV,
-        name="WKSC 103.5 Manual CSV Fallback",
-        base_url=None,
-        config=None,
-        priority=99,
-        validation_note="Always available — manual fallback",
-    ),
-    # --- KIIS-FM 102.7 Los Angeles (EXTRACT-3) ---
-    # VAL-KIIS1027-WEB-001: iHeart web recently-played page — UNVALIDATED.
-    # iHeart v3 API is entirely dead (404 on all paths). This replaces it.
+    # --- KIIS-FM 102.7 Los Angeles ---
+    # VAL-KIIS1027-WEB-001: iHeart web recently-played page — figcaption parser
+    # confirmed on real HTML 2026-06-06.
     SourceSeed(
         station_call_sign="KIIS1027",
         source_type=SourceType.IHEART_WEB,
@@ -251,8 +131,8 @@ SOURCE_SEEDS: tuple[SourceSeed, ...] = (
         config={"station_slug": "kiisfm"},
         priority=1,
         validation_note=(
-            "UNVALIDATED — VAL-KIIS1027-WEB-001 required. "
-            "Run dry_run_kiis_iheart_web to inspect HTML/JSON structure."
+            "VALIDATED — figcaption parser confirmed on real HTML 2026-06-06. "
+            "Run dry_run_kiis_iheart_web to re-validate."
         ),
     ),
     # VAL-KIIS-RAD-001: Radiowave IDDS=5080 FAILED live (0 tr.diary-row rows).

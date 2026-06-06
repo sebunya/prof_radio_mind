@@ -38,21 +38,18 @@ class OverviewStats(BaseModel):
 class OverviewResponse(BaseModel):
     app_env: str
     scheduler_enabled: bool
-    # Original collectors
+    # Nova 96.9 collectors
     enable_nova_collector: bool
-    enable_kiis_collector: bool
+    enable_nova_radoxo_collector: bool
+    enable_nova_radio_australia_collector: bool
+    # Capital FM UK collectors
     enable_capital_collector: bool
-    enable_nightly_reconciliation: bool
-    # EXTRACT-1B / EXTRACT-2 collectors
-    enable_bbc_radio1_collector: bool
-    enable_heart_collector: bool
-    enable_z100_collector: bool
-    enable_wksc_collector: bool
-    enable_iheart_top_songs: bool
-    # EXTRACT-3 / EXTRACT-4 collectors
+    enable_capital_ukradiolive_collector: bool
+    # KIIS-FM 102.7 Los Angeles collectors
+    enable_kiis_iheart_web_collector: bool
     enable_kiis_radiowave_collector: bool
-    enable_iheart_recently_played: bool
     # Nightly automation
+    enable_nightly_reconciliation: bool
     enable_nightly_report_generation: bool
     # Operational
     raw_payload_retention_days: int
@@ -64,21 +61,18 @@ class OverviewResponse(BaseModel):
 class OperationsResponse(BaseModel):
     app_env: str
     scheduler_enabled: bool
-    # Original collectors
+    # Nova 96.9 collectors
     enable_nova_collector: bool
-    enable_kiis_collector: bool
+    enable_nova_radoxo_collector: bool
+    enable_nova_radio_australia_collector: bool
+    # Capital FM UK collectors
     enable_capital_collector: bool
-    enable_nightly_reconciliation: bool
-    # EXTRACT-1B / EXTRACT-2 collectors
-    enable_bbc_radio1_collector: bool
-    enable_heart_collector: bool
-    enable_z100_collector: bool
-    enable_wksc_collector: bool
-    enable_iheart_top_songs: bool
-    # EXTRACT-3 / EXTRACT-4 collectors
+    enable_capital_ukradiolive_collector: bool
+    # KIIS-FM 102.7 Los Angeles collectors
+    enable_kiis_iheart_web_collector: bool
     enable_kiis_radiowave_collector: bool
-    enable_iheart_recently_played: bool
     # Nightly automation
+    enable_nightly_reconciliation: bool
     enable_nightly_report_generation: bool
     # Operational
     raw_payload_retention_days: int
@@ -238,16 +232,13 @@ async def get_overview(session: AsyncSession = Depends(get_db)) -> OverviewRespo
         app_env=settings.app_env,
         scheduler_enabled=settings.scheduler_enabled,
         enable_nova_collector=settings.enable_nova_collector,
-        enable_kiis_collector=settings.enable_kiis_collector,
+        enable_nova_radoxo_collector=settings.enable_nova_radoxo_collector,
+        enable_nova_radio_australia_collector=settings.enable_nova_radio_australia_collector,
         enable_capital_collector=settings.enable_capital_collector,
-        enable_nightly_reconciliation=settings.enable_nightly_reconciliation,
-        enable_bbc_radio1_collector=settings.enable_bbc_radio1_collector,
-        enable_heart_collector=settings.enable_heart_collector,
-        enable_z100_collector=settings.enable_z100_collector,
-        enable_wksc_collector=settings.enable_wksc_collector,
-        enable_iheart_top_songs=settings.enable_iheart_top_songs,
+        enable_capital_ukradiolive_collector=settings.enable_capital_ukradiolive_collector,
+        enable_kiis_iheart_web_collector=settings.enable_kiis_iheart_web_collector,
         enable_kiis_radiowave_collector=settings.enable_kiis_radiowave_collector,
-        enable_iheart_recently_played=settings.enable_iheart_recently_played,
+        enable_nightly_reconciliation=settings.enable_nightly_reconciliation,
         enable_nightly_report_generation=settings.enable_nightly_report_generation,
         raw_payload_retention_days=settings.raw_payload_retention_days,
         enable_docs_in_production=settings.enable_docs_in_production,
@@ -272,16 +263,13 @@ async def get_operations() -> OperationsResponse:
         app_env=settings.app_env,
         scheduler_enabled=settings.scheduler_enabled,
         enable_nova_collector=settings.enable_nova_collector,
-        enable_kiis_collector=settings.enable_kiis_collector,
+        enable_nova_radoxo_collector=settings.enable_nova_radoxo_collector,
+        enable_nova_radio_australia_collector=settings.enable_nova_radio_australia_collector,
         enable_capital_collector=settings.enable_capital_collector,
-        enable_nightly_reconciliation=settings.enable_nightly_reconciliation,
-        enable_bbc_radio1_collector=settings.enable_bbc_radio1_collector,
-        enable_heart_collector=settings.enable_heart_collector,
-        enable_z100_collector=settings.enable_z100_collector,
-        enable_wksc_collector=settings.enable_wksc_collector,
-        enable_iheart_top_songs=settings.enable_iheart_top_songs,
+        enable_capital_ukradiolive_collector=settings.enable_capital_ukradiolive_collector,
+        enable_kiis_iheart_web_collector=settings.enable_kiis_iheart_web_collector,
         enable_kiis_radiowave_collector=settings.enable_kiis_radiowave_collector,
-        enable_iheart_recently_played=settings.enable_iheart_recently_played,
+        enable_nightly_reconciliation=settings.enable_nightly_reconciliation,
         enable_nightly_report_generation=settings.enable_nightly_report_generation,
         raw_payload_retention_days=settings.raw_payload_retention_days,
         enable_docs_in_production=settings.enable_docs_in_production,
