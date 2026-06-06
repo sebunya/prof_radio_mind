@@ -20,6 +20,12 @@ const PAGES = {
   backfill:   () => import('./pages/backfill.js'),
   'operations-guardrails': () => import('./pages/operations-guardrails.js'),
   operations: () => import('./pages/operations.js'),
+  // Civic Services (Uganda)
+  'civil-status':          () => import('./pages/civil-status.js'),
+  'business-ip':           () => import('./pages/business-ip.js'),
+  'tax-property':          () => import('./pages/tax-property.js'),
+  'immigration-services':  () => import('./pages/immigration-services.js'),
+  'legal-education':       () => import('./pages/legal-education.js'),
 };
 
 const TITLES = {
@@ -35,6 +41,12 @@ const TITLES = {
   backfill:   'Historical Backfill',
   'operations-guardrails': 'Operations & Safety Guardrails',
   operations: 'Operations',
+  // Civic Services (Uganda)
+  'civil-status':         'Civil Status & Life Events',
+  'business-ip':          'Business & Intellectual Property',
+  'tax-property':         'Taxation & Property',
+  'immigration-services': 'Immigration Services',
+  'legal-education':      'Legal, Security & Education',
 };
 
 // ── Router ───────────────────────────────────────────────────────
