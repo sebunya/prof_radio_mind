@@ -313,6 +313,14 @@ def test_nova969_radoxo_has_correct_url() -> None:
     assert "nova-969" in seed.base_url
 
 
+def test_nova969_radoxo_validation_note_confirmed() -> None:
+    seed = next(
+        s for s in SOURCE_SEEDS
+        if s.station_call_sign == "NOVA969" and s.source_type == SourceType.RADOXO
+    )
+    assert "VALIDATED" in seed.validation_note
+
+
 def test_nova969_radoxo_is_lower_priority_than_radiowave() -> None:
     rw = next(
         s for s in SOURCE_SEEDS

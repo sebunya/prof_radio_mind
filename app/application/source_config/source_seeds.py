@@ -39,7 +39,9 @@ SOURCE_SEEDS: tuple[SourceSeed, ...] = (
             "URL confirmed. Card-grid parser (Strategy 3) confirmed on real HTML 2026-06-06."
         ),
     ),
-    # VAL-NOVA-RADOXO-001: radoxo.com/australia/nova-969/playlist UNVALIDATED.
+    # VAL-NOVA-RADOXO-001: radoxo.com parser confirmed on real HTML 2026-06-06.
+    # data-ts Unix timestamps give exact broadcast times to second precision.
+    # 86+ tracks per day available (full day playlist).
     SourceSeed(
         station_call_sign="NOVA969",
         source_type=SourceType.RADOXO,
@@ -48,8 +50,8 @@ SOURCE_SEEDS: tuple[SourceSeed, ...] = (
         config={"station_slug": "nova-969"},
         priority=2,
         validation_note=(
-            "UNVALIDATED — VAL-NOVA-RADOXO-001 required. "
-            "Run dry_run_nova_radoxo to confirm HTML structure and implement parser."
+            "VALIDATED — li.playlist-track + data-ts Unix timestamps confirmed 2026-06-06. "
+            "86+ tracks/day. Exact broadcast times to second precision."
         ),
     ),
     # VAL-NOVA-RAO-001: radio-australia.org weekly chart — confirmed SSR, parser validated
