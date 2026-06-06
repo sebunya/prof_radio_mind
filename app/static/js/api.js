@@ -79,6 +79,16 @@ export const API = {
   adminOverview: () => apiCall('GET', '/api/admin/overview'),
   adminOperations: () => apiCall('GET', '/api/admin/operations'),
   adminRecentEvents: () => apiCall('GET', '/api/admin/recent-events'),
+  playEvents: (params = {}) => {
+    const q = new URLSearchParams();
+    if (params.station_id) q.set('station_id', params.station_id);
+    if (params.date_from)  q.set('date_from', params.date_from);
+    if (params.date_to)    q.set('date_to', params.date_to);
+    if (params.limit)      q.set('limit', String(params.limit));
+    if (params.offset)     q.set('offset', String(params.offset));
+    const qs = q.toString();
+    return apiCall('GET', `/api/admin/play-events${qs ? '?' + qs : ''}`);
+  },
   adminSourceHealth: () => apiCall('GET', '/api/admin/source-health'),
   adminReviewSummary: () => apiCall('GET', '/api/admin/review-summary'),
   adminEnrichmentStatus: () => apiCall('GET', '/api/admin/enrichment-status'),

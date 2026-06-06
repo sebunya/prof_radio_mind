@@ -45,10 +45,15 @@ export async function init(container) {
         </div>
         <table class="flag-table">
           <tbody>
-            ${collectorRow('Capital FM UK',           ov.enable_capital_collector,       'ENABLE_CAPITAL_COLLECTOR')}
-            ${collectorRow('Nova 96.9 FM',             ov.enable_nova_collector,           'ENABLE_NOVA_COLLECTOR')}
-            ${collectorRow('KIIS FM 102.7',            ov.enable_kiis_collector,           'ENABLE_KIIS_COLLECTOR')}
-            ${collectorRow('Nightly Reconciliation',   ov.enable_nightly_reconciliation,   'ENABLE_NIGHTLY_RECONCILIATION')}
+            ${collectorRow('Nova 96.9 (Radiowave)',            ov.enable_nova_collector,                   'ENABLE_NOVA_COLLECTOR')}
+            ${collectorRow('Nova 96.9 (Radoxo)',              ov.enable_nova_radoxo_collector,            'ENABLE_NOVA_RADOXO_COLLECTOR')}
+            ${collectorRow('Nova 96.9 (Radio Australia)',     ov.enable_nova_radio_australia_collector,   'ENABLE_NOVA_RADIO_AUSTRALIA_COLLECTOR')}
+            ${collectorRow('Capital FM UK (Online Radio Box)',ov.enable_capital_collector,                'ENABLE_CAPITAL_COLLECTOR')}
+            ${collectorRow('Capital FM UK (UK Radio Live)',   ov.enable_capital_ukradiolive_collector,    'ENABLE_CAPITAL_UKRADIOLIVE_COLLECTOR')}
+            ${collectorRow('KIIS-FM 102.7 (iHeart Web)',      ov.enable_kiis_iheart_web_collector,        'ENABLE_KIIS_IHEART_WEB_COLLECTOR')}
+            ${collectorRow('KIIS-FM 102.7 (Radiowave)',       ov.enable_kiis_radiowave_collector,         'ENABLE_KIIS_RADIOWAVE_COLLECTOR')}
+            ${collectorRow('Nightly Reconciliation',          ov.enable_nightly_reconciliation,           'ENABLE_NIGHTLY_RECONCILIATION')}
+            ${collectorRow('Nightly Report Generation',       ov.enable_nightly_report_generation,        'ENABLE_NIGHTLY_REPORT_GENERATION')}
           </tbody>
         </table>
       </div>

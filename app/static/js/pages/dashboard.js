@@ -1,5 +1,5 @@
 import { API } from '../api.js';
-import { fmtRelative, badge, esc } from '../ui.js';
+import { fmtRelative, fmtDateTime, badge, esc } from '../ui.js';
 
 export async function init(container) {
   container.innerHTML = '<div class="loader-center"><div class="loader" role="status" aria-label="Loading"></div></div>';
@@ -40,7 +40,7 @@ export async function init(container) {
         <span class="badge ${ov.scheduler_enabled ? 'badge-success' : 'badge-muted'}">SCHEDULER: ${ov.scheduler_enabled ? 'ON' : 'OFF'}</span>
         <span class="badge ${ov.enable_capital_collector ? 'badge-success' : 'badge-muted'}">CAPITAL: ${ov.enable_capital_collector ? 'ON' : 'OFF'}</span>
         <span class="badge ${ov.enable_nova_collector ? 'badge-success' : 'badge-muted'}">NOVA: ${ov.enable_nova_collector ? 'ON' : 'OFF'}</span>
-        <span class="badge ${ov.enable_kiis_collector ? 'badge-success' : 'badge-muted'}">KIIS: ${ov.enable_kiis_collector ? 'ON' : 'OFF'}</span>
+        <span class="badge ${(ov.enable_kiis_iheart_web_collector || ov.enable_kiis_radiowave_collector) ? 'badge-success' : 'badge-muted'}">KIIS: ${(ov.enable_kiis_iheart_web_collector || ov.enable_kiis_radiowave_collector) ? 'ON' : 'OFF'}</span>
       </div>
     </div>
 

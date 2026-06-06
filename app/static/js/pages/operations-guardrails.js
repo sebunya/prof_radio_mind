@@ -30,27 +30,57 @@ export async function init(container, actions) {
             </span>
           </div>
           <div style="display:flex;justify-content:space-between;border-bottom:1px solid var(--border2);padding-bottom:6px">
-            <span class="text-2">Capital FM UK Collector</span>
-            <span class="badge ${ops.enable_capital_collector ? 'badge-success' : 'badge-muted'}">
-              ${ops.enable_capital_collector ? 'ENABLED' : 'DISABLED'}
-            </span>
-          </div>
-          <div style="display:flex;justify-content:space-between;border-bottom:1px solid var(--border2);padding-bottom:6px">
-            <span class="text-2">Nova 96.9 Collector</span>
+            <span class="text-2">Nova 96.9 (Radiowave)</span>
             <span class="badge ${ops.enable_nova_collector ? 'badge-success' : 'badge-muted'}">
               ${ops.enable_nova_collector ? 'ENABLED' : 'DISABLED'}
             </span>
           </div>
           <div style="display:flex;justify-content:space-between;border-bottom:1px solid var(--border2);padding-bottom:6px">
-            <span class="text-2">KIIS-FM Collector</span>
-            <span class="badge ${ops.enable_kiis_collector ? 'badge-success' : 'badge-muted'}">
-              ${ops.enable_kiis_collector ? 'ENABLED' : 'DISABLED'}
+            <span class="text-2">Nova 96.9 (Radoxo)</span>
+            <span class="badge ${ops.enable_nova_radoxo_collector ? 'badge-success' : 'badge-muted'}">
+              ${ops.enable_nova_radoxo_collector ? 'ENABLED' : 'DISABLED'}
             </span>
           </div>
           <div style="display:flex;justify-content:space-between;border-bottom:1px solid var(--border2);padding-bottom:6px">
-            <span class="text-2">Nightly Reconciliation Task</span>
+            <span class="text-2">Nova 96.9 (Radio Australia)</span>
+            <span class="badge ${ops.enable_nova_radio_australia_collector ? 'badge-success' : 'badge-muted'}">
+              ${ops.enable_nova_radio_australia_collector ? 'ENABLED' : 'DISABLED'}
+            </span>
+          </div>
+          <div style="display:flex;justify-content:space-between;border-bottom:1px solid var(--border2);padding-bottom:6px">
+            <span class="text-2">Capital FM UK (Online Radio Box)</span>
+            <span class="badge ${ops.enable_capital_collector ? 'badge-success' : 'badge-muted'}">
+              ${ops.enable_capital_collector ? 'ENABLED' : 'DISABLED'}
+            </span>
+          </div>
+          <div style="display:flex;justify-content:space-between;border-bottom:1px solid var(--border2);padding-bottom:6px">
+            <span class="text-2">Capital FM UK (UK Radio Live)</span>
+            <span class="badge ${ops.enable_capital_ukradiolive_collector ? 'badge-success' : 'badge-muted'}">
+              ${ops.enable_capital_ukradiolive_collector ? 'ENABLED' : 'DISABLED'}
+            </span>
+          </div>
+          <div style="display:flex;justify-content:space-between;border-bottom:1px solid var(--border2);padding-bottom:6px">
+            <span class="text-2">KIIS-FM 102.7 (iHeart Web)</span>
+            <span class="badge ${ops.enable_kiis_iheart_web_collector ? 'badge-success' : 'badge-muted'}">
+              ${ops.enable_kiis_iheart_web_collector ? 'ENABLED' : 'DISABLED'}
+            </span>
+          </div>
+          <div style="display:flex;justify-content:space-between;border-bottom:1px solid var(--border2);padding-bottom:6px">
+            <span class="text-2">KIIS-FM 102.7 (Radiowave)</span>
+            <span class="badge ${ops.enable_kiis_radiowave_collector ? 'badge-success' : 'badge-muted'}">
+              ${ops.enable_kiis_radiowave_collector ? 'ENABLED' : 'DISABLED'}
+            </span>
+          </div>
+          <div style="display:flex;justify-content:space-between;border-bottom:1px solid var(--border2);padding-bottom:6px">
+            <span class="text-2">Nightly Reconciliation</span>
             <span class="badge ${ops.enable_nightly_reconciliation ? 'badge-success' : 'badge-muted'}">
               ${ops.enable_nightly_reconciliation ? 'ENABLED' : 'DISABLED'}
+            </span>
+          </div>
+          <div style="display:flex;justify-content:space-between;border-bottom:1px solid var(--border2);padding-bottom:6px">
+            <span class="text-2">Nightly Report Generation</span>
+            <span class="badge ${ops.enable_nightly_report_generation ? 'badge-success' : 'badge-muted'}">
+              ${ops.enable_nightly_report_generation ? 'ENABLED' : 'DISABLED'}
             </span>
           </div>
         </div>

@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+import uuid
 from datetime import datetime
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -90,6 +91,26 @@ class RecentEventResponse(BaseModel):
     played_at: datetime
     is_duplicate: bool
     fingerprint: str | None
+
+
+class PlayEventListItem(BaseModel):
+    id: str
+    station_id: str
+    station_name: str
+    station_call_sign: str
+    raw_artist: str
+    raw_title: str
+    played_at: datetime
+    is_duplicate: bool
+    fingerprint: str | None
+    attribution: str | None
+
+
+class PlayEventsPageResponse(BaseModel):
+    items: list[PlayEventListItem]
+    total: int
+    limit: int
+    offset: int
 
 
 class SourceHealthResponse(BaseModel):
@@ -309,6 +330,76 @@ async def get_recent_events(
         import logging
         logging.getLogger(__name__).warning("admin_recent_events_db_error: %s", e)
         return []
+
+
+@router.get("/play-events", response_model=PlayEventsPageResponse)
+async def list_play_events(
+    station_id: str | None = Query(default=None),
+    date_from: str | None = Query(default=None, description="ISO date YYYY-MM-DD"),
+    date_to: str | None = Query(default=None, description="ISO date YYYY-MM-DD inclusive"),
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    session: AsyncSession = Depends(get_db),
+) -> PlayEventsPageResponse:
+    try:
+        count_q = select(func.count()).select_from(PlayEventDB)
+        items_q = (
+            select(PlayEventDB, StationModel)
+            .join(StationModel, PlayEventDB.station_id == StationModel.id)
+        )
+
+        if station_id:
+            try:
+                sid = uuid.UUID(station_id)
+                count_q = count_q.where(PlayEventDB.station_id == sid)
+                items_q = items_q.where(PlayEventDB.station_id == sid)
+            except ValueError:
+                pass
+
+        if date_from:
+            try:
+                d = datetime.strptime(date_from, "%Y-%m-%d")
+                count_q = count_q.where(PlayEventDB.played_at >= d)
+                items_q = items_q.where(PlayEventDB.played_at >= d)
+            except ValueError:
+                pass
+
+        if date_to:
+            try:
+                d = datetime.strptime(date_to + " 23:59:59", "%Y-%m-%d %H:%M:%S")
+                count_q = count_q.where(PlayEventDB.played_at <= d)
+                items_q = items_q.where(PlayEventDB.played_at <= d)
+            except ValueError:
+                pass
+
+        total = (await session.execute(count_q)).scalar() or 0
+        items_q = items_q.order_by(PlayEventDB.played_at.desc()).limit(limit).offset(offset)
+        rows = (await session.execute(items_q)).all()
+
+        return PlayEventsPageResponse(
+            items=[
+                PlayEventListItem(
+                    id=str(event.id),
+                    station_id=str(event.station_id),
+                    station_name=station.name,
+                    station_call_sign=station.call_sign,
+                    raw_artist=event.raw_artist,
+                    raw_title=event.raw_title,
+                    played_at=event.played_at,
+                    is_duplicate=event.is_duplicate,
+                    fingerprint=event.fingerprint,
+                    attribution=event.attribution,
+                )
+                for event, station in rows
+            ],
+            total=total,
+            limit=limit,
+            offset=offset,
+        )
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning("admin_play_events_db_error: %s", e)
+        return PlayEventsPageResponse(items=[], total=0, limit=limit, offset=offset)
 
 
 @router.get("/source-health", response_model=list[SourceHealthResponse])
