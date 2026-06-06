@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
@@ -27,10 +28,30 @@ from app.infrastructure.scheduler.scheduler import build_scheduler
 
 logger = logging.getLogger(__name__)
 
+_ALEMBIC_INI = Path(__file__).parent.parent / "alembic.ini"
+
+
+def _migrate_db() -> None:
+    """Run alembic upgrade head (sync — call via asyncio.to_thread)."""
+    from alembic import command
+    from alembic.config import Config
+
+    cfg = Config(str(_ALEMBIC_INI))
+    command.upgrade(cfg, "head")
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    import asyncio
+
     configure_logging()
+
+    # Run database migrations (idempotent — safe on every startup)
+    try:
+        await asyncio.to_thread(_migrate_db)
+        logger.info("db_migrations_complete")
+    except Exception as exc:
+        logger.warning("db_migrations_failed error=%s (continuing)", exc)
 
     # Seed DB (idempotent — safe to run on every startup)
     try:
