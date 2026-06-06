@@ -27,6 +27,8 @@ from app.domain.entities.no_track_event import NoTrackEvent
 from app.domain.entities.play_event import PlayEvent
 from app.domain.value_objects.raw_payload import RawPayload
 
+_DEFAULT_REQUEST_TIMEOUT = 30.0
+
 
 @dataclass
 class CollectorResult:
@@ -153,3 +155,32 @@ class BaseCollector(ABC):
             content_type=content_type,
             http_status=http_status,
         )
+
+
+class SimpleHTTPCollector(BaseCollector):
+    """Intermediate base for collectors that issue a single unconditional GET request.
+
+    Subclasses set _DEFAULT_URL and _REQUEST_TIMEOUT at the class level, then only
+    need to implement parse(). fetch_raw() and __init__ are provided here.
+    """
+
+    _DEFAULT_URL: str = ""
+    _REQUEST_TIMEOUT: float = _DEFAULT_REQUEST_TIMEOUT
+
+    def __init__(
+        self,
+        source_id: uuid.UUID,
+        station_id: uuid.UUID,
+        *,
+        url: str | None = None,
+        storage_root: str = "/data/raw_payloads",
+    ) -> None:
+        super().__init__(source_id, station_id, storage_root=storage_root)
+        self.url = url if url is not None else self._DEFAULT_URL
+
+    async def fetch_raw(self) -> tuple[bytes, int | None, str | None]:
+        from app.infrastructure.http.client import build_client
+
+        async with await build_client(timeout=self._REQUEST_TIMEOUT) as client:
+            response = await client.get(self.url)
+        return response.content, response.status_code, response.headers.get("content-type")

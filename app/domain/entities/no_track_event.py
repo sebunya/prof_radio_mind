@@ -9,6 +9,7 @@ from enum import StrEnum
 class NoTrackReason(StrEnum):
     COMMERCIAL_BREAK_OR_TALK = "commercial_break_or_talk"
     SOURCE_HTTP_204 = "source_http_204"
+    SOURCE_HTTP_ERROR = "source_http_error"
     PARSE_FAILURE = "parse_failure"
     UNKNOWN = "unknown"
 

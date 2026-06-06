@@ -16,18 +16,13 @@ import json
 import logging
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from bs4 import BeautifulSoup, Tag
 
-logger = logging.getLogger(__name__)
+from app.infrastructure.parsers._json_utils import find_track_list
 
-_TRACK_LIST_KEYS = frozenset({
-    "recentlyPlayedSongs", "recentlyPlayed", "songHistory",
-    "playHistory", "songs", "tracks", "playlist",
-})
-_MAX_DEPTH = 10
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -35,27 +30,6 @@ class IHeartWebParseResult:
     title: str
     artist: str
     played_at: datetime
-
-
-def _find_track_list(data: Any, depth: int = 0) -> list | None:
-    """Recursively locate the first list that looks like a track list."""
-    if depth > _MAX_DEPTH:
-        return None
-    if isinstance(data, dict):
-        for key in _TRACK_LIST_KEYS:
-            val = data.get(key)
-            if isinstance(val, list) and val:
-                return val
-        for value in data.values():
-            found = _find_track_list(value, depth + 1)
-            if found is not None:
-                return found
-    elif isinstance(data, list):
-        for item in data:
-            found = _find_track_list(item, depth + 1)
-            if found is not None:
-                return found
-    return None
 
 
 def _extract_artist(item: dict) -> str:
@@ -93,7 +67,7 @@ def _try_next_data(soup: BeautifulSoup) -> list[IHeartWebParseResult] | None:
         logger.debug("iheart_web: __NEXT_DATA__ present but JSON is invalid")
         return None
 
-    raw_tracks = _find_track_list(data)
+    raw_tracks = find_track_list(data)
     if raw_tracks is None:
         logger.debug("iheart_web: __NEXT_DATA__ parsed but no track list key found")
         return None

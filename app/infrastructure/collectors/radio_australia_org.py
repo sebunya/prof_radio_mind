@@ -1,12 +1,11 @@
-"""Nova 96.9 radio-australia.org weekly chart collector.
+"""radio-australia.org weekly chart collector.
 
-Fetches https://www.radio-australia.org/nova-969 and extracts the
-server-side-rendered weekly top songs chart.
+Fetches https://www.radio-australia.org/{station-slug} and extracts the
+server-side-rendered weekly top songs chart. Usable for any station on
+that site — pass the full page URL at construction time.
 
 NOTE: played_at is synthetic (time of collection). These are chart positions
 representing plays over the preceding 7 days, not individual timed events.
-
-VAL-NOVA-RAO-001 validated SSR chart structure 2026-06-06.
 """
 
 from __future__ import annotations
@@ -16,33 +15,12 @@ from datetime import UTC, datetime
 
 from app.domain.entities.no_track_event import NoTrackEvent, NoTrackReason
 from app.domain.entities.play_event import PlayEvent
-from app.infrastructure.collectors.base import BaseCollector
+from app.infrastructure.collectors.base import SimpleHTTPCollector
 from app.infrastructure.parsers.radio_australia_org import parse_radio_australia_chart
 
-_DEFAULT_URL = "https://www.radio-australia.org/nova-969"
-_REQUEST_TIMEOUT = 30.0
 
-
-class NovaRadioAustraliaCollector(BaseCollector):
-    """Collects Nova 96.9 weekly chart from radio-australia.org."""
-
-    def __init__(
-        self,
-        source_id: uuid.UUID,
-        station_id: uuid.UUID,
-        *,
-        url: str = _DEFAULT_URL,
-        storage_root: str = "/data/raw_payloads",
-    ) -> None:
-        super().__init__(source_id, station_id, storage_root=storage_root)
-        self.url = url
-
-    async def fetch_raw(self) -> tuple[bytes, int | None, str | None]:
-        from app.infrastructure.http.client import build_client
-
-        async with await build_client(timeout=_REQUEST_TIMEOUT) as client:
-            response = await client.get(self.url)
-        return response.content, response.status_code, response.headers.get("content-type")
+class RadioAustraliaOrgCollector(SimpleHTTPCollector):
+    """Collects weekly chart data from radio-australia.org for any station."""
 
     def parse(
         self,
@@ -56,7 +34,7 @@ class NovaRadioAustraliaCollector(BaseCollector):
                 source_id=self.source_id,
                 collector_run_id=collector_run_id,
                 observed_at=datetime.now(tz=UTC),
-                reason=NoTrackReason.SOURCE_HTTP_204,
+                reason=NoTrackReason.SOURCE_HTTP_ERROR,
                 raw_http_status=http_status,
                 notes=f"radio-australia.org HTTP {http_status} — {self.url}",
             )
@@ -70,7 +48,7 @@ class NovaRadioAustraliaCollector(BaseCollector):
                 source_id=self.source_id,
                 collector_run_id=collector_run_id,
                 observed_at=collected_at,
-                reason=NoTrackReason.SOURCE_HTTP_204,
+                reason=NoTrackReason.PARSE_FAILURE,
                 raw_http_status=http_status,
                 notes="radio-australia.org: no chart items parsed",
             )

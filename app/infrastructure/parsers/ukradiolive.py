@@ -18,19 +18,15 @@ import logging
 import re
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
-from typing import Any
 from zoneinfo import ZoneInfo
 
 from bs4 import BeautifulSoup, Tag
 
+from app.infrastructure.parsers._json_utils import find_track_list
+
 logger = logging.getLogger(__name__)
 
 _LONDON = ZoneInfo("Europe/London")
-_TRACK_LIST_KEYS = frozenset({
-    "songs", "tracks", "playlist", "history", "recentTracks",
-    "recentlyPlayed", "nowPlaying", "playlistItems",
-})
-_MAX_DEPTH = 10
 _PLIST_TIME_RE = re.compile(r"(?:LIVE\s*-\s*)?(\d{1,2})\.(\d{2})\s+(\d{2}):(\d{2})")
 
 
@@ -40,26 +36,6 @@ class UKRadioLiveParseResult:
     artist: str
     played_at: datetime
     source_event_id: str | None = field(default=None)
-
-
-def _find_track_list(data: Any, depth: int = 0) -> list | None:
-    if depth > _MAX_DEPTH:
-        return None
-    if isinstance(data, dict):
-        for key in _TRACK_LIST_KEYS:
-            val = data.get(key)
-            if isinstance(val, list) and val:
-                return val
-        for value in data.values():
-            found = _find_track_list(value, depth + 1)
-            if found is not None:
-                return found
-    elif isinstance(data, list):
-        for item in data:
-            found = _find_track_list(item, depth + 1)
-            if found is not None:
-                return found
-    return None
 
 
 def _extract_played_at(item: dict) -> datetime:
@@ -88,7 +64,7 @@ def _try_next_data(soup: BeautifulSoup) -> list[UKRadioLiveParseResult] | None:
         logger.debug("ukradiolive: __NEXT_DATA__ present but JSON invalid")
         return None
 
-    raw_tracks = _find_track_list(data)
+    raw_tracks = find_track_list(data)
     if raw_tracks is None:
         logger.debug("ukradiolive: __NEXT_DATA__ parsed but no track list found")
         return None

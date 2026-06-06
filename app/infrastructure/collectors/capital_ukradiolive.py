@@ -13,33 +13,14 @@ from datetime import UTC, datetime
 
 from app.domain.entities.no_track_event import NoTrackEvent, NoTrackReason
 from app.domain.entities.play_event import PlayEvent
-from app.infrastructure.collectors.base import BaseCollector
+from app.infrastructure.collectors.base import SimpleHTTPCollector
 from app.infrastructure.parsers.ukradiolive import parse_ukradiolive_playlist
 
-_DEFAULT_URL = "https://ukradiolive.com/capital-fm/playlist"
-_REQUEST_TIMEOUT = 30.0
 
-
-class CapitalUKRadioLiveCollector(BaseCollector):
+class CapitalUKRadioLiveCollector(SimpleHTTPCollector):
     """Collects Capital FM recently-played tracks from ukradiolive.com."""
 
-    def __init__(
-        self,
-        source_id: uuid.UUID,
-        station_id: uuid.UUID,
-        *,
-        url: str = _DEFAULT_URL,
-        storage_root: str = "/data/raw_payloads",
-    ) -> None:
-        super().__init__(source_id, station_id, storage_root=storage_root)
-        self.url = url
-
-    async def fetch_raw(self) -> tuple[bytes, int | None, str | None]:
-        from app.infrastructure.http.client import build_client
-
-        async with await build_client(timeout=_REQUEST_TIMEOUT) as client:
-            response = await client.get(self.url)
-        return response.content, response.status_code, response.headers.get("content-type")
+    _DEFAULT_URL = "https://ukradiolive.com/capital-fm/playlist"
 
     def parse(
         self,
@@ -53,7 +34,7 @@ class CapitalUKRadioLiveCollector(BaseCollector):
                 source_id=self.source_id,
                 collector_run_id=collector_run_id,
                 observed_at=datetime.now(tz=UTC),
-                reason=NoTrackReason.SOURCE_HTTP_204,
+                reason=NoTrackReason.SOURCE_HTTP_ERROR,
                 raw_http_status=http_status,
                 notes=f"ukradiolive HTTP {http_status} — {self.url}",
             )
@@ -66,7 +47,7 @@ class CapitalUKRadioLiveCollector(BaseCollector):
                 source_id=self.source_id,
                 collector_run_id=collector_run_id,
                 observed_at=datetime.now(tz=UTC),
-                reason=NoTrackReason.SOURCE_HTTP_204,
+                reason=NoTrackReason.PARSE_FAILURE,
                 raw_http_status=http_status,
                 notes="ukradiolive: no tracks parsed — inspect raw HTML",
             )
@@ -80,6 +61,7 @@ class CapitalUKRadioLiveCollector(BaseCollector):
                 played_at=r.played_at,
                 raw_artist=r.artist,
                 raw_title=r.title,
+                source_event_id=r.source_event_id,
                 attribution="ukradiolive",
             )
             for r in results
