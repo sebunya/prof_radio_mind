@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import uuid
 from datetime import datetime
 
@@ -23,6 +24,8 @@ from app.infrastructure.database.models.sources import (
 )
 from app.infrastructure.database.models.stations import Station as StationModel
 from app.infrastructure.database.session import get_db
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -126,6 +129,10 @@ class SourceHealthResponse(BaseModel):
     latest_validation_code: str | None
     latest_validated_at: datetime | None
     latest_response_status_code: int | None
+
+
+class ReviewCountResponse(BaseModel):
+    pending: int
 
 
 class ReviewSummaryResponse(BaseModel):
@@ -234,8 +241,7 @@ async def get_overview(session: AsyncSession = Depends(get_db)) -> OverviewRespo
         )
         pending_reviews = (await session.execute(reviews_q)).scalar() or 0
     except Exception as e:
-        import logging
-        logging.getLogger(__name__).warning("admin_overview_db_error: %s", e)
+        logger.warning("admin_overview_db_error: %s", e)
 
     # 4. Count active webhooks from the Webhook Store (in-memory subscription cache)
     active_webhooks = 0
@@ -327,8 +333,7 @@ async def get_recent_events(
             for event, station in rows
         ]
     except Exception as e:
-        import logging
-        logging.getLogger(__name__).warning("admin_recent_events_db_error: %s", e)
+        logger.warning("admin_recent_events_db_error: %s", e)
         return []
 
 
@@ -397,8 +402,7 @@ async def list_play_events(
             offset=offset,
         )
     except Exception as e:
-        import logging
-        logging.getLogger(__name__).warning("admin_play_events_db_error: %s", e)
+        logger.warning("admin_play_events_db_error: %s", e)
         return PlayEventsPageResponse(items=[], total=0, limit=limit, offset=offset)
 
 
@@ -407,46 +411,61 @@ async def get_source_health(
     session: AsyncSession = Depends(get_db),
 ) -> list[SourceHealthResponse]:
     try:
-        # Query all active sources
+        # 1. Fetch all sources + stations in one query
         stmt = (
             select(SourceModel, StationModel)
             .join(StationModel, SourceModel.station_id == StationModel.id)
             .order_by(StationModel.call_sign, SourceModel.source_type)
         )
-        result = await session.execute(stmt)
-        rows = result.all()
+        rows = (await session.execute(stmt)).all()
+
+        if not rows:
+            return []
+
+        source_ids = [s.id for s, _ in rows]
+
+        # 2. Bulk fetch active priorities for all sources
+        prio_rows = (
+            await session.execute(
+                select(SourceRoutePriority.source_id, SourceRoutePriority.priority)
+                .where(
+                    SourceRoutePriority.source_id.in_(source_ids),
+                    SourceRoutePriority.is_active.is_(True),
+                )
+            )
+        ).all()
+        priority_map: dict = {str(r.source_id): r.priority for r in prio_rows}
+
+        # 3. Bulk fetch all validations; keep latest per source in Python
+        val_rows = (
+            await session.execute(
+                select(SourceValidation)
+                .where(SourceValidation.source_id.in_(source_ids))
+                .order_by(SourceValidation.validated_at.desc())
+            )
+        ).scalars().all()
+        validation_map: dict = {}
+        for v in val_rows:
+            sid = str(v.source_id)
+            if sid not in validation_map:
+                validation_map[sid] = v
 
         health_list = []
         for source, station in rows:
-            # Load priority
-            p_stmt = select(SourceRoutePriority.priority).where(
-                SourceRoutePriority.source_id == source.id,
-                SourceRoutePriority.is_active.is_(True)
-            ).limit(1)
-            priority = (await session.execute(p_stmt)).scalar() or 99
-
-            # Load latest validation run
-            val_stmt = (
-                select(SourceValidation)
-                .where(SourceValidation.source_id == source.id)
-                .order_by(SourceValidation.validated_at.desc())
-                .limit(1)
-            )
-            val = (await session.execute(val_stmt)).scalar_one_or_none()
-
+            sid = str(source.id)
+            val = validation_map.get(sid)
             st = source.source_type
             src_type = st if isinstance(st, str) else st.value
-
             health_list.append(
                 SourceHealthResponse(
-                    id=str(source.id),
+                    id=sid,
                     station_id=str(source.station_id),
                     station_call_sign=station.call_sign,
                     source_type=src_type,
                     name=source.name,
                     base_url=source.base_url,
                     is_active=source.is_active,
-                    priority=priority,
+                    priority=priority_map.get(sid, 99),
                     latest_validation_status=val.status if val else None,
                     latest_validation_code=val.validation_code if val else None,
                     latest_validated_at=val.validated_at if val else None,
@@ -456,9 +475,25 @@ async def get_source_health(
 
         return health_list
     except Exception as e:
-        import logging
-        logging.getLogger(__name__).warning("admin_source_health_db_error: %s", e)
+        logger.warning("admin_source_health_db_error: %s", e)
         return []
+
+
+@router.get("/review-count", response_model=ReviewCountResponse)
+async def get_review_count(
+    session: AsyncSession = Depends(get_db),
+) -> ReviewCountResponse:
+    try:
+        q = (
+            select(func.count())
+            .select_from(ReviewItemModel)
+            .where(ReviewItemModel.status == "pending")
+        )
+        count = (await session.execute(q)).scalar() or 0
+        return ReviewCountResponse(pending=count)
+    except Exception as e:
+        logger.warning("admin_review_count_db_error: %s", e)
+        return ReviewCountResponse(pending=0)
 
 
 @router.get("/review-summary", response_model=ReviewSummaryResponse)
@@ -477,8 +512,7 @@ async def get_review_summary(
             escalated=counts.get("escalated", 0),
         )
     except Exception as e:
-        import logging
-        logging.getLogger(__name__).warning("admin_review_summary_db_error: %s", e)
+        logger.warning("admin_review_summary_db_error: %s", e)
         return ReviewSummaryResponse(pending=0, reviewed=0, dismissed=0, escalated=0)
 
 
@@ -493,8 +527,7 @@ async def get_enrichment_status(
         total_q = select(func.count()).select_from(PlayEventDB)
         total_plays = (await session.execute(total_q)).scalar() or 0
     except Exception as e:
-        import logging
-        logging.getLogger(__name__).warning("admin_enrichment_status_db_error: %s", e)
+        logger.warning("admin_enrichment_status_db_error: %s", e)
 
     return EnrichmentSummaryResponse(
         spotify_metadata_enrichment_enabled=settings.spotify_metadata_enrichment_enabled,
@@ -603,6 +636,5 @@ async def get_collector_runs(
             for run, station, source in rows
         ]
     except Exception as e:
-        import logging
-        logging.getLogger(__name__).warning("admin_collector_runs_db_error: %s", e)
+        logger.warning("admin_collector_runs_db_error: %s", e)
         return []

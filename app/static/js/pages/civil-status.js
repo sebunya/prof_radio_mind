@@ -2,7 +2,7 @@
  * Civil Status & Life Events — service directory for NIRA, URSB, and CivicGate.
  * Purely informational; links out to official Ugandan government portals.
  */
-import { esc } from '../ui.js';
+import { serviceCard, notesCard } from '../civic-utils.js';
 
 export async function init(container, actions) {
   actions.innerHTML = '';
@@ -133,56 +133,11 @@ export async function init(container, actions) {
       })}
     </div>
 
-    <div class="card mt-5" style="font-size:12px;color:var(--text3)">
-      <div class="card-header"><span class="card-title" style="font-size:12px">Important Notes</span></div>
-      <ul style="padding-left:18px;line-height:1.9;margin:0">
-        <li>All fees quoted are indicative and subject to change. Confirm current fees on the official portal before payment.</li>
-        <li>NIRA maintains biometric registration centres across all districts. Walk-in visits remain available for document collection.</li>
-        <li>CivicGate provides a single sign-on for multiple government services. Create one account to access NIRA, URSB, and other agencies.</li>
-        <li>Late birth registrations (older than 12 months) require an investigation and may be referred to the Registrar General.</li>
-      </ul>
-    </div>`;
+    ${notesCard([
+      'All fees quoted are indicative and subject to change. Confirm current fees on the official portal before payment.',
+      'NIRA maintains biometric registration centres across all districts. Walk-in visits remain available for document collection.',
+      'CivicGate provides a single sign-on for multiple government services. Create one account to access NIRA, URSB, and other agencies.',
+      'Late birth registrations (older than 12 months) require an investigation and may be referred to the Registrar General.',
+    ])}`;
 }
 
-function serviceCard({ title, authorities, description, processingTime, fee, documents, steps, portals }) {
-  return `
-    <div style="border:1px solid var(--border);border-radius:var(--r);padding:20px;background:var(--bg2);display:flex;flex-direction:column;gap:14px">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px">
-        <h3 style="font-size:15px;font-weight:600;color:var(--text);margin:0">${esc(title)}</h3>
-        <div style="display:flex;gap:5px;flex-wrap:wrap">
-          ${authorities.map(a => `<span class="badge badge-accent" style="font-size:9px;padding:2px 7px">${esc(a)}</span>`).join('')}
-        </div>
-      </div>
-
-      <p style="font-size:13px;color:var(--text2);line-height:1.55;margin:0">${esc(description)}</p>
-
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-        <div style="background:rgba(255,255,255,.025);border:1px solid var(--border);border-radius:4px;padding:10px">
-          <div style="font-size:10px;color:var(--text3);margin-bottom:3px;text-transform:uppercase;letter-spacing:.4px">Processing Time</div>
-          <div style="font-size:12px;color:var(--text);font-weight:500">${esc(processingTime)}</div>
-        </div>
-        <div style="background:rgba(255,255,255,.025);border:1px solid var(--border);border-radius:4px;padding:10px">
-          <div style="font-size:10px;color:var(--text3);margin-bottom:3px;text-transform:uppercase;letter-spacing:.4px">Government Fee</div>
-          <div style="font-size:12px;color:var(--text);font-weight:500">${esc(fee)}</div>
-        </div>
-      </div>
-
-      <div>
-        <div style="font-size:10px;color:var(--text3);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px;font-weight:600">Required Documents</div>
-        <ul style="font-size:12px;color:var(--text2);line-height:1.85;padding-left:16px;margin:0">
-          ${documents.map(d => `<li>${esc(d)}</li>`).join('')}
-        </ul>
-      </div>
-
-      <div>
-        <div style="font-size:10px;color:var(--text3);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px;font-weight:600">How to Apply</div>
-        <ol style="font-size:12px;color:var(--text2);line-height:1.85;padding-left:16px;margin:0">
-          ${steps.map(s => `<li>${esc(s)}</li>`).join('')}
-        </ol>
-      </div>
-
-      <div style="display:flex;gap:8px;flex-wrap:wrap;padding-top:8px;border-top:1px solid var(--border)">
-        ${portals.map(p => `<a href="${p.url}" target="_blank" rel="noopener noreferrer" class="btn ${p.primary ? 'btn-primary' : 'btn-ghost'} btn-sm">${esc(p.label)} ↗</a>`).join('')}
-      </div>
-    </div>`;
-}

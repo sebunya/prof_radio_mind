@@ -115,7 +115,7 @@ async function refreshEnvBadge() {
   try {
     const data  = await API.adminOverview();
     const badge = document.getElementById('env-badge');
-    const env   = data.environment || 'unknown';
+    const env   = data.app_env || 'unknown';
     badge.textContent = env.toUpperCase();
     badge.className   = `env-badge ${
       env === 'production' ? 'env-prod' :
@@ -130,11 +130,10 @@ async function refreshEnvBadge() {
 // ── Pending review badge ─────────────────────────────────────────
 async function refreshPendingBadge() {
   try {
-    const items = await API.reviewItems('pending');
+    const { pending } = await API.adminReviewCount();
     const badge = document.getElementById('nav-pending-badge');
-    const n = items.length;
-    if (n > 0) {
-      badge.textContent = n > 99 ? '99+' : String(n);
+    if (pending > 0) {
+      badge.textContent = pending > 99 ? '99+' : String(pending);
       badge.hidden = false;
     } else {
       badge.hidden = true;

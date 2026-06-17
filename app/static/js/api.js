@@ -90,6 +90,7 @@ export const API = {
     return apiCall('GET', `/api/admin/play-events${qs ? '?' + qs : ''}`);
   },
   adminSourceHealth: () => apiCall('GET', '/api/admin/source-health'),
+  adminReviewCount: () => apiCall('GET', '/api/admin/review-count'),
   adminReviewSummary: () => apiCall('GET', '/api/admin/review-summary'),
   adminEnrichmentStatus: () => apiCall('GET', '/api/admin/enrichment-status'),
   adminSpotifyReadiness: () => apiCall('GET', '/api/admin/spotify-readiness'),

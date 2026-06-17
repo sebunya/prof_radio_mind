@@ -118,25 +118,29 @@ def test_source_health_200(client_with_db) -> None:
     mock_result_sources = MagicMock()
     mock_result_sources.all.return_value = [(mock_source, mock_station)]
 
-    # execute side effects:
-    # 1. Sources query
-    # 2. Priority query
-    # 3. Validation query
+    # execute side effects (now 3 bulk queries):
+    # 1. Sources + stations JOIN
+    # 2. Bulk priorities (.all())
+    # 3. Bulk validations (.scalars().all())
+    mock_prio_row = MagicMock()
+    mock_prio_row.source_id = mock_source.id
+    mock_prio_row.priority = 1
     mock_priority = MagicMock()
-    mock_priority.scalar.return_value = 1
+    mock_priority.all.return_value = [mock_prio_row]
 
-    mock_validation = MagicMock()
     mock_validation_row = MagicMock()
+    mock_validation_row.source_id = mock_source.id
     mock_validation_row.status = "validated"
     mock_validation_row.validation_code = "VAL-KIIS-001"
     mock_validation_row.validated_at = datetime.now(UTC)
     mock_validation_row.response_status_code = 200
-    mock_validation.scalar_one_or_none.return_value = mock_validation_row
+    mock_validation = MagicMock()
+    mock_validation.scalars.return_value.all.return_value = [mock_validation_row]
 
     session.execute = AsyncMock(side_effect=[
         mock_result_sources,
         mock_priority,
-        mock_validation
+        mock_validation,
     ])
 
     r = client.get("/api/admin/source-health")
